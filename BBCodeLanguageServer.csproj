@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <BaseOutputPath>C:\Users\bazsi\.vscode\extensions\bbc\server</BaseOutputPath>
+    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="GuiLabs.Language.Xml" Version="1.2.60" />
+    <PackageReference Include="LanguageServerProtocol" Version="7.0.1" />
+    <PackageReference Include="OmniSharp.Extensions.LanguageProtocol" Version="0.19.7" />
+    <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BBCode\BBCode.csproj" />
+  </ItemGroup>
+
+</Project>

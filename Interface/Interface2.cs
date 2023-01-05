@@ -283,7 +283,7 @@ namespace BBCodeLanguageServer.Interface
             Server.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
             {
                 Uri = uri,
-                Diagnostics = diagnostics_
+                Diagnostics = diagnostics_,
             });
         }
 

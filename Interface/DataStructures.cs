@@ -307,6 +307,7 @@ namespace BBCodeLanguageServer.Interface
         });
     }
 
+#pragma warning disable CS0618 // Type or member is obsolete
     internal class HoverContent : IConvertable1<MarkedString>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.MarkedString>
     {
         internal string Lang;
@@ -320,6 +321,7 @@ namespace BBCodeLanguageServer.Interface
 
         OmniSharp.Extensions.LanguageServer.Protocol.Models.MarkedString IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.MarkedString>.Convert2() => new(Lang, Text);
     }
+#pragma warning restore CS0618 // Type or member is obsolete
 
     internal class HoverInfo : IConvertable1<Hover>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.Hover>
     {
@@ -345,26 +347,57 @@ namespace BBCodeLanguageServer.Interface
 
     internal class FilePosition : IConvertable1<Location>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationOrLocationLink>
     {
-        internal IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> Range;
-        internal System.Uri Uri;
+        /// <summary>
+        /// Span of the origin of this link.<br/><br/>
+        /// Used as the underlined span for mouse interaction. Defaults to the word range at the mouse position.
+        /// </summary>
+        internal IngameCoding.Core.Range<IngameCoding.Core.SinglePosition>? OriginRange;
+        /// <summary>
+        /// The full target range of this link. If the target for example is a symbol
+        /// then target range is the range enclosing this symbol not including
+        /// leading/trailing whitespace but everything else like comments.
+        /// This information is typically used to highlight the range in the editor.
+        /// </summary>
+        internal IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> TargetRange;
+        /// <summary>
+        /// The target resource identifier of this link.
+        /// </summary>
+        internal System.Uri TargetUri;
 
-        public FilePosition(IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> range, System.Uri uri)
+        public FilePosition(IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> targetRange, System.Uri targetUri)
         {
-            Range = range;
-            Uri = uri;
+            TargetRange = targetRange;
+            TargetUri = targetUri;
+            OriginRange = null;
+        }
+
+        public FilePosition(IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> originRange, IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> targetRange, System.Uri targetUri)
+        {
+            TargetRange = targetRange;
+            TargetUri = targetUri;
+            OriginRange = originRange;
         }
 
         public Location Convert1() => new()
         {
-            range = Range.Convert1(),
-            uri = Uri,
+            range = TargetRange.Convert1(),
+            uri = TargetUri,
         };
 
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationOrLocationLink IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationOrLocationLink>.Convert2() => new(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Location()
-        {
-            Range = Range.Convert2(),
-            Uri = Uri,
-        });
+        OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationOrLocationLink IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationOrLocationLink>.Convert2() => 
+            OriginRange.HasValue ?
+            new(new OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationLink()
+            {
+                TargetRange = TargetRange.Convert2(),
+                TargetUri = TargetUri,
+                OriginSelectionRange = OriginRange.Value.Convert2(),
+            })
+            :
+            new(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Location()
+            {
+                Range = TargetRange.Convert2(),
+                Uri = TargetUri,
+            });
     }
 
     internal class DiagnosticInfo : IConvertable1<Diagnostic>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>

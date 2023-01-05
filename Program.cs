@@ -18,10 +18,12 @@ namespace BBCodeLanguageServer
         {
             ServiceAppInterface2 serviceAppInterface = new();
             Console.OutputEncoding = new System.Text.UTF8Encoding(); // UTF8N for non-Windows platform
-            DocumentInterface app = new(serviceAppInterface);
+            _ = new DocumentInterface(serviceAppInterface);
             try
             {
-                serviceAppInterface.Create().Wait();
+#pragma warning disable VSTHRD002
+                serviceAppInterface.CreateAsync().Wait();
+#pragma warning restore VSTHRD002
             }
             catch (AggregateException ex)
             {

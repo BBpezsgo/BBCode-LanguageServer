@@ -236,57 +236,36 @@ namespace BBCodeLanguageServer
                 }
             }
 
-            try
+            for (int i = 0; i < AnalysisResult.Warnings.Length; i++)
             {
-                for (int i = 0; i < AnalysisResult.Warnings.Length; i++)
+                var warning = AnalysisResult.Warnings[i];
+
+                if (warning.File != path && warning.File != null) continue;
+
+                diagnostics.Add(new DiagnosticInfo
                 {
-                    var warning = AnalysisResult.Warnings[i];
-
-                    if (warning.File != path && warning.File != null) continue;
-
-                    diagnostics.Add(new DiagnosticInfo
-                    {
-                        severity = DiagnosticSeverity.Warning,
-                        range = warning.position.Convert1(),
-                        message = warning.Message,
-                    });
-                }
-            }
-            catch (NullReferenceException)
-            {
-                Logger.Warn($"NullReferenceException");
+                    severity = DiagnosticSeverity.Warning,
+                    range = warning.position.Convert1(),
+                    message = warning.Message,
+                });
             }
 
-            try
+            for (int i = 0; i < AnalysisResult.Hints.Length; i++)
             {
-                for (int i = 0; i < AnalysisResult.Hints.Length; i++)
-                {
-                    var hint = AnalysisResult.Hints[i];
+                var hint = AnalysisResult.Hints[i];
 
-                    if (hint.File != path && hint.File != null) continue;
+                if (hint.File != path && hint.File != null) continue;
 
-                    diagnostics.Add(DiagnostizeHint(hint, "Compiler"));
-                }
+                diagnostics.Add(DiagnostizeHint(hint, "Compiler"));
             }
-            catch (NullReferenceException)
+            
+            for (int i = 0; i < AnalysisResult.Informations.Length; i++)
             {
-                Logger.Warn($"NullReferenceException");
-            }
+                var information = AnalysisResult.Informations[i];
 
-            try
-            {
-                for (int i = 0; i < AnalysisResult.Informations.Length; i++)
-                {
-                    var information = AnalysisResult.Informations[i];
+                if (information.File != path && information.File != null) continue;
 
-                    if (information.File != path && information.File != null) continue;
-
-                    diagnostics.Add(DiagnostizeInformation(information, "Compiler"));
-                }
-            }
-            catch (NullReferenceException)
-            {
-                Logger.Warn($"NullReferenceException");
+                diagnostics.Add(DiagnostizeInformation(information, "Compiler"));
             }
 
             App.Interface.PublishDiagnostics(e.Uri, diagnostics.ToArray());
@@ -433,7 +412,7 @@ namespace BBCodeLanguageServer
                 return new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"{text} {(IsDefinition ? "// Function definition" : "// Function call")}",
+                    Text = $"{text} {(IsDefinition ? "// Function Definition" : "// Function Call")}",
                 };
             }
             static HoverContent InfoStructDefinition(StructDefinition structDef)
@@ -441,7 +420,7 @@ namespace BBCodeLanguageServer
                 return new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"struct {structDef.FullName} // Struct definition",
+                    Text = $"struct {structDef.FullName} // Struct Definition",
                 };
             }
             static bool InfoReachedUnit(Token token, out HoverContent result)
@@ -543,7 +522,7 @@ namespace BBCodeLanguageServer
                                     addComma = true;
                                 }
 
-                                newContentText += $")";
+                                newContentText += $") // Function Call";
 
                                 result.Add(new HoverContent()
                                 {
@@ -805,6 +784,35 @@ namespace BBCodeLanguageServer
                         Contents = result.ToArray(),
                     };
                 }
+
+                for (int i = 0; i < AnalysisResult.ParserResult.Usings.Count; i++)
+                {
+                    UsingDefinition usingItem = AnalysisResult.ParserResult.Usings[i];
+
+                    foreach (var pathToken in usingItem.Path)
+                    {
+                        if (!pathToken.Position.Contains(pos)) continue;
+
+                        Logger.Log($"Hover: Using def. found, {pathToken.Position}");
+
+                        if (InfoReachedUnit(pathToken, out var reachedUnit))
+                        { result.Add(reachedUnit); }
+
+                        result.Add(new HoverContent()
+                        {
+                            Lang = "csharp",
+                            Text = $"using {usingItem.PathString};",
+                        });
+
+                        return new HoverInfo()
+                        {
+                            Range = Range<SinglePosition>.Create(usingItem.Path),
+                            Contents = result.ToArray(),
+                        };
+                    }
+
+                    if (usingItem.Keyword.Position.Contains(pos)) break;
+                }
             }
 
             Logger.Log($"Hover: Fallback to token");
@@ -820,7 +828,7 @@ namespace BBCodeLanguageServer
             if (InfoReachedUnit(token, out var reachedUnit2))
             { result.Add(reachedUnit2); }
 
-            if (token is TypeToken typeToken)
+            if (false && token is TypeToken typeToken)
             {
                 Logger.Log($"Hover: TypeToken found");
 
@@ -917,142 +925,6 @@ namespace BBCodeLanguageServer
         }
         internal static HoverContent Hover(Token token)
         {
-            static HoverContent InfoToken(Token t)
-            {
-                if ((new string[]
-                {
-                    "{", "}",
-                    "[", "]",
-                    "=", ",",
-                    ";",
-                }).Contains(t.text)) return null;
-                return t.type switch
-                {
-                    TokenType.LITERAL_FLOAT => new HoverContent()
-                    {
-                        Lang = "csharp",
-                        Text = $"{t.text} // Literal Float",
-                    },
-                    TokenType.LITERAL_NUMBER => new HoverContent()
-                    {
-                        Lang = "csharp",
-                        Text = $"{t.text} // Literal Integer",
-                    },
-                    TokenType.LITERAL_STRING => new HoverContent()
-                    {
-                        Lang = "csharp",
-                        Text = $"\"{t.text}\" // Literal String",
-                    },
-                    TokenType.OPERATOR => new HoverContent()
-                    {
-                        Lang = "csharp",
-                        Text = $"{t.text} // Operator",
-                    },
-                    _ => null,
-                };
-            };
-            static HoverContent InfoTokenSubtype(Token t) => t.Analysis.Subtype switch
-            {
-                TokenSubtype.VariableName => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text}",
-                },
-                TokenSubtype.MethodName => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"? {t.text}()",
-                },
-                TokenSubtype.Type => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Type",
-                },
-                TokenSubtype.Struct => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"struct {t.text}",
-                },
-                TokenSubtype.None => null,
-                TokenSubtype.Keyword => new HoverContent()
-                {
-                    Lang = "text",
-                    Text = $"Keyword {t.text}",
-                },
-                TokenSubtype.Statement => new HoverContent()
-                {
-                    Lang = "text",
-                    Text = $"Statement {t.text}",
-                },
-                TokenSubtype.Library => new HoverContent()
-                {
-                    Lang = "text",
-                    Text = $"Library {t.text}",
-                },
-                TokenSubtype.BuiltinType => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Type",
-                },
-                TokenSubtype.Hash => new HoverContent()
-                {
-                    Lang = "text",
-                    Text = $"Hash {t.text}",
-                },
-                TokenSubtype.HashParameter => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"\"{t.text}\" // Hash Parameter",
-                },
-                _ => null,
-            };
-            static HoverContent InfoTokenSubSubtype(Token t) => t.Analysis.SubSubtype switch
-            {
-                TokenSubSubtype.Attribute => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"[{t.text}]",
-                },
-                TokenSubSubtype.Type => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Type",
-                },
-                TokenSubSubtype.Struct => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"struct {t.text} // Type",
-                },
-                TokenSubSubtype.FunctionName => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"? {t.text}()",
-                },
-                TokenSubSubtype.VariableName => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"var {t.text}; // Variable",
-                },
-                TokenSubSubtype.ParameterName => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Parameter",
-                },
-                TokenSubSubtype.FieldName => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"?.{t.text} // Field",
-                },
-                TokenSubSubtype.None => null,
-                TokenSubSubtype.Keyword => null,
-                TokenSubSubtype.Namespace => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"namespace {t.text}",
-                },
-                _ => null,
-            };
-
             {
                 var info = InfoTokenSubSubtype(token);
                 if (info != null) return info;
@@ -1070,6 +942,138 @@ namespace BBCodeLanguageServer
 
             return null;
         }
+
+        static HoverContent InfoToken(Token t)
+        {
+            if ((new string[]
+            {
+                    "{", "}",
+                    "[", "]",
+                    "=", ",",
+                    ";",
+            }).Contains(t.text)) return null;
+            return t.type switch
+            {
+                TokenType.LITERAL_FLOAT => new HoverContent()
+                {
+                    Lang = "csharp",
+                    Text = $"{t.text} // Literal Float",
+                },
+                TokenType.LITERAL_NUMBER => new HoverContent()
+                {
+                    Lang = "csharp",
+                    Text = $"{t.text} // Literal Integer",
+                },
+                TokenType.LITERAL_STRING => new HoverContent()
+                {
+                    Lang = "csharp",
+                    Text = $"\"{t.text}\" // Literal String",
+                },
+                TokenType.OPERATOR => new HoverContent()
+                {
+                    Lang = "csharp",
+                    Text = $"{t.text} // Operator",
+                },
+                _ => null,
+            };
+        }
+        static HoverContent InfoTokenSubtype(Token t) => t.Analysis.Subtype switch
+        {
+            TokenSubtype.VariableName => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"{t.text}",
+            },
+            TokenSubtype.MethodName => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"? {t.text}() // Function Call",
+            },
+            TokenSubtype.Type => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"{t.text} // Type",
+            },
+            TokenSubtype.Struct => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"struct {t.text}",
+            },
+            TokenSubtype.None => null,
+            TokenSubtype.Keyword => null,
+            TokenSubtype.Statement => new HoverContent()
+            {
+                Lang = "text",
+                Text = $"Statement {t.text}",
+            },
+            TokenSubtype.Library => new HoverContent()
+            {
+                Lang = "text",
+                Text = $"Library {t.text}",
+            },
+            TokenSubtype.BuiltinType => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"{t.text} // Built-in Type",
+            },
+            TokenSubtype.Hash => new HoverContent()
+            {
+                Lang = "text",
+                Text = $"Hash {t.text}",
+            },
+            TokenSubtype.HashParameter => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"\"{t.text}\" // Hash Parameter",
+            },
+            _ => null,
+        };
+        static HoverContent InfoTokenSubSubtype(Token t) => t.Analysis.SubSubtype switch
+        {
+            TokenSubSubtype.Attribute => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"[{t.text}]",
+            },
+            TokenSubSubtype.Type => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"{t.text} // Type",
+            },
+            TokenSubSubtype.Struct => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"struct {t.text} // Type",
+            },
+            TokenSubSubtype.FunctionName => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"? {t.text}()",
+            },
+            TokenSubSubtype.VariableName => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"var {t.text}; // Variable",
+            },
+            TokenSubSubtype.ParameterName => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"{t.text} // Parameter",
+            },
+            TokenSubSubtype.FieldName => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"?.{t.text} // Field",
+            },
+            TokenSubSubtype.None => null,
+            TokenSubSubtype.Keyword => null,
+            TokenSubSubtype.Namespace => new HoverContent()
+            {
+                Lang = "csharp",
+                Text = $"namespace {t.text}",
+            },
+            _ => null,
+        };
 
         internal CodeLensInfo[] CodeLens(DocumentEventArgs e)
         {
@@ -1181,13 +1185,15 @@ namespace BBCodeLanguageServer
 
                         if (isContains == false) break;
 
-                        var usingFile = usingItem.PathString + "." + "bbc";
-                        var usingFilePath = currentFile.Directory.FullName + "\\" + usingFile;
+                        var usingFilePath = currentFile.Directory.FullName + "\\" + usingItem.PathString + "." + IngameCoding.Core.FileExtensions.Code;
 
                         if (System.IO.File.Exists(usingFilePath))
                         {
-                            var uri = new Uri($"file:///" + System.Net.WebUtility.UrlEncode(usingFilePath.Replace('\\', '/')));
-                            result = new SingleOrArray<FilePosition>(new FilePosition(usingItem.Keyword.Position, uri));
+                            result = new SingleOrArray<FilePosition>(new FilePosition(
+                                Range < SinglePosition >.Create(usingItem.Path),
+                                new Range<SinglePosition>(new SinglePosition(1, 1), new SinglePosition(1, 1)),
+                                new Uri($"file:///" + System.Net.WebUtility.UrlEncode(usingFilePath.Replace('\\', '/')))
+                                ));
 
                             Logger.Log($"Using file found");
                         }

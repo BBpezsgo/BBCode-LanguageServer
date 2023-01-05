@@ -46,6 +46,8 @@ namespace BBCodeLanguageServer.Managers
 
             BufferManager.UpdateBuffer(request.TextDocument.Uri.ToUri(), new StringBuffer(request.TextDocument.Text));
 
+            BufferManager.Interface.OnDocumentOpenedExternal(new Interface.Managers.BufferManager.DocumentEventArgs(request.TextDocument.Uri.ToUri()));
+
             return Unit.Task;
         }
 
@@ -57,6 +59,8 @@ namespace BBCodeLanguageServer.Managers
             var text = request.ContentChanges.FirstOrDefault()?.Text;
 
             BufferManager.UpdateBuffer(uri, new StringBuffer(text));
+
+            BufferManager.Interface.OnDocumentChangedExternal(new Interface.Managers.BufferManager.DocumentEventArgs(uri));
 
             return Unit.Task;
         }

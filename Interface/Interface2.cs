@@ -111,7 +111,7 @@ namespace BBCodeLanguageServer.Interface
             throw new ServiceException($"Document {uri} is not buffered");
         }
 
-        internal async Task Create()
+        internal async Task CreateAsync()
         {
             logger = new Logger2();
             Logger.Setup(logger);
@@ -303,10 +303,15 @@ namespace BBCodeLanguageServer.Interface
             if (Server == null) return;
             OnDocumentClosed?.Invoke(new DocumentEventArgs(new Document(e.TextDocument)));
         }
-        internal void OnDocumentChangedExternal(Managers.BufferManager.DidUpdateTextDocumentParams e)
+        internal void OnDocumentChangedExternal(Managers.BufferManager.DocumentEventArgs e)
         {
             if (Server == null) return;
             OnDocumentChanged?.Invoke(new DocumentItemEventArgs(new DocumentItem(e.Uri, GetDocumentContent(e.Uri), "bbc")));
+        }
+        internal void OnDocumentOpenedExternal(BufferManager.DocumentEventArgs e)
+        {
+            if (Server == null) return;
+            OnDocumentOpened?.Invoke(new DocumentItemEventArgs(new DocumentItem(e.Uri, GetDocumentContent(e.Uri), "bbc")));
         }
         internal FilePosition[] OnReferencesExternal(ReferenceParams e) => OnReferences?.Invoke(new FindReferencesEventArgs(e));
         internal void OnConfigChangedExternal(DidChangeConfigurationParams e) => OnConfigChanged?.Invoke(new ConfigEventArgs(e));
@@ -357,18 +362,17 @@ namespace BBCodeLanguageServer.Interface
             public void UpdateBuffer(Uri uri, Microsoft.Language.Xml.Buffer buffer)
             {
                 Buffers.AddOrUpdate(uri, buffer, (k, v) => buffer);
-                Interface?.OnDocumentChangedExternal(new DidUpdateTextDocumentParams(uri));
             }
             public Microsoft.Language.Xml.Buffer GetBuffer(Uri uri)
             {
                 return Buffers.TryGetValue(uri, out var buffer) ? buffer : null;
             }
 
-            public class DidUpdateTextDocumentParams : EventArgs
+            public class DocumentEventArgs : EventArgs
             {
                 public Uri Uri { get; }
 
-                public DidUpdateTextDocumentParams(Uri uri)
+                public DocumentEventArgs(Uri uri)
                 {
                     Uri = uri;
                 }

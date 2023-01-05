@@ -90,8 +90,12 @@ namespace BBCodeLanguageServer.Interface
         protected override VoidResult<ResponseError> Shutdown()
         {
             Logger.Log("Shutdown()");
-            // WORKAROUND: Language Server does not receive an exit notification.
-            System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ => System.Environment.Exit(0));
+            System.Threading.Timer timer = null;
+            timer = new System.Threading.Timer((_) =>
+            {
+                timer.Dispose();
+                System.Environment.Exit(0);
+            }, null, 1000, System.Threading.Timeout.Infinite);
             return VoidResult<ResponseError>.Success();
         }
 

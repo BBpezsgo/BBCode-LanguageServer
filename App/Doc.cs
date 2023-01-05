@@ -245,7 +245,7 @@ namespace BBCodeLanguageServer
                 diagnostics.Add(new DiagnosticInfo
                 {
                     severity = DiagnosticSeverity.Warning,
-                    range = warning.position.Convert1(),
+                    range = warning.Position.Convert1(),
                     message = warning.Message,
                 });
             }

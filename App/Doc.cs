@@ -219,21 +219,6 @@ namespace BBCodeLanguageServer
             {
                 LastSuccessAnalysisResult = AnalysisResult;
                 HaveSuccesAlanysisResult = true;
-
-                for (int i = 0; i < AnalysisResult.ParserResult.Usings.Count; i++)
-                {
-                    if (i >= AnalysisResult.ParserResult.UsingsAnalytics.Count) break;
-                    var usingDef = AnalysisResult.ParserResult.Usings[i];
-                    var usingAnly = AnalysisResult.ParserResult.UsingsAnalytics[i];
-
-                    diagnostics.Add(new DiagnosticInfo
-                    {
-                        severity = DiagnosticSeverity.Warning,
-                        range = Convert1(usingDef.Path),
-                        message = "File not found",
-                        source = "Compiler",
-                    });
-                }
             }
 
             for (int i = 0; i < AnalysisResult.Warnings.Length; i++)

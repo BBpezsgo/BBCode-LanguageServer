@@ -243,7 +243,7 @@ namespace BBCodeLanguageServer
 
                 diagnostics.Add(DiagnostizeHint(hint, "Compiler"));
             }
-            
+
             for (int i = 0; i < AnalysisResult.Informations.Length; i++)
             {
                 var information = AnalysisResult.Informations[i];
@@ -751,12 +751,6 @@ namespace BBCodeLanguageServer
                     if (InfoReachedUnit(namespaceDef.Name, out var reachedUnit))
                     { result.Add(reachedUnit); }
 
-                    result.Add(new()
-                    {
-                        Lang = "text",
-                        Text = $"Struct Definition",
-                    });
-
                     result.Add(new HoverContent()
                     {
                         Lang = "csharp",
@@ -1018,7 +1012,7 @@ namespace BBCodeLanguageServer
             TokenSubSubtype.Attribute => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"[{t.text}]",
+                Text = $"{t.text} // Attribute",
             },
             TokenSubSubtype.Type => new HoverContent()
             {
@@ -1175,7 +1169,7 @@ namespace BBCodeLanguageServer
                         if (System.IO.File.Exists(usingFilePath))
                         {
                             result = new SingleOrArray<FilePosition>(new FilePosition(
-                                Range < SinglePosition >.Create(usingItem.Path),
+                                Range<SinglePosition>.Create(usingItem.Path),
                                 new Range<SinglePosition>(new SinglePosition(1, 1), new SinglePosition(1, 1)),
                                 new Uri($"file:///" + System.Net.WebUtility.UrlEncode(usingFilePath.Replace('\\', '/')))
                                 ));

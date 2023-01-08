@@ -370,6 +370,17 @@ namespace BBCodeLanguageServer
                 Kind = CompletionItemKind.Keyword,
             });
 
+            result.Add(new CompletionInfo()
+            {
+                Label = "true",
+                Kind = CompletionItemKind.Keyword,
+            });
+            result.Add(new CompletionInfo()
+            {
+                Label = "false",
+                Kind = CompletionItemKind.Keyword,
+            });
+
             return result.ToArray();
         }
 

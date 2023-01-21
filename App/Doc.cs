@@ -845,7 +845,7 @@ namespace BBCodeLanguageServer
                 result.Add(new HoverContent()
                 {
                     Lang = "text",
-                    Text = $"TypeToken: {typeToken.typeName} {typeToken.text}{(typeToken.isList ? "[]" : "")}",
+                    Text = $"TypeToken: {typeToken.typeName} {typeToken.text}{(typeToken.IsList ? "[]" : "")}",
                 });
             }
             else

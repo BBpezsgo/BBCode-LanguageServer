@@ -260,6 +260,69 @@ namespace BBCodeLanguageServer.Interface
         };
     }
 
+    internal class ParameterInfo : IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformation>
+    {
+        readonly string Label;
+        readonly string Documentation;
+
+        public ParameterInfo(string Label, string Documentation)
+        {
+            this.Label = Label;
+            this.Documentation = Documentation;
+        }
+
+        OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformation IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformation>.Convert2() => new()
+        {
+            Label = new OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformationLabel(this.Label),
+            Documentation = new OmniSharp.Extensions.LanguageServer.Protocol.Models.StringOrMarkupContent(this.Documentation),
+        };
+    }
+
+    internal class SignatureInfo : IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureInformation>
+    {
+        readonly int ActiveParameter;
+        readonly string Label;
+        readonly string Documentation;
+        readonly ParameterInfo[] Parameters;
+
+        public SignatureInfo(int ActiveParameter, string Label, string Documentation, params ParameterInfo[] Parameters)
+        {
+            this.ActiveParameter = ActiveParameter;
+            this.Label = Label;
+            this.Documentation = Documentation;
+            this.Parameters = Parameters;
+        }
+
+        OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureInformation IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureInformation>.Convert2() => new()
+        {
+            ActiveParameter = this.ActiveParameter,
+            Label = this.Label,
+            Documentation = new OmniSharp.Extensions.LanguageServer.Protocol.Models.StringOrMarkupContent(this.Documentation),
+            Parameters = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformation>(this.Parameters.Convert2())
+        };
+    }
+
+    internal class SignatureHelpInfo : IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelp>
+    {
+        readonly int ActiveParameter;
+        readonly int ActiveSignature;
+        readonly SignatureInfo[] Signatures;
+
+        public SignatureHelpInfo(int ActiveParameter, int ActiveSignature, params SignatureInfo[] Signatures)
+        {
+            this.ActiveParameter = ActiveParameter;
+            this.ActiveSignature = ActiveSignature;
+            this.Signatures = Signatures;
+        }
+
+        OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelp IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelp>.Convert2() => new()
+        {
+            ActiveParameter = ActiveParameter,
+            ActiveSignature = ActiveSignature,
+            Signatures = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureInformation>(Signatures.Convert2()),
+        };
+    }
+
     internal class CompletionInfo : IConvertable1<CompletionItem>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItem>
     {
         internal CompletionItemKind Kind;
@@ -592,6 +655,20 @@ namespace BBCodeLanguageServer.Interface
         internal ConfigEventArgs(DidChangeConfigurationParams v)
         {
             this.Config = new Newtonsoft.Json.Linq.JObject(v.settings);
+        }
+    }
+
+    internal struct SignatureHelpEventArgs
+    {
+        internal readonly IngameCoding.Core.SinglePosition Position;
+        internal readonly Document Document;
+        internal readonly OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelpContext Context;
+
+        public SignatureHelpEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelpParams v)
+        {
+            this.Position = new IngameCoding.Core.SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
+            this.Document = new Document(v.TextDocument);
+            this.Context = v.Context;
         }
     }
 }

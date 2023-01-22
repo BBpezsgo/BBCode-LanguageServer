@@ -26,6 +26,7 @@ namespace BBCodeLanguageServer
             Interface.OnCompletion += Completion;
             Interface.OnHover += Hover;
             Interface.OnCodeLens += CodeLens;
+            Interface.OnSignatureHelp += SignatureHelp;
         }
 
         internal void Initialize()
@@ -75,5 +76,6 @@ namespace BBCodeLanguageServer
         internal HoverInfo Hover(DocumentPositionEventArgs e) => GetDoc(e.Document).Hover(e);
         internal CodeLensInfo[] CodeLens(DocumentEventArgs e) => GetDoc(e.Document).CodeLens(e);
         internal FilePosition[] References(DocumentEventArgs e) => GetDoc(e.Document).References(e);
+        internal SignatureHelpInfo SignatureHelp(SignatureHelpEventArgs e) => GetDoc(e.Document).SignatureHelp(e);
     }
 }

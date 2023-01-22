@@ -34,6 +34,7 @@ namespace BBCodeLanguageServer.Interface
         event ServiceAppEvent<DocumentItemEventArgs> OnDocumentOpened;
         event ServiceAppEvent<DocumentEventArgs> OnDocumentClosed;
         event ServiceAppEvent<ConfigEventArgs> OnConfigChanged;
+        event ServiceAppEvent<SignatureHelpEventArgs, SignatureHelpInfo> OnSignatureHelp;
         event ServiceAppEvent<DocumentEventArgs, CodeLensInfo[]> OnCodeLens;
         event ServiceAppEvent<DocumentPositionContextEventArgs, CompletionInfo[]> OnCompletion;
         event ServiceAppEvent<DocumentEventArgs, SymbolInformationInfo[]> OnDocumentSymbols;
@@ -100,6 +101,11 @@ namespace BBCodeLanguageServer.Interface
         {
             add => OnReferences += value;
             remove => OnReferences -= value;
+        }
+        event ServiceAppEvent<SignatureHelpEventArgs, SignatureHelpInfo> IInterface.OnSignatureHelp
+        {
+            add => OnSignatureHelp += value;
+            remove => OnSignatureHelp -= value;
         }
 
         internal string GetDocumentContent(Uri uri)
@@ -210,7 +216,8 @@ namespace BBCodeLanguageServer.Interface
                .WithHandler<Managers.HoverHandler>()
                .WithHandler<Managers.DidChangeConfigurationHandler>()
                .WithHandler<Managers.SemanticTokensHandler>()
-               .WithHandler<Managers.ReferencesHandler>();
+               .WithHandler<Managers.ReferencesHandler>()
+               .WithHandler<Managers.SignatureHelpHandler>();
 
             options.OnInitialize((server, e, cancellationToken) =>
             {
@@ -315,6 +322,12 @@ namespace BBCodeLanguageServer.Interface
         }
         internal FilePosition[] OnReferencesExternal(ReferenceParams e) => OnReferences?.Invoke(new FindReferencesEventArgs(e));
         internal void OnConfigChangedExternal(DidChangeConfigurationParams e) => OnConfigChanged?.Invoke(new ConfigEventArgs(e));
+
+        internal SignatureHelpInfo OnSignatureHelpExternal(SignatureHelpParams e)
+        {
+            if (Server == null) return null;
+            return OnSignatureHelp?.Invoke(new SignatureHelpEventArgs(e));
+        }
 
         #endregion
     }
@@ -561,6 +574,37 @@ namespace BBCodeLanguageServer.Interface
                 return new ReferenceRegistrationOptions()
                 {
                     DocumentSelector = DocumentSelector.ForLanguage("bbc"),
+                };
+            }
+        }
+
+        internal class SignatureHelpHandler : ISignatureHelpHandler
+        {
+            public Task<SignatureHelp> Handle(SignatureHelpParams e, CancellationToken cancellationToken) => Task.Run(() =>
+            {
+                Logger.Log($"SignatureHelpHandler.Handle()");
+
+                if (ServiceAppInterface2.Instance.Server == null) return null;
+
+                try
+                {
+                    var result = ServiceAppInterface2.Instance.OnSignatureHelpExternal(e);
+                    if (result == null) return new SignatureHelp();
+                    return result.Convert2();
+                }
+                catch (ServiceException error)
+                {
+                    ServiceAppInterface2.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
+                    return new SignatureHelp();
+                }
+            });
+
+            public SignatureHelpRegistrationOptions GetRegistrationOptions(SignatureHelpCapability capability, ClientCapabilities clientCapabilities)
+            {
+                return new SignatureHelpRegistrationOptions()
+                {
+                    DocumentSelector = DocumentSelector.ForLanguage("bbc"),
+                    TriggerCharacters = new Container<string>("(", ","),
                 };
             }
         }

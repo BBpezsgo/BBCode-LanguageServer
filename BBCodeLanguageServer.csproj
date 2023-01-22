@@ -8,7 +8,12 @@
     <BaseOutputPath>C:\Users\bazsi\Documents\GitHub\InterpreterVSCodeExtension\server</BaseOutputPath>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <ApplicationIcon>ls.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="ls.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="GuiLabs.Language.Xml" Version="1.2.60" />

@@ -1411,5 +1411,25 @@ namespace BBCodeLanguageServer
         }
 
         internal FilePosition[] References(DocumentEventArgs e) => Array.Empty<FilePosition>();
+
+        internal SignatureHelpInfo SignatureHelp(SignatureHelpEventArgs e)
+        {
+            if (!HaveSuccesAlanysisResult) return null;
+            if (!BestAnalysisResult.Compiled) return null;
+            return null;
+            /*
+            List<SignatureInfo> signatures = new();
+            foreach (var func in BestAnalysisResult.CompilerResult.compiledFunctions)
+            {
+                ParameterInfo[] parameters = new ParameterInfo[func.Value.ParameterCount];
+                for (int i = 0; i < func.Value.Parameters.Count; i++)
+                {
+                    parameters[i] = new ParameterInfo(func.Value.Parameters[i].name.text, null);
+                }
+                signatures.Add(new SignatureInfo(0, func.Key, null, parameters));
+            }
+            return new SignatureHelpInfo(0, 0, signatures.ToArray());
+            */
+        }
     }
 }

@@ -87,6 +87,19 @@ namespace BBCodeLanguageServer.Interface
             remove { }
         }
 
+        event ServiceAppEvent<SignatureHelpEventArgs, SignatureHelpInfo> IInterface.OnSignatureHelp
+        {
+            add
+            {
+                throw new System.NotImplementedException();
+            }
+
+            remove
+            {
+                throw new System.NotImplementedException();
+            }
+        }
+
         protected override VoidResult<ResponseError> Shutdown()
         {
             Logger.Log("Shutdown()");

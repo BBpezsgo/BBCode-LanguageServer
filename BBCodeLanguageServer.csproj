@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\BBCode\BBCode.csproj" />
+    <ProjectReference Include="..\..\BBCode\BBCodeInterpreter.csproj" />
   </ItemGroup>
 
 </Project>

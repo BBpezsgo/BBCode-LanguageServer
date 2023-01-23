@@ -287,7 +287,7 @@ namespace BBCodeLanguageServer
                 {
                     result.Add(new CompletionInfo()
                     {
-                        Label = variable.variableName.text,
+                        Label = variable.VariableName.text,
                         Kind = CompletionItemKind.Variable,
                     });
                 }
@@ -449,19 +449,19 @@ namespace BBCodeLanguageServer
                     {
                         if (statement is Statement_FunctionCall functionCall)
                         {
-                            if (!functionCall.functionNameT.Position.Contains(pos)) return false;
-                            if (functionCall.functionNameT.text == "return") return false;
+                            if (!functionCall.Identifier.Position.Contains(pos)) return false;
+                            if (functionCall.Identifier.text == "return") return false;
 
                             Logger.Log($"Hover: Func. call found");
 
-                            range = functionCall.functionNameT.Position;
+                            range = functionCall.Identifier.Position;
 
-                            if (InfoReachedUnit(functionCall.functionNameT, out var reachedUnit))
+                            if (InfoReachedUnit(functionCall.Identifier, out var reachedUnit))
                             { result.Add(reachedUnit); }
 
-                            Logger.Log($"{functionCall.functionNameT.Analysis}");
+                            Logger.Log($"{functionCall.Identifier.Analysis}");
 
-                            if (functionCall.functionNameT.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
+                            if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
                             {
                                 result.Add(InfoFunctionDefinition(refFunction.Definition, false));
                                 return true;
@@ -470,17 +470,17 @@ namespace BBCodeLanguageServer
                             {
                                 string newContentText = "";
 
-                                newContentText += $"? {functionCall.TargetNamespacePathPrefix}{functionCall.functionNameT}(";
+                                newContentText += $"? {functionCall.TargetNamespacePathPrefix}{functionCall.Identifier}(";
 
                                 bool addComma = false;
                                 int paramIndex = 0;
-                                foreach (var param in functionCall.parameters)
+                                foreach (var param in functionCall.Parameters)
                                 {
                                     paramIndex++;
                                     if (addComma) newContentText += $", ";
                                     if (param is Statement_Literal literalParam)
                                     {
-                                        switch (literalParam.type.typeName)
+                                        switch (literalParam.Type.typeName)
                                         {
                                             case BuiltinType.AUTO:
                                                 newContentText += $"var p{paramIndex}";
@@ -545,7 +545,7 @@ namespace BBCodeLanguageServer
 
                             if (info != null)
                             {
-                                if (literal.type.typeName == BuiltinType.STRING)
+                                if (literal.Type.typeName == BuiltinType.STRING)
                                 { range.End.Character++; }
                                 result.Add(info);
                             }
@@ -554,30 +554,30 @@ namespace BBCodeLanguageServer
                         }
                         else if (statement is Statement_Variable variable)
                         {
-                            if (!variable.variableName.Position.Contains(pos)) return false;
+                            if (!variable.VariableName.Position.Contains(pos)) return false;
 
-                            Logger.Log($"Hover: Variable found {variable.variableName.Analysis}");
+                            Logger.Log($"Hover: Variable found {variable.VariableName.Analysis}");
 
-                            range = variable.variableName.Position;
+                            range = variable.VariableName.Position;
 
-                            if (InfoReachedUnit(variable.variableName, out var reachedUnit))
+                            if (InfoReachedUnit(variable.VariableName, out var reachedUnit))
                             { result.Add(reachedUnit); }
 
-                            if (variable.variableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
+                            if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
                             {
                                 var def = refVariable.Declaration;
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{def.type.text} {def.variableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
+                                    Text = $"{def.Type.text} {def.VariableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
                                 });
                             }
-                            else if (variable.variableName.Analysis.Reference is TokenAnalysis.RefParameter refParameter)
+                            else if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefParameter refParameter)
                             {
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{refParameter.Type} {variable.variableName.text}; // Parameter",
+                                    Text = $"{refParameter.Type} {variable.VariableName.text}; // Parameter",
                                 });
                             }
                             else
@@ -585,7 +585,7 @@ namespace BBCodeLanguageServer
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"var {variable.variableName.text};",
+                                    Text = $"var {variable.VariableName.text};",
                                 });
                             }
 
@@ -593,22 +593,22 @@ namespace BBCodeLanguageServer
                         }
                         else if (statement is Statement_NewVariable newVariable)
                         {
-                            if (!newVariable.variableName.Position.Contains(pos)) return false;
+                            if (!newVariable.VariableName.Position.Contains(pos)) return false;
 
-                            Logger.Log($"Hover: NewVariable found {newVariable.variableName.Analysis}");
+                            Logger.Log($"Hover: NewVariable found {newVariable.VariableName.Analysis}");
 
-                            range = newVariable.variableName.Position;
+                            range = newVariable.VariableName.Position;
 
-                            if (InfoReachedUnit(newVariable.variableName, out var reachedUnit))
+                            if (InfoReachedUnit(newVariable.VariableName, out var reachedUnit))
                             { result.Add(reachedUnit); }
 
-                            if (newVariable.variableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
+                            if (newVariable.VariableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
                             {
                                 var def = refVariable.Declaration;
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{def.type.text} {def.variableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
+                                    Text = $"{def.Type.text} {def.VariableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
                                 });
                             }
                             else
@@ -616,7 +616,7 @@ namespace BBCodeLanguageServer
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{newVariable.type} {newVariable.variableName.text}; // Variable",
+                                    Text = $"{newVariable.Type} {newVariable.VariableName.text}; // Variable",
                                 });
                             }
 
@@ -1209,9 +1209,9 @@ namespace BBCodeLanguageServer
             {
                 if (statement is Statement_FunctionCall functionCall)
                 {
-                    if (functionCall.functionNameT.Position.Contains(pos))
+                    if (functionCall.Identifier.Position.Contains(pos))
                     {
-                        if (functionCall.functionNameT.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
+                        if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
                         {
                             if (refFunction.Definition.FilePath == null)
                             {
@@ -1232,9 +1232,9 @@ namespace BBCodeLanguageServer
                 }
                 else if (statement is Statement_NewStruct newStruct)
                 {
-                    if (newStruct.structName.Position.Contains(pos))
+                    if (newStruct.StructName.Position.Contains(pos))
                     {
-                        if (newStruct.structName.Analysis.Reference is TokenAnalysis.RefStruct refStruct)
+                        if (newStruct.StructName.Analysis.Reference is TokenAnalysis.RefStruct refStruct)
                         {
                             var uri = new Uri($"file:///" + System.Net.WebUtility.UrlEncode(refStruct.Definition.FilePath.Replace('\\', '/')));
                             result = new SingleOrArray<FilePosition>(new FilePosition(refStruct.Definition.Name.Position, uri));
@@ -1268,14 +1268,14 @@ namespace BBCodeLanguageServer
                 }
                 else if (statement is Statement_Variable variable)
                 {
-                    if (!variable.variableName.Position.Contains(pos)) return false;
+                    if (!variable.VariableName.Position.Contains(pos)) return false;
 
-                    if (variable.variableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
+                    if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
                     {
                         var uri = new Uri($"file:///" + System.Net.WebUtility.UrlEncode(refVariable.Declaration.FilePath.Replace('\\', '/')));
-                        result = new SingleOrArray<FilePosition>(new FilePosition(refVariable.Declaration.variableName.Position, uri));
+                        result = new SingleOrArray<FilePosition>(new FilePosition(refVariable.Declaration.VariableName.Position, uri));
 
-                        Logger.Log($"Variable Ref found {refVariable.Declaration.variableName.Position} {uri}");
+                        Logger.Log($"Variable Ref found {refVariable.Declaration.VariableName.Position} {uri}");
                     }
                     else
                     {

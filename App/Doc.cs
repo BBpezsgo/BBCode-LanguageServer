@@ -12,7 +12,6 @@ using LanguageServer.Parameters.TextDocument;
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Tracing;
 using System.Linq;
 
 using static BBCodeLanguageServer.Interface.Extensions;
@@ -503,9 +502,6 @@ namespace BBCodeLanguageServer
                                             case BuiltinType.STRUCT:
                                                 newContentText += $"struct p{paramIndex}";
                                                 break;
-                                            case BuiltinType.RUNTIME:
-                                                newContentText += $"? p{paramIndex}";
-                                                break;
                                             case BuiltinType.ANY:
                                                 newContentText += $"any p{paramIndex}";
                                                 break;
@@ -889,7 +885,6 @@ namespace BBCodeLanguageServer
             HoverContent info = token.typeName switch
             {
                 BuiltinType.AUTO => null,
-                BuiltinType.RUNTIME => null,
                 BuiltinType.ANY => null,
 
                 BuiltinType.STRUCT => new HoverContent()
@@ -1127,7 +1122,10 @@ namespace BBCodeLanguageServer
 
                     if (usingAnly.Found)
                     {
-                        result.Add(new CodeLensInfo($"Parsed in {Math.Floor(usingAnly.ParseTime + .9d)} ms", usingDef.Keyword));
+                        if (usingAnly.ParseTime == -1d)
+                        { result.Add(new CodeLensInfo($"Not parsed", usingDef.Keyword)); }
+                        else
+                        { result.Add(new CodeLensInfo($"Parsed in {Math.Floor(usingAnly.ParseTime + .9d)} ms", usingDef.Keyword)); }
                     }
                 }
             }

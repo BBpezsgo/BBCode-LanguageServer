@@ -949,6 +949,16 @@ namespace BBCodeLanguageServer
                     Lang = "csharp",
                     Text = $"{t.text} // Literal Integer",
                 },
+                TokenType.LITERAL_HEX => new HoverContent()
+                {
+                    Lang = "csharp",
+                    Text = $"{t.text} // Literal Integer",
+                },
+                TokenType.LITERAL_BIN => new HoverContent()
+                {
+                    Lang = "csharp",
+                    Text = $"{t.text} // Literal Integer",
+                },
                 TokenType.LITERAL_STRING => new HoverContent()
                 {
                     Lang = "csharp",

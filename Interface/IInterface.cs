@@ -14,6 +14,7 @@
         internal event ServiceAppEvent<DocumentPositionEventArgs, HoverInfo> OnHover;
         internal event ServiceAppEvent<FindReferencesEventArgs, FilePosition[]> OnReferences;
         internal event ServiceAppEvent<SignatureHelpEventArgs, SignatureHelpInfo> OnSignatureHelp;
+        internal event ServiceAppEvent<DocumentEventArgs, SemanticToken[]> OnSemanticTokensNeed;
 
         internal void PublishDiagnostics(System.Uri uri, DiagnosticInfo[] diagnostics);
     }

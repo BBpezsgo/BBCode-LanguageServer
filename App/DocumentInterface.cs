@@ -1,6 +1,6 @@
 ﻿using BBCodeLanguageServer.Interface;
-using BBCodeLanguageServer.Interface.SystemExtensions;
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -27,6 +27,7 @@ namespace BBCodeLanguageServer
             Interface.OnHover += Hover;
             Interface.OnCodeLens += CodeLens;
             Interface.OnSignatureHelp += SignatureHelp;
+            Interface.OnSemanticTokensNeed += OnSemanticTokensNeed;
         }
 
         internal void Initialize()
@@ -77,5 +78,6 @@ namespace BBCodeLanguageServer
         internal CodeLensInfo[] CodeLens(DocumentEventArgs e) => GetDoc(e.Document).CodeLens(e);
         internal FilePosition[] References(DocumentEventArgs e) => GetDoc(e.Document).References(e);
         internal SignatureHelpInfo SignatureHelp(SignatureHelpEventArgs e) => GetDoc(e.Document).SignatureHelp(e);
+        internal SemanticToken[] OnSemanticTokensNeed(DocumentEventArgs e) => GetDoc(e.Document).GetSemanticTokens(e);
     }
 }

@@ -2,10 +2,14 @@
 
 using LanguageServer.Parameters.General;
 
+using MediatR;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+using OmniSharp.Extensions.JsonRpc;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -41,6 +45,7 @@ namespace BBCodeLanguageServer.Interface
         event ServiceAppEvent<DocumentPositionEventArgs, SingleOrArray<FilePosition>?> OnGotoDefinition;
         event ServiceAppEvent<DocumentPositionEventArgs, HoverInfo> OnHover;
         event ServiceAppEvent<FindReferencesEventArgs, FilePosition[]> OnReferences;
+        event ServiceAppEvent<DocumentEventArgs, SemanticToken[]> OnSemanticTokensNeed;
 
         internal ServiceAppInterface2()
         {
@@ -106,6 +111,11 @@ namespace BBCodeLanguageServer.Interface
         {
             add => OnSignatureHelp += value;
             remove => OnSignatureHelp -= value;
+        }
+        event ServiceAppEvent<DocumentEventArgs, SemanticToken[]> IInterface.OnSemanticTokensNeed
+        {
+            add => OnSemanticTokensNeed += value;
+            remove => OnSemanticTokensNeed -= value;
         }
 
         internal string GetDocumentContent(Uri uri)
@@ -322,6 +332,7 @@ namespace BBCodeLanguageServer.Interface
         }
         internal FilePosition[] OnReferencesExternal(ReferenceParams e) => OnReferences?.Invoke(new FindReferencesEventArgs(e));
         internal void OnConfigChangedExternal(DidChangeConfigurationParams e) => OnConfigChanged?.Invoke(new ConfigEventArgs(e));
+        internal SemanticToken[] OnSemanticTokensNeedExternal(ITextDocumentIdentifierParams e) => OnSemanticTokensNeed?.Invoke(new DocumentEventArgs(e));
 
         internal SignatureHelpInfo OnSignatureHelpExternal(SignatureHelpParams e)
         {
@@ -656,6 +667,16 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Info($"SemanticTokensHandler.Tokenize()");
 
+                var tokens = ServiceAppInterface2.Instance.OnSemanticTokensNeedExternal(identifier);
+
+                await Task.Yield();
+
+                foreach (var token in tokens)
+                {
+                    builder.Push(token.Line - 1, token.Col - 2, token.Length, token.Type, token.Modifier);
+                }
+
+                /*
                 using var typesEnumerator = RotateEnum(SemanticTokenType.Defaults).GetEnumerator();
                 using var modifiersEnumerator = RotateEnum(SemanticTokenModifier.Defaults).GetEnumerator();
                 // you would normally get this from a common source that is managed by current open editor, current active editor, etc.
@@ -672,9 +693,10 @@ namespace BBCodeLanguageServer.Interface
                         modifiersEnumerator.MoveNext();
                         if (string.IsNullOrWhiteSpace(part)) continue;
                         index = text.IndexOf(part, index, StringComparison.Ordinal);
-                        builder.Push(line, index, part.Length, SemanticTokenType.Interface, modifiersEnumerator.Current);
+                        builder.Push(line, index, part.Length, typesEnumerator.Current, modifiersEnumerator.Current);
                     }
                 }
+                */
             }
 
             static IEnumerable<T> RotateEnum<T>(IEnumerable<T> values)
@@ -697,34 +719,21 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Info($"SemanticTokensHandler.CreateRegistrationOptions()");
 
-                SemanticTokensRegistrationOptions result = new()
+                return new SemanticTokensRegistrationOptions
                 {
-                    DocumentSelector = DocumentSelector.ForLanguage("bcc"),
+                    DocumentSelector = DocumentSelector.ForLanguage("bbc"),
+                    Legend = new SemanticTokensLegend
+                    {
+                        TokenModifiers = capability.TokenModifiers,
+                        TokenTypes = capability.TokenTypes
+                    },
                     Full = new SemanticTokensCapabilityRequestFull
                     {
-                        Delta = true,
+                        Delta = true
                     },
-                    Range = true,
+                    Range = true
                 };
-                capability = new SemanticTokensCapability
-                {
-                    TokenTypes = new Container<SemanticTokenType>(SemanticTokenType.Defaults),
-                    TokenModifiers = new Container<SemanticTokenModifier>(SemanticTokenModifier.Defaults),
-                    MultilineTokenSupport = false,
-                    OverlappingTokenSupport = false,
-                    Formats = new Container<SemanticTokenFormat>(SemanticTokenFormat.Defaults),
-                    Requests = new SemanticTokensCapabilityRequests()
-                    {
-                        Full = new Supports<SemanticTokensCapabilityRequestFull>(true),
-                        Range = new Supports<SemanticTokensCapabilityRequestRange>(true),
-                    },
-                };
-                result.Legend = new SemanticTokensLegend()
-                {
-                    TokenTypes = capability.TokenTypes,
-                    TokenModifiers = capability.TokenModifiers,
-                };
-                return result;
+
             }
         }
     }

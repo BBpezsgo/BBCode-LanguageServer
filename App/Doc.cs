@@ -25,6 +25,8 @@ namespace BBCodeLanguageServer
         string Url;
         string LanguageId;
 
+        static readonly bool DEBUG = false;
+
         protected AnalysisResult AnalysisResult;
         AnalysisResult LastSuccessAnalysisResult;
         bool HaveSuccesAlanysisResult;
@@ -269,6 +271,7 @@ namespace BBCodeLanguageServer
                     result.Add(new CompletionInfo()
                     {
                         Label = function.Name.text,
+                        Detail = function.ReadableID(),
                         Kind = CompletionItemKind.Function,
                     });
                 }
@@ -278,6 +281,7 @@ namespace BBCodeLanguageServer
                     result.Add(new CompletionInfo()
                     {
                         Label = @struct.Value.Name.text,
+                        Detail = @struct.Value.FullName,
                         Kind = CompletionItemKind.Struct,
                     });
                 }
@@ -287,6 +291,7 @@ namespace BBCodeLanguageServer
                     result.Add(new CompletionInfo()
                     {
                         Label = variable.VariableName.text,
+                        Detail = $"(global var) {variable.Type.text} {variable.VariableName.text}",
                         Kind = CompletionItemKind.Variable,
                     });
                 }
@@ -407,7 +412,7 @@ namespace BBCodeLanguageServer
                 return new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"{text} {(IsDefinition ? "// Function Definition" : "// Function Call")}",
+                    Text = text,
                 };
             }
             static HoverContent InfoStructDefinition(StructDefinition structDef)
@@ -415,11 +420,12 @@ namespace BBCodeLanguageServer
                 return new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"struct {structDef.FullName} // Struct Definition",
+                    Text = $"struct {structDef.FullName}",
                 };
             }
             static bool InfoReachedUnit(Token token, out HoverContent result)
             {
+                if (!DEBUG) { result = null; return false; }
                 if (!token.Analysis.CompilerReached)
                 {
                     result = new HoverContent()
@@ -634,7 +640,7 @@ namespace BBCodeLanguageServer
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"struct {refField.StructName}\n{{\n  {refField.Type} {refField.Name.text}; // Field\n  // ...\n}}",
+                                    Text = $"struct {refField.StructName}\n{{\n  {refField.Type} {refField.Name.text}; // Field\n}}",
                                 });
                             }
                             else
@@ -676,10 +682,10 @@ namespace BBCodeLanguageServer
                         return false;
                     });
 
-                    if (result.Count > 0)
+                    if (result.Count > 0 && !range.IsUnset())
                     {
-                        if (range.IsUnset())
-                        { throw new ServiceException($"Hover range is null"); }
+                        // if (range.IsUnset())
+                        // { throw new ServiceException($"Hover range is null"); }
                         return new HoverInfo()
                         {
                             Range = range,
@@ -690,7 +696,30 @@ namespace BBCodeLanguageServer
 
                 foreach (var funcDef in AnalysisResult.ParserResult.Functions)
                 {
-                    if (!funcDef.Name.Position.Contains(pos)) continue;
+                    if (!funcDef.Name.Position.Contains(pos))
+                    {
+                        foreach (var paramDef in funcDef.Parameters)
+                        {
+                            if (!paramDef.name.Position.Contains(pos)) continue;
+                            Logger.Log($"Hover: Param. def. found");
+
+                            if (InfoReachedUnit(funcDef.Name, out var reachedUnit_))
+                            { result.Add(reachedUnit_); }
+
+                            result.Add(new()
+                            {
+                                Lang = "csharp",
+                                Text = $"{paramDef.type.text} {paramDef.name.text}; // Parameter",
+                            });
+
+                            return new HoverInfo()
+                            {
+                                Range = paramDef.name.Position,
+                                Contents = result.ToArray(),
+                            };
+                        }
+                        continue;
+                    }
 
                     Logger.Log($"Hover: Func. def. found");
 
@@ -723,7 +752,7 @@ namespace BBCodeLanguageServer
                             result.Add(new()
                             {
                                 Lang = "csharp",
-                                Text = $"struct {structDef.Name.text}\n{{\n  {field.type} {field.name.text}; // Field\n  // ...\n}}",
+                                Text = $"struct {structDef.Name.text}\n{{\n  {field.type} {field.name.text}; // Field\n}}",
                             });
 
                             return new HoverInfo()
@@ -777,24 +806,34 @@ namespace BBCodeLanguageServer
 
                     foreach (var pathToken in usingItem.Path)
                     {
-                        if (!pathToken.Position.Contains(pos)) continue;
-
-                        Logger.Log($"Hover: Using def. found, {pathToken.Position}");
-
-                        if (InfoReachedUnit(pathToken, out var reachedUnit))
-                        { result.Add(reachedUnit); }
-
-                        result.Add(new HoverContent()
+                        if (pathToken.Position.Contains(pos))
                         {
-                            Lang = "csharp",
-                            Text = $"using {usingItem.PathString};",
-                        });
+                            Logger.Log($"Hover: Using def. found, {pathToken.Position}");
 
-                        return new HoverInfo()
-                        {
-                            Range = Range<SinglePosition>.Create(usingItem.Path),
-                            Contents = result.ToArray(),
-                        };
+                            if (InfoReachedUnit(pathToken, out var reachedUnit))
+                            { result.Add(reachedUnit); }
+
+                            if (!string.IsNullOrEmpty(usingItem.CompiledUri))
+                            {
+                                result.Add(new HoverContent()
+                                {
+                                    Lang = "text",
+                                    Text = usingItem.CompiledUri,
+                                });
+                            }
+
+                            result.Add(new HoverContent()
+                            {
+                                Lang = "csharp",
+                                Text = $"using {usingItem.PathString};",
+                            });
+
+                            return new HoverInfo()
+                            {
+                                Range = Range<SinglePosition>.Create(usingItem.Path),
+                                Contents = result.ToArray(),
+                            };
+                        }
                     }
 
                     if (usingItem.Keyword.Position.Contains(pos)) break;
@@ -939,36 +978,12 @@ namespace BBCodeLanguageServer
             }).Contains(t.text)) return null;
             return t.type switch
             {
-                TokenType.LITERAL_FLOAT => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Literal Float",
-                },
-                TokenType.LITERAL_NUMBER => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Literal Integer",
-                },
-                TokenType.LITERAL_HEX => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Literal Integer",
-                },
-                TokenType.LITERAL_BIN => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Literal Integer",
-                },
-                TokenType.LITERAL_STRING => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"\"{t.text}\" // Literal String",
-                },
-                TokenType.OPERATOR => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{t.text} // Operator",
-                },
+                TokenType.LITERAL_FLOAT => null,
+                TokenType.LITERAL_NUMBER => null,
+                TokenType.LITERAL_HEX => null,
+                TokenType.LITERAL_BIN => null,
+                TokenType.LITERAL_STRING => null,
+                TokenType.OPERATOR => null,
                 _ => null,
             };
         }
@@ -977,12 +992,12 @@ namespace BBCodeLanguageServer
             TokenSubtype.VariableName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"{t.text}",
+                Text = $"var {t.text}; // Variable or parameter",
             },
             TokenSubtype.MethodName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"? {t.text}() // Function Call",
+                Text = $"? {t.text}()",
             },
             TokenSubtype.Type => new HoverContent()
             {
@@ -996,31 +1011,15 @@ namespace BBCodeLanguageServer
             },
             TokenSubtype.None => null,
             TokenSubtype.Keyword => null,
-            TokenSubtype.Statement => new HoverContent()
-            {
-                Lang = "text",
-                Text = $"Statement {t.text}",
-            },
+            TokenSubtype.Statement => null,
             TokenSubtype.Library => new HoverContent()
             {
                 Lang = "text",
                 Text = $"Library {t.text}",
             },
-            TokenSubtype.BuiltinType => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"{t.text} // Built-in Type",
-            },
-            TokenSubtype.Hash => new HoverContent()
-            {
-                Lang = "text",
-                Text = $"Hash {t.text}",
-            },
-            TokenSubtype.HashParameter => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"\"{t.text}\" // Hash Parameter",
-            },
+            TokenSubtype.BuiltinType => null,
+            TokenSubtype.Hash => null,
+            TokenSubtype.HashParameter => null,
             _ => null,
         };
         static HoverContent InfoTokenSubSubtype(Token t) => t.Analysis.SubSubtype switch
@@ -1038,7 +1037,7 @@ namespace BBCodeLanguageServer
             TokenSubSubtype.Struct => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"struct {t.text} // Type",
+                Text = $"struct {t.text}",
             },
             TokenSubSubtype.FunctionName => new HoverContent()
             {
@@ -1053,12 +1052,12 @@ namespace BBCodeLanguageServer
             TokenSubSubtype.ParameterName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"{t.text} // Parameter",
+                Text = $"var {t.text}; // Parameter",
             },
             TokenSubSubtype.FieldName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"?.{t.text} // Field",
+                Text = $"?.{t.text}; // Field",
             },
             TokenSubSubtype.None => null,
             TokenSubSubtype.Keyword => null,
@@ -1092,7 +1091,7 @@ namespace BBCodeLanguageServer
 
                             FunctionsBruh.Add(func.ID());
 
-                            int referenceCount = func.TimesUsed;
+                            int referenceCount = func.TimesUsedTotal;
 
                             result.Add(new CodeLensInfo($"{referenceCount} reference", func.Name));
 
@@ -1129,6 +1128,11 @@ namespace BBCodeLanguageServer
                 {
                     var usingDef = AnalysisResult.ParserResult.Usings[i];
                     var usingAnly = AnalysisResult.ParserResult.UsingsAnalytics[i];
+
+                    if (usingDef.DownloadTime.HasValue)
+                    {
+                        result.Add(new CodeLensInfo($"Downloaded in {Math.Floor(usingDef.DownloadTime.Value + .9d)} ms", usingDef.Keyword));
+                    }
 
                     if (usingAnly.Found)
                     {
@@ -1438,6 +1442,123 @@ namespace BBCodeLanguageServer
             }
             return new SignatureHelpInfo(0, 0, signatures.ToArray());
             */
+        }
+
+        internal SemanticToken[] GetSemanticTokens(DocumentEventArgs e)
+        {
+            if (!HaveSuccesAlanysisResult) return Array.Empty<SemanticToken>();
+            if (!BestAnalysisResult.Compiled) return Array.Empty<SemanticToken>();
+
+            var tokens = BestAnalysisResult.Tokens;
+            List<SemanticToken> result = new();
+
+            foreach (var token in tokens)
+            {
+                switch (token.type)
+                {
+                    case TokenType.IDENTIFIER:
+                        {
+                            if (!token.Analysis.CompilerReached) break;
+                            if (!token.Analysis.ParserReached) break;
+
+                            switch (token.Analysis.SubSubtype)
+                            {
+                                case TokenSubSubtype.Attribute:
+                                    break;
+                                case TokenSubSubtype.Type:
+                                    break;
+                                case TokenSubSubtype.Struct:
+                                    result.Add(new SemanticToken(token,
+                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Struct));
+                                    break;
+                                case TokenSubSubtype.Keyword:
+                                    break;
+                                case TokenSubSubtype.FunctionName:
+                                    break;
+                                case TokenSubSubtype.VariableName:
+                                    result.Add(new SemanticToken(token,
+                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Variable));
+                                    break;
+                                case TokenSubSubtype.FieldName:
+                                    break;
+                                case TokenSubSubtype.ParameterName:
+                                    result.Add(new SemanticToken(token,
+                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Parameter));
+                                    break;
+                                case TokenSubSubtype.Namespace:
+                                    result.Add(new SemanticToken(token,
+                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Namespace));
+                                    break;
+
+                                case TokenSubSubtype.None:
+                                default:
+                                    switch (token.Analysis.Subtype)
+                                    {
+                                        case TokenSubtype.MethodName:
+                                            break;
+                                        case TokenSubtype.Keyword:
+                                            break;
+                                        case TokenSubtype.Type:
+                                            break;
+                                        case TokenSubtype.VariableName:
+                                            result.Add(new SemanticToken(token,
+                                                OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Variable));
+                                            break;
+                                        case TokenSubtype.Statement:
+                                            break;
+                                        case TokenSubtype.Library:
+                                            result.Add(new SemanticToken(token,
+                                                OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Namespace));
+                                            break;
+                                        case TokenSubtype.Struct:
+                                            result.Add(new SemanticToken(token,
+                                                OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Struct));
+                                            break;
+                                        case TokenSubtype.BuiltinType:
+                                            break;
+                                        case TokenSubtype.Hash:
+                                            break;
+                                        case TokenSubtype.HashParameter:
+                                            break;
+                                        case TokenSubtype.Class:
+                                            result.Add(new SemanticToken(token,
+                                                OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Class));
+                                            break;
+                                        case TokenSubtype.None:
+                                        default:
+                                            break;
+                                    }
+                                    break;
+                            }
+                        }
+                        break;
+
+                    case TokenType.LITERAL_NUMBER:
+                    case TokenType.LITERAL_HEX:
+                    case TokenType.LITERAL_BIN:
+                    case TokenType.LITERAL_FLOAT:
+                        break;
+
+                    case TokenType.LITERAL_STRING:
+                        break;
+
+                    case TokenType.OPERATOR:
+                        break;
+
+                    case TokenType.STRING_ESCAPE_SEQUENCE:
+                    case TokenType.POTENTIAL_FLOAT:
+                    case TokenType.POTENTIAL_COMMENT:
+                    case TokenType.POTENTIAL_END_MULTILINE_COMMENT:
+                    case TokenType.COMMENT:
+                    case TokenType.COMMENT_MULTILINE:
+                    case TokenType.WHITESPACE:
+                    case TokenType.LINEBREAK:
+                    default:
+                        break;
+                }
+            }
+
+            return result.ToArray();
         }
     }
 }

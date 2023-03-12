@@ -1,4 +1,6 @@
-﻿using LanguageServer.Parameters;
+﻿using IngameCoding.BBCode;
+
+using LanguageServer.Parameters;
 using LanguageServer.Parameters.TextDocument;
 using LanguageServer.Parameters.Workspace;
 
@@ -327,17 +329,26 @@ namespace BBCodeLanguageServer.Interface
     {
         internal CompletionItemKind Kind;
         internal string Label;
+        internal bool Preselect;
+        internal string? Detail;
+        internal bool Deprecated;
 
         public CompletionItem Convert1() => new()
         {
             kind = Kind,
             label = Label,
+            deprecated = Deprecated,
+            detail = Detail,
+            preselect = Preselect,
         };
 
         OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItem IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItem>.Convert2() => new()
         {
             Kind = Kind.Convert(),
             Label = Label,
+            Deprecated = Deprecated,
+            Detail = Detail,
+            Preselect = Preselect,
         };
     }
 
@@ -568,6 +579,11 @@ namespace BBCodeLanguageServer.Interface
     {
         internal readonly Document Document;
 
+        public DocumentEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.ITextDocumentIdentifierParams v)
+        {
+            this.Document = new Document(v.TextDocument);
+        }
+
         internal DocumentEventArgs(TextDocumentIdentifier v)
         {
             this.Document = new Document(v);
@@ -669,6 +685,24 @@ namespace BBCodeLanguageServer.Interface
             this.Position = new IngameCoding.Core.SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
             this.Document = new Document(v.TextDocument);
             this.Context = v.Context;
+        }
+    }
+
+    internal struct SemanticToken
+    {
+        internal readonly int Line;
+        internal readonly int Col;
+        internal readonly int Length;
+        internal readonly OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType Type;
+        internal readonly OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenModifier[] Modifier;
+
+        public SemanticToken(Token token, OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType type, params OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenModifier[] modifiers)
+        {
+            this.Line = token.Position.Start.Line;
+            this.Col = token.Position.Start.Character;
+            this.Length = token.text.Length;
+            this.Type = type;
+            this.Modifier = modifiers;
         }
     }
 }

@@ -89,6 +89,12 @@ namespace BBCodeLanguageServer.Interface
 
         event ServiceAppEvent<SignatureHelpEventArgs, SignatureHelpInfo> IInterface.OnSignatureHelp
         {
+            add { }
+            remove { }
+        }
+
+        event ServiceAppEvent<DocumentEventArgs, SemanticToken[]> IInterface.OnSemanticTokensNeed
+        {
             add
             {
                 throw new System.NotImplementedException();

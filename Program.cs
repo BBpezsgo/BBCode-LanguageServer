@@ -16,7 +16,7 @@ namespace BBCodeLanguageServer
 #if true
         static void Main(string[] args)
         {
-            ServiceAppInterface2 serviceAppInterface = new();
+            ServiceAppInterfaceOmniSharp serviceAppInterface = new();
             Console.OutputEncoding = new System.Text.UTF8Encoding(); // UTF8N for non-Windows platform
             _ = new DocumentInterface(serviceAppInterface);
             try

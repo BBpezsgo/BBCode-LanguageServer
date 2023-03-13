@@ -1,8 +1,4 @@
-﻿using LanguageServer;
-using LanguageServer.Client;
-using LanguageServer.Parameters.Window;
-
-using System;
+﻿using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 namespace BBCodeLanguageServer
 {

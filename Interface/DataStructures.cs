@@ -1,11 +1,9 @@
 ﻿using IngameCoding.BBCode;
 
-using LanguageServer.Parameters;
-using LanguageServer.Parameters.TextDocument;
-using LanguageServer.Parameters.Workspace;
-
 namespace BBCodeLanguageServer.Interface
 {
+    using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+
     namespace SystemExtensions
     {
         using System;
@@ -53,162 +51,25 @@ namespace BBCodeLanguageServer.Interface
 
     internal static class Extensions
     {
-        internal static Range Convert1(this IngameCoding.Core.Position position) => new IngameCoding.Core.Range<IngameCoding.Core.SinglePosition>(position.Start, position.End).Convert1();
-        internal static Range Convert1(params IngameCoding.Tokenizer.BaseToken[] tokens)
-        {
-            if (tokens.Length == 0) throw new System.ArgumentException("Argument 'tokens's length can not be 0");
-
-            Range result = null;
-
-            for (int i = 0; i < tokens.Length; i++)
-            {
-                var token = tokens[i];
-
-                if (token == null) continue;
-                if (result == null) { result = token.Position.Convert1(); continue; }
-
-                var range = token.Position.Convert1();
-
-                if (result.start.line > range.start.line)
-                {
-                    result.start.line = range.start.line;
-                    result.start.character = range.start.character;
-                }
-                else if (result.start.character > range.start.character)
-                {
-                    result.start.character = range.start.character;
-                }
-
-                if (result.end.line < range.end.line)
-                {
-                    result.end.line = range.end.line;
-                    result.end.character = range.end.character;
-                }
-                else if (result.end.character < range.end.character)
-                {
-                    result.end.character = range.end.character;
-                }
-            }
-
-            if (result == null) throw new System.Exception("All tokens are null");
-
-            return result;
-        }
-
-        internal static Range Convert1(this IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> self) => new()
-        {
-            start = self.Start.Convert1(),
-            end = self.End.Convert1(),
-        };
-        internal static OmniSharp.Extensions.LanguageServer.Protocol.Models.Range Convert2(this IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> self) => new()
+        internal static Range Convert2(this IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> self) => new()
         {
             Start = self.Start.Convert2(),
             End = self.End.Convert2(),
         };
 
-        internal static Position Convert1(this IngameCoding.Core.SinglePosition self) => new()
-        {
-            line = self.Line - 1,
-            character = System.Math.Max(self.Character - 2, 0),
-        };
-        internal static OmniSharp.Extensions.LanguageServer.Protocol.Models.Position Convert2(this IngameCoding.Core.SinglePosition self) => new()
+        internal static Position Convert2(this IngameCoding.Core.SinglePosition self) => new()
         {
             Line = self.Line - 1,
             Character = System.Math.Max(self.Character - 2, 0),
         };
 
-        internal static IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> Convert1(this Range self) => new()
+        internal static Range Convert2(this IngameCoding.Core.Position self) => new()
         {
-            Start = self.start.Convert1(),
-            End = self.end.Convert1(),
+            Start = self.Start.Convert2(),
+            End = self.End.Convert2(),
         };
 
-        internal static IngameCoding.Core.SinglePosition Convert1(this Position self) => new()
-        {
-            Line = (int)self.line + 1,
-            Character = (int)self.character + 1,
-        };
-
-        internal static LocationSingleOrArray Convert(this SingleOrArray<FilePosition> self)
-        {
-            if (self.v.Length == 1)
-            {
-                return new LocationSingleOrArray(self.v[0].Convert1());
-            }
-            return new LocationSingleOrArray(self.v.Convert1());
-        }
-
-        internal static OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind Convert(this CompletionItemKind self) => self switch
-        {
-            CompletionItemKind.Text => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Text,
-            CompletionItemKind.Method => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Method,
-            CompletionItemKind.Function => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Function,
-            CompletionItemKind.Constructor => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Constructor,
-            CompletionItemKind.Field => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Field,
-            CompletionItemKind.Variable => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Variable,
-            CompletionItemKind.Class => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Class,
-            CompletionItemKind.Interface => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Interface,
-            CompletionItemKind.Module => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Module,
-            CompletionItemKind.Property => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Property,
-            CompletionItemKind.Unit => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Unit,
-            CompletionItemKind.Value => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Value,
-            CompletionItemKind.Enum => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Enum,
-            CompletionItemKind.Keyword => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            CompletionItemKind.Snippet => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Snippet,
-            CompletionItemKind.Color => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Color,
-            CompletionItemKind.File => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.File,
-            CompletionItemKind.Reference => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Reference,
-            CompletionItemKind.Folder => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Folder,
-            CompletionItemKind.EnumMember => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.EnumMember,
-            CompletionItemKind.Constant => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Constant,
-            CompletionItemKind.Struct => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Struct,
-            CompletionItemKind.Event => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Event,
-            CompletionItemKind.Operator => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Operator,
-            CompletionItemKind.TypeParameter => OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.TypeParameter,
-            _ => throw new System.NotImplementedException(),
-        };
-
-        internal static OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind Convert(this SymbolKind self) => self switch
-        {
-            SymbolKind.Array => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Array,
-            SymbolKind.File => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.File,
-            SymbolKind.Module => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Module,
-            SymbolKind.Namespace => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Namespace,
-            SymbolKind.Package => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Package,
-            SymbolKind.Class => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Class,
-            SymbolKind.Method => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Method,
-            SymbolKind.Property => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Property,
-            SymbolKind.Field => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Field,
-            SymbolKind.Constructor => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Constructor,
-            SymbolKind.Enum => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Enum,
-            SymbolKind.Interface => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Interface,
-            SymbolKind.Function => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Function,
-            SymbolKind.Variable => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Variable,
-            SymbolKind.Constant => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Constant,
-            SymbolKind.String => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.String,
-            SymbolKind.Number => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Number,
-            SymbolKind.Boolean => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Boolean,
-            SymbolKind.Object => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Object,
-            SymbolKind.Key => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Key,
-            SymbolKind.Null => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Null,
-            SymbolKind.EnumMember => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.EnumMember,
-            SymbolKind.Struct => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Struct,
-            SymbolKind.Event => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Event,
-            SymbolKind.Operator => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Operator,
-            SymbolKind.TypeParameter => OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.TypeParameter,
-            _ => throw new System.NotImplementedException(),
-        };
-
-        internal static T[] Convert1<T>(this IConvertable1<T>[] self)
-        {
-            T[] result = new T[self.Length];
-            for (int i = 0; i < self.Length; i++)
-            {
-                result[i] = self[i].Convert1();
-            }
-            return result;
-        }
-        internal static T[] Convert2<T>(this IConvertable2<T>[] self)
+        internal static T[] Convert2<T>(this IConvertable<T>[] self)
         {
             T[] result = new T[self.Length];
             for (int i = 0; i < self.Length; i++)
@@ -218,21 +79,15 @@ namespace BBCodeLanguageServer.Interface
             return result;
         }
 
-        internal static T Convert1<T>(this IConvertable1<T> self) => self.Convert1();
-        internal static T Convert2<T>(this IConvertable2<T> self) => self.Convert2();
+        internal static T Convert2<T>(this IConvertable<T> self) => self.Convert2();
     }
 
-    internal interface IConvertable1<T>
-    {
-        internal T Convert1();
-    }
-
-    internal interface IConvertable2<T>
+    internal interface IConvertable<T>
     {
         internal T Convert2();
     }
 
-    internal class CodeLensInfo : IConvertable1<CodeLens>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens>
+    internal class CodeLensInfo : IConvertable<CodeLens>
     {
         internal IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> Range;
         internal string Title;
@@ -243,18 +98,9 @@ namespace BBCodeLanguageServer.Interface
             Range = range.Position;
         }
 
-        CodeLens IConvertable1<CodeLens>.Convert1() => new()
+        CodeLens IConvertable<CodeLens>.Convert2() => new()
         {
-            range = Range.Convert1(),
-            command = new Command()
-            {
-                title = Title,
-            },
-        };
-
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens>.Convert2() => new()
-        {
-            Command = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Command()
+            Command = new Command()
             {
                 Title = Title,
             },
@@ -262,7 +108,7 @@ namespace BBCodeLanguageServer.Interface
         };
     }
 
-    internal class ParameterInfo : IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformation>
+    internal class ParameterInfo : IConvertable<ParameterInformation>
     {
         readonly string Label;
         readonly string Documentation;
@@ -273,14 +119,14 @@ namespace BBCodeLanguageServer.Interface
             this.Documentation = Documentation;
         }
 
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformation IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformation>.Convert2() => new()
+        ParameterInformation IConvertable<ParameterInformation>.Convert2() => new()
         {
-            Label = new OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformationLabel(this.Label),
-            Documentation = new OmniSharp.Extensions.LanguageServer.Protocol.Models.StringOrMarkupContent(this.Documentation),
+            Label = new ParameterInformationLabel(this.Label),
+            Documentation = new StringOrMarkupContent(this.Documentation),
         };
     }
 
-    internal class SignatureInfo : IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureInformation>
+    internal class SignatureInfo : IConvertable<SignatureInformation>
     {
         readonly int ActiveParameter;
         readonly string Label;
@@ -295,16 +141,16 @@ namespace BBCodeLanguageServer.Interface
             this.Parameters = Parameters;
         }
 
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureInformation IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureInformation>.Convert2() => new()
+        SignatureInformation IConvertable<SignatureInformation>.Convert2() => new()
         {
             ActiveParameter = this.ActiveParameter,
             Label = this.Label,
-            Documentation = new OmniSharp.Extensions.LanguageServer.Protocol.Models.StringOrMarkupContent(this.Documentation),
-            Parameters = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<OmniSharp.Extensions.LanguageServer.Protocol.Models.ParameterInformation>(this.Parameters.Convert2())
+            Documentation = new StringOrMarkupContent(this.Documentation),
+            Parameters = new Container<ParameterInformation>(this.Parameters.Convert2())
         };
     }
 
-    internal class SignatureHelpInfo : IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelp>
+    internal class SignatureHelpInfo : IConvertable<SignatureHelp>
     {
         readonly int ActiveParameter;
         readonly int ActiveSignature;
@@ -317,34 +163,25 @@ namespace BBCodeLanguageServer.Interface
             this.Signatures = Signatures;
         }
 
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelp IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelp>.Convert2() => new()
+        SignatureHelp IConvertable<SignatureHelp>.Convert2() => new()
         {
             ActiveParameter = ActiveParameter,
             ActiveSignature = ActiveSignature,
-            Signatures = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureInformation>(Signatures.Convert2()),
+            Signatures = new Container<SignatureInformation>(Signatures.Convert2()),
         };
     }
 
-    internal class CompletionInfo : IConvertable1<CompletionItem>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItem>
+    internal class CompletionInfo : IConvertable<CompletionItem>
     {
         internal CompletionItemKind Kind;
         internal string Label;
         internal bool Preselect;
-        internal string? Detail;
+        internal string Detail;
         internal bool Deprecated;
 
-        public CompletionItem Convert1() => new()
+        CompletionItem IConvertable<CompletionItem>.Convert2() => new()
         {
-            kind = Kind,
-            label = Label,
-            deprecated = Deprecated,
-            detail = Detail,
-            preselect = Preselect,
-        };
-
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItem IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItem>.Convert2() => new()
-        {
-            Kind = Kind.Convert(),
+            Kind = Kind,
             Label = Label,
             Deprecated = Deprecated,
             Detail = Detail,
@@ -352,52 +189,33 @@ namespace BBCodeLanguageServer.Interface
         };
     }
 
-    internal class SymbolInformationInfo : IConvertable1<SymbolInformation>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolInformationOrDocumentSymbol>
+    internal class SymbolInformationInfo : IConvertable<SymbolInformationOrDocumentSymbol>
     {
         internal SymbolKind Kind;
         internal string Name;
-        internal Location Location;
+        internal DocumentLocation Location;
 
-        public SymbolInformation Convert1() => new()
+        SymbolInformationOrDocumentSymbol IConvertable<SymbolInformationOrDocumentSymbol>.Convert2() => new(new SymbolInformation()
         {
-            kind = Kind,
-            name = Name,
-            location = Location,
-        };
-
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolInformationOrDocumentSymbol IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolInformationOrDocumentSymbol>.Convert2() => new(new OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolInformation()
-        {
-            Kind = Kind.Convert(),
+            Kind = Kind,
             Name = Name,
-            Location = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Location()
+            Location = new Location()
             {
-                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range()
-                {
-                    Start = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Position((int)Location.range.start.line, (int)Location.range.start.character),
-                    End = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Position((int)Location.range.end.line, (int)Location.range.end.character),
-                },
-                Uri = Location.uri,
+                Range = Location.Range.Convert2(),
+                Uri = Location.Uri,
             },
         });
     }
 
-#pragma warning disable CS0618 // Type or member is obsolete
-    internal class HoverContent : IConvertable1<MarkedString>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.MarkedString>
+    internal class HoverContent : IConvertable<MarkedString>
     {
         internal string Lang;
         internal string Text;
 
-        MarkedString IConvertable1<MarkedString>.Convert1() => new()
-        {
-            language = Lang,
-            value = Text,
-        };
-
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.MarkedString IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.MarkedString>.Convert2() => new(Lang, Text);
+        MarkedString IConvertable<MarkedString>.Convert2() => new(Lang, Text);
     }
-#pragma warning restore CS0618 // Type or member is obsolete
 
-    internal class HoverInfo : IConvertable1<Hover>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.Hover>
+    internal class HoverInfo : IConvertable<Hover>
     {
         internal HoverContent Content
         {
@@ -406,20 +224,14 @@ namespace BBCodeLanguageServer.Interface
         internal HoverContent[] Contents;
         internal IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> Range;
 
-        public Hover Convert1() => new()
-        {
-            range = Range.Convert1(),
-            contents = Contents.Convert1(),
-        };
-
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.Hover IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.Hover>.Convert2() => new()
+        Hover IConvertable<Hover>.Convert2() => new()
         {
             Range = Range.Convert2(),
-            Contents = new OmniSharp.Extensions.LanguageServer.Protocol.Models.MarkedStringsOrMarkupContent(Contents.Convert2()),
+            Contents = new MarkedStringsOrMarkupContent(Contents.Convert2()),
         };
     }
 
-    internal class FilePosition : IConvertable1<Location>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationOrLocationLink>
+    internal class FilePosition : IConvertable<LocationOrLocationLink>
     {
         /// <summary>
         /// Span of the origin of this link.<br/><br/>
@@ -452,52 +264,34 @@ namespace BBCodeLanguageServer.Interface
             OriginRange = originRange;
         }
 
-        public Location Convert1() => new()
-        {
-            range = TargetRange.Convert1(),
-            uri = TargetUri,
-        };
-
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationOrLocationLink IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationOrLocationLink>.Convert2() => 
+        LocationOrLocationLink IConvertable<LocationOrLocationLink>.Convert2() => 
             OriginRange.HasValue ?
-            new(new OmniSharp.Extensions.LanguageServer.Protocol.Models.LocationLink()
+            new(new LocationLink()
             {
                 TargetRange = TargetRange.Convert2(),
                 TargetUri = TargetUri,
                 OriginSelectionRange = OriginRange.Value.Convert2(),
             })
             :
-            new(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Location()
+            new(new Location()
             {
                 Range = TargetRange.Convert2(),
                 Uri = TargetUri,
             });
     }
 
-    internal class DiagnosticInfo : IConvertable1<Diagnostic>, IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>
+    internal class DiagnosticInfo : IConvertable<Diagnostic>
     {
         internal DiagnosticSeverity severity;
-        internal Range range;
+        internal IngameCoding.Core.Position range;
         internal string message;
         internal string source;
 
-        public Diagnostic Convert1() => new()
-        {
-            message = message,
-            range = range,
-            severity = severity,
-            source = source,
-        };
-
-        OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic IConvertable2<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>.Convert2() => new()
+        Diagnostic IConvertable<Diagnostic>.Convert2() => new()
         {
             Message = message,
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range()
-            {
-                Start = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Position((int)range.start.line, (int)range.start.character),
-                End = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Position((int)range.end.line, (int)range.end.character),
-            },
-            Severity = (OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity)(int)severity,
+            Range = range.Convert2(),
+            Severity = (DiagnosticSeverity)(int)severity,
             Source = source,
         };
     }
@@ -541,37 +335,20 @@ namespace BBCodeLanguageServer.Interface
             Content = code;
             LanguageID = languageID;
         }
-
-        internal DocumentItem(TextDocumentItem v)
-        {
-            this.Uri = v.uri;
-            this.LanguageID = v.languageId;
-            this.Content = v.text;
-        }
     }
 
     internal struct Document
     {
         internal readonly System.Uri Uri;
 
-        public Document(TextDocumentItem v)
-        {
-            this.Uri = v.uri;
-        }
-
         public Document(DocumentItem v)
         {
             this.Uri = v.Uri;
         }
 
-        public Document(OmniSharp.Extensions.LanguageServer.Protocol.Models.TextDocumentIdentifier textDocument)
+        public Document(TextDocumentIdentifier textDocument)
         {
             this.Uri = textDocument.Uri.ToUri();
-        }
-
-        internal Document(TextDocumentIdentifier v)
-        {
-            this.Uri = v.uri;
         }
     }
 
@@ -579,16 +356,10 @@ namespace BBCodeLanguageServer.Interface
     {
         internal readonly Document Document;
 
-        public DocumentEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.ITextDocumentIdentifierParams v)
+        public DocumentEventArgs(ITextDocumentIdentifierParams v)
         {
             this.Document = new Document(v.TextDocument);
         }
-
-        internal DocumentEventArgs(TextDocumentIdentifier v)
-        {
-            this.Document = new Document(v);
-        }
-
         internal DocumentEventArgs(Document v)
         {
             this.Document = v;
@@ -600,25 +371,18 @@ namespace BBCodeLanguageServer.Interface
         internal readonly IngameCoding.Core.SinglePosition Position;
         internal readonly Document Document;
 
-        public DocumentPositionEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.DefinitionParams v) : this()
+        public DocumentPositionEventArgs(DefinitionParams v) : this()
         {
             this.Position = new IngameCoding.Core.SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
             this.Position.Character++;
             this.Document = new Document(v.TextDocument);
         }
 
-        public DocumentPositionEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.HoverParams v) : this()
+        public DocumentPositionEventArgs(HoverParams v) : this()
         {
             this.Position = new IngameCoding.Core.SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
             this.Position.Character++;
             this.Document = new Document(v.TextDocument);
-        }
-
-        internal DocumentPositionEventArgs(TextDocumentPositionParams v)
-        {
-            this.Position = v.position.Convert1();
-            this.Position.Character++;
-            this.Document = new Document(v.textDocument);
         }
     }
 
@@ -628,7 +392,7 @@ namespace BBCodeLanguageServer.Interface
         internal readonly IngameCoding.Core.SinglePosition Position;
         internal readonly Document Document;
 
-        public FindReferencesEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.ReferenceParams e) : this()
+        public FindReferencesEventArgs(ReferenceParams e) : this()
         {
             this.IncludeDeclaration = e.Context.IncludeDeclaration;
             this.Position = new IngameCoding.Core.SinglePosition(e.Position.Line + 1, e.Position.Character + 1);
@@ -643,19 +407,12 @@ namespace BBCodeLanguageServer.Interface
         internal readonly Document Document;
         internal readonly CompletionContext Context;
 
-        public DocumentPositionContextEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionParams e, string content) : this()
+        public DocumentPositionContextEventArgs(CompletionParams e, string content)
         {
             this.Position = new IngameCoding.Core.SinglePosition(e.Position.Line + 1, e.Position.Character + 1);
             this.Position.Character++;
             this.Document = new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), content, "bbc"));
-        }
-
-        internal DocumentPositionContextEventArgs(CompletionParams v)
-        {
-            this.Position = v.position.Convert1();
-            this.Position.Character++;
-            this.Document = new Document(v.textDocument);
-            this.Context = v.context;
+            this.Context = e.Context;
         }
     }
 
@@ -663,14 +420,9 @@ namespace BBCodeLanguageServer.Interface
     {
         internal readonly dynamic Config;
 
-        public ConfigEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.DidChangeConfigurationParams v)
+        public ConfigEventArgs(DidChangeConfigurationParams v)
         {
             this.Config = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(v.Settings.ToString());
-        }
-
-        internal ConfigEventArgs(DidChangeConfigurationParams v)
-        {
-            this.Config = new Newtonsoft.Json.Linq.JObject(v.settings);
         }
     }
 
@@ -678,9 +430,9 @@ namespace BBCodeLanguageServer.Interface
     {
         internal readonly IngameCoding.Core.SinglePosition Position;
         internal readonly Document Document;
-        internal readonly OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelpContext Context;
+        internal readonly SignatureHelpContext Context;
 
-        public SignatureHelpEventArgs(OmniSharp.Extensions.LanguageServer.Protocol.Models.SignatureHelpParams v)
+        public SignatureHelpEventArgs(SignatureHelpParams v)
         {
             this.Position = new IngameCoding.Core.SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
             this.Document = new Document(v.TextDocument);
@@ -693,10 +445,10 @@ namespace BBCodeLanguageServer.Interface
         internal readonly int Line;
         internal readonly int Col;
         internal readonly int Length;
-        internal readonly OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType Type;
-        internal readonly OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenModifier[] Modifier;
+        internal readonly SemanticTokenType Type;
+        internal readonly SemanticTokenModifier[] Modifier;
 
-        public SemanticToken(Token token, OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType type, params OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenModifier[] modifiers)
+        public SemanticToken(Token token, SemanticTokenType type, params SemanticTokenModifier[] modifiers)
         {
             this.Line = token.Position.Start.Line;
             this.Col = token.Position.Start.Character;
@@ -704,5 +456,12 @@ namespace BBCodeLanguageServer.Interface
             this.Type = type;
             this.Modifier = modifiers;
         }
+    }
+
+    internal class DocumentLocation
+    {
+        public System.Uri Uri;
+
+        public IngameCoding.Core.Position Range;
     }
 }

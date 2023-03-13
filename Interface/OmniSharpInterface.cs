@@ -1,16 +1,8 @@
 ﻿using BBCodeLanguageServer.Interface.Managers;
 
-using LanguageServer.Parameters.General;
-
-using MediatR;
-
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-using OmniSharp.Extensions.JsonRpc;
-using OmniSharp.Extensions.LanguageServer.Protocol;
-using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
@@ -20,18 +12,16 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using System;
 using System.Threading.Tasks;
 
-using DiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
-
 namespace BBCodeLanguageServer.Interface
 {
-    internal class ServiceAppInterface2 : IInterface
+    internal class ServiceAppInterfaceOmniSharp : IInterface
     {
         internal ILanguageServer Server;
         internal IServiceProvider ServiceProvider;
         internal Managers.BufferManager BufferManager;
         Logger2 logger;
 
-        internal static ServiceAppInterface2 Instance { get; private set; }
+        internal static ServiceAppInterfaceOmniSharp Instance { get; private set; }
 
         event ServiceAppEvent OnInitialize;
         event ServiceAppEvent<DocumentItemEventArgs> OnDocumentChanged;
@@ -47,7 +37,7 @@ namespace BBCodeLanguageServer.Interface
         event ServiceAppEvent<FindReferencesEventArgs, FilePosition[]> OnReferences;
         event ServiceAppEvent<DocumentEventArgs, SemanticToken[]> OnSemanticTokensNeed;
 
-        internal ServiceAppInterface2()
+        internal ServiceAppInterfaceOmniSharp()
         {
             Instance = this;
         }
@@ -141,20 +131,20 @@ namespace BBCodeLanguageServer.Interface
 
         class Logger2 : ILogger
         {
-            public void Send(LanguageServer.Parameters.Window.MessageType type, string message)
+            public void Send(MessageType type, string message)
             {
                 switch (type)
                 {
-                    case LanguageServer.Parameters.Window.MessageType.Error:
+                    case MessageType.Error:
                         Instance?.Server?.Window.LogError(message);
                         break;
-                    case LanguageServer.Parameters.Window.MessageType.Warning:
+                    case MessageType.Warning:
                         Instance?.Server?.Window.LogWarning(message);
                         break;
-                    case LanguageServer.Parameters.Window.MessageType.Info:
+                    case MessageType.Info:
                         Instance?.Server?.Window.LogInfo(message);
                         break;
-                    case LanguageServer.Parameters.Window.MessageType.Log:
+                    case MessageType.Log:
                         Instance?.Server?.Window.Log(message);
                         break;
                     default:
@@ -289,11 +279,7 @@ namespace BBCodeLanguageServer.Interface
                     Message = diagnostics[i].message,
                     Severity = (DiagnosticSeverity)((int)diagnostics[i].severity),
                     Source = diagnostics[i].source,
-                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range()
-                    {
-                        Start = new Position((int)diagnostics[i].range.start.line, (int)diagnostics[i].range.start.character),
-                        End = new Position((int)diagnostics[i].range.end.line, (int)diagnostics[i].range.end.character),
-                    },
+                    Range = diagnostics[i].range.Convert2(),
                 };
             }
 
@@ -361,7 +347,7 @@ namespace BBCodeLanguageServer.Interface
         class DiagnosticsHandler
         {
             readonly ILanguageServerFacade Router;
-            internal ServiceAppInterface2 Interface;
+            internal ServiceAppInterfaceOmniSharp Interface;
 
             public DiagnosticsHandler(ILanguageServerFacade router, BufferManager bufferManager)
             {
@@ -380,7 +366,7 @@ namespace BBCodeLanguageServer.Interface
 
         class BufferManager
         {
-            internal ServiceAppInterface2 Interface;
+            internal ServiceAppInterfaceOmniSharp Interface;
             readonly System.Collections.Concurrent.ConcurrentDictionary<Uri, Microsoft.Language.Xml.Buffer> Buffers = new();
 
             public void UpdateBuffer(Uri uri, Microsoft.Language.Xml.Buffer buffer)
@@ -409,16 +395,16 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Log($"Symbols()");
 
-                if (ServiceAppInterface2.Instance.Server == null) return null;
+                if (ServiceAppInterfaceOmniSharp.Instance.Server == null) return null;
 
                 try
                 {
-                    SymbolInformationInfo[] result = ServiceAppInterface2.Instance.OnDocumentSymbolsExternal(new DocumentEventArgs(new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), ServiceAppInterface2.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri()), "bbc"))));
+                    SymbolInformationInfo[] result = ServiceAppInterfaceOmniSharp.Instance.OnDocumentSymbolsExternal(new DocumentEventArgs(new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), ServiceAppInterfaceOmniSharp.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri()), "bbc"))));
                     return new SymbolInformationOrDocumentSymbolContainer(result.Convert2());
                 }
                 catch (ServiceException error)
                 {
-                    ServiceAppInterface2.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
+                    ServiceAppInterfaceOmniSharp.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
                     return new SymbolInformationOrDocumentSymbolContainer();
                 }
             });
@@ -439,16 +425,16 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Log($"CompletionHandler.Handle()");
 
-                if (ServiceAppInterface2.Instance.Server == null) return null;
+                if (ServiceAppInterfaceOmniSharp.Instance.Server == null) return null;
 
                 try
                 {
-                    CompletionInfo[] result = ServiceAppInterface2.Instance.OnCompletionExternal(new DocumentPositionContextEventArgs(e, ServiceAppInterface2.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri())));
+                    CompletionInfo[] result = ServiceAppInterfaceOmniSharp.Instance.OnCompletionExternal(new DocumentPositionContextEventArgs(e, ServiceAppInterfaceOmniSharp.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri())));
                     return new CompletionList(result.Convert2());
                 }
                 catch (ServiceException error)
                 {
-                    ServiceAppInterface2.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
+                    ServiceAppInterfaceOmniSharp.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
                     return new CompletionList();
                 }
             });
@@ -470,16 +456,16 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Log($"CodeLens()");
 
-                if (ServiceAppInterface2.Instance.Server == null) return null;
+                if (ServiceAppInterfaceOmniSharp.Instance.Server == null) return null;
 
                 try
                 {
-                    var result = ServiceAppInterface2.Instance.OnCodeLensExternal(new DocumentEventArgs(new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), ServiceAppInterface2.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri()), "bbc"))));
+                    var result = ServiceAppInterfaceOmniSharp.Instance.OnCodeLensExternal(new DocumentEventArgs(new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), ServiceAppInterfaceOmniSharp.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri()), "bbc"))));
                     return new CodeLensContainer(result.Convert2());
                 }
                 catch (ServiceException error)
                 {
-                    ServiceAppInterface2.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
+                    ServiceAppInterfaceOmniSharp.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
                     return new CodeLensContainer();
                 }
             });
@@ -500,17 +486,17 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Log($"DefinitionHandler.Handle()");
 
-                if (ServiceAppInterface2.Instance.Server == null) return null;
+                if (ServiceAppInterfaceOmniSharp.Instance.Server == null) return null;
 
                 try
                 {
-                    var result = ServiceAppInterface2.Instance.OnGotoDefinitionExternal(new DocumentPositionEventArgs(e));
+                    var result = ServiceAppInterfaceOmniSharp.Instance.OnGotoDefinitionExternal(new DocumentPositionEventArgs(e));
                     if (!result.HasValue) return new LocationOrLocationLinks();
                     return new LocationOrLocationLinks(result.Value.v.Convert2());
                 }
                 catch (ServiceException error)
                 {
-                    ServiceAppInterface2.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
+                    ServiceAppInterfaceOmniSharp.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
                     return new LocationOrLocationLinks();
                 }
             });
@@ -530,17 +516,17 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Log($"DefinitionHandler.Handle()");
 
-                if (ServiceAppInterface2.Instance.Server == null) return null;
+                if (ServiceAppInterfaceOmniSharp.Instance.Server == null) return null;
 
                 try
                 {
-                    var result = ServiceAppInterface2.Instance.OnHoverExternal(new DocumentPositionEventArgs(e));
+                    var result = ServiceAppInterfaceOmniSharp.Instance.OnHoverExternal(new DocumentPositionEventArgs(e));
                     if (result == null) return new Hover();
                     return result.Convert2();
                 }
                 catch (ServiceException error)
                 {
-                    ServiceAppInterface2.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
+                    ServiceAppInterfaceOmniSharp.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
                     return new Hover();
                 }
             });
@@ -560,11 +546,11 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Log($"ReferencesHandler.Handle()");
 
-                if (ServiceAppInterface2.Instance.Server == null) return null;
+                if (ServiceAppInterfaceOmniSharp.Instance.Server == null) return null;
 
                 try
                 {
-                    var result = ServiceAppInterface2.Instance.OnReferencesExternal(e);
+                    var result = ServiceAppInterfaceOmniSharp.Instance.OnReferencesExternal(e);
                     if (result == null) return new LocationContainer();
                     var resultConverted = new Location[result.Length];
                     for (int i = 0; i < result.Length; i++)
@@ -575,7 +561,7 @@ namespace BBCodeLanguageServer.Interface
                 }
                 catch (ServiceException error)
                 {
-                    ServiceAppInterface2.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
+                    ServiceAppInterfaceOmniSharp.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
                     return new LocationContainer();
                 }
             });
@@ -595,17 +581,17 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Log($"SignatureHelpHandler.Handle()");
 
-                if (ServiceAppInterface2.Instance.Server == null) return null;
+                if (ServiceAppInterfaceOmniSharp.Instance.Server == null) return null;
 
                 try
                 {
-                    var result = ServiceAppInterface2.Instance.OnSignatureHelpExternal(e);
+                    var result = ServiceAppInterfaceOmniSharp.Instance.OnSignatureHelpExternal(e);
                     if (result == null) return new SignatureHelp();
                     return result.Convert2();
                 }
                 catch (ServiceException error)
                 {
-                    ServiceAppInterface2.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
+                    ServiceAppInterfaceOmniSharp.Instance?.Server?.Window?.ShowWarning($"ServiceException: {error.Message}");
                     return new SignatureHelp();
                 }
             });
@@ -626,7 +612,7 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Log($"DidChangeConfiguration()");
 
-                ServiceAppInterface2.Instance.OnConfigChangedExternal(e);
+                ServiceAppInterfaceOmniSharp.Instance.OnConfigChangedExternal(e);
 
                 return Unit.Value;
             });
@@ -667,7 +653,7 @@ namespace BBCodeLanguageServer.Interface
             {
                 Logger.Info($"SemanticTokensHandler.Tokenize()");
 
-                var tokens = ServiceAppInterface2.Instance.OnSemanticTokensNeedExternal(identifier);
+                var tokens = ServiceAppInterfaceOmniSharp.Instance.OnSemanticTokensNeedExternal(identifier);
 
                 await Task.Yield();
 

@@ -7,14 +7,9 @@ using IngameCoding.BBCode.Parser;
 using IngameCoding.BBCode.Parser.Statements;
 using IngameCoding.Core;
 
-using LanguageServer.Parameters;
-using LanguageServer.Parameters.TextDocument;
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
-using static BBCodeLanguageServer.Interface.Extensions;
 
 namespace BBCodeLanguageServer
 {
@@ -95,13 +90,13 @@ namespace BBCodeLanguageServer
 
             static DiagnosticInfo DiagnostizeException(IngameCoding.Errors.Exception exception, string source)
             {
-                var range = exception.Position.Convert1();
+                var range = exception.Position;
 
-                Logger.Log($"{source} Error: {exception.MessageAll}\n  at {range.start.line}:{range.start.character} - {range.end.line}:{range.end.character}");
+                Logger.Log($"{source} Error: {exception.MessageAll}\n  at {range.ToMinString()}");
 
                 return new DiagnosticInfo
                 {
-                    severity = DiagnosticSeverity.Error,
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
                     range = range,
                     message = exception.Message,
                     source = source,
@@ -109,13 +104,13 @@ namespace BBCodeLanguageServer
             }
             static DiagnosticInfo DiagnostizeError(IngameCoding.Errors.Error error, string source)
             {
-                var range = error.Position.Convert1();
+                var range = error.Position;
 
-                Logger.Log($"{source} Error: {error.MessageAll}\n  at {range.start.line}:{range.start.character} - {range.end.line}:{range.end.character}");
+                Logger.Log($"{source} Error: {error.MessageAll}\n  at {range.ToMinString()}");
 
                 return new DiagnosticInfo
                 {
-                    severity = DiagnosticSeverity.Error,
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
                     range = range,
                     message = error.Message,
                     source = source,
@@ -123,13 +118,13 @@ namespace BBCodeLanguageServer
             }
             static DiagnosticInfo DiagnostizeHint(IngameCoding.Errors.Hint hint, string source)
             {
-                var range = hint.Position.Convert1();
+                var range = hint.Position;
 
-                Logger.Log($"{source}: {hint.MessageAll}\n  at {range.start.line}:{range.start.character} - {range.end.line}:{range.end.character}");
+                Logger.Log($"{source}: {hint.MessageAll}\n  at {range.ToMinString()}");
 
                 return new DiagnosticInfo
                 {
-                    severity = DiagnosticSeverity.Hint,
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Hint,
                     range = range,
                     message = hint.Message,
                     source = source,
@@ -137,17 +132,17 @@ namespace BBCodeLanguageServer
             }
             static DiagnosticInfo DiagnostizeInformation(IngameCoding.Errors.Information information, string source)
             {
-                var range = information.Position.Convert1();
+                var range = information.Position;
 
                 Logger.Log(
                     $"{source}: {information.MessageAll}\n" +
-                    $"  at {range.start.line}:{range.start.character} - {range.end.line}:{range.end.character}\n" +
+                    $"  at {range.ToMinString()}\n" +
                     $"  in {information.File}"
                     );
 
                 return new DiagnosticInfo
                 {
-                    severity = DiagnosticSeverity.Information,
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Information,
                     range = range,
                     message = information.Message,
                     source = source,
@@ -205,8 +200,8 @@ namespace BBCodeLanguageServer
                         Logger.Log($"Compiler Warning: {AnalysisResult.CompilerErrors[i]}");
                         diagnostics.Add(new DiagnosticInfo
                         {
-                            severity = DiagnosticSeverity.Warning,
-                            range = error.Position.Convert1(),
+                            severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
+                            range = error.Position,
                             message = error.Message,
                             source = "Compiler",
                         });
@@ -230,8 +225,8 @@ namespace BBCodeLanguageServer
 
                 diagnostics.Add(new DiagnosticInfo
                 {
-                    severity = DiagnosticSeverity.Warning,
-                    range = warning.Position.Convert1(),
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
+                    range = warning.Position,
                     message = warning.Message,
                 });
             }
@@ -272,7 +267,7 @@ namespace BBCodeLanguageServer
                     {
                         Label = function.Name.text,
                         Detail = function.ReadableID(),
-                        Kind = CompletionItemKind.Function,
+                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Function,
                     });
                 }
 
@@ -282,7 +277,7 @@ namespace BBCodeLanguageServer
                     {
                         Label = @struct.Value.Name.text,
                         Detail = @struct.Value.FullName,
-                        Kind = CompletionItemKind.Struct,
+                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Struct,
                     });
                 }
 
@@ -292,7 +287,7 @@ namespace BBCodeLanguageServer
                     {
                         Label = variable.VariableName.text,
                         Detail = $"(global var) {variable.Type.text} {variable.VariableName.text}",
-                        Kind = CompletionItemKind.Variable,
+                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Variable,
                     });
                 }
             }
@@ -300,89 +295,89 @@ namespace BBCodeLanguageServer
             result.Add(new CompletionInfo()
             {
                 Label = "int",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "float",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "bool",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "string",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "new",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "void",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "struct",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "namespace",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "var",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
 
             result.Add(new CompletionInfo()
             {
                 Label = "return",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "if",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "elseif",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "else",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "for",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "while",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
 
             result.Add(new CompletionInfo()
             {
                 Label = "true",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
             result.Add(new CompletionInfo()
             {
                 Label = "false",
-                Kind = CompletionItemKind.Keyword,
+                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
             });
 
             return result.ToArray();
@@ -1316,11 +1311,11 @@ namespace BBCodeLanguageServer
                 {
                     symbols.Add(new SymbolInformationInfo()
                     {
-                        Kind = SymbolKind.Namespace,
-                        Location = new Location()
+                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Namespace,
+                        Location = new DocumentLocation()
                         {
-                            range = Convert1(item.Keyword, item.Name, item.BracketStart, item.BracketEnd),
-                            uri = e.Document.Uri,
+                            Range = new IngameCoding.Core.Position(item.Keyword, item.Name, item.BracketStart, item.BracketEnd),
+                            Uri = e.Document.Uri,
                         },
                         Name = item.Name.text,
                     });
@@ -1336,11 +1331,11 @@ namespace BBCodeLanguageServer
                             if (attr.Parameters[0] is not string eventName) continue;
                             symbols.Add(new SymbolInformationInfo()
                             {
-                                Kind = SymbolKind.Event,
-                                Location = new Location()
+                                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Event,
+                                Location = new DocumentLocation()
                                 {
-                                    range = Convert1(item.Type, item.Name, item.BracketStart, item.BracketEnd, attr.Name),
-                                    uri = e.Document.Uri,
+                                    Range = new IngameCoding.Core.Position(item.Type, item.Name, item.BracketStart, item.BracketEnd, attr.Name),
+                                    Uri = e.Document.Uri,
                                 },
                                 Name = "On" + eventName.FirstCharToUpper(),
                             });
@@ -1348,11 +1343,11 @@ namespace BBCodeLanguageServer
                     }
                     SymbolInformationInfo funcSymbol = new()
                     {
-                        Kind = SymbolKind.Function,
-                        Location = new Location()
+                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Function,
+                        Location = new DocumentLocation()
                         {
-                            range = Convert1(item.Type, item.Name, item.BracketStart, item.BracketEnd),
-                            uri = e.Document.Uri,
+                            Range = new IngameCoding.Core.Position(item.Type, item.Name, item.BracketStart, item.BracketEnd),
+                            Uri = e.Document.Uri,
                         },
                         Name = item.Name.text,
                     };
@@ -1376,11 +1371,11 @@ namespace BBCodeLanguageServer
                             Namespaces.Add(item2);
                             symbols.Add(new SymbolInformationInfo()
                             {
-                                Kind = SymbolKind.Namespace,
-                                Location = new Location()
+                                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Namespace,
+                                Location = new DocumentLocation()
                                 {
-                                    range = item.Name.Position.Convert1(),
-                                    uri = e.Document.Uri,
+                                    Range = new IngameCoding.Core.Position(item.Name),
+                                    Uri = e.Document.Uri,
                                 },
                                 Name = item2,
                             });
@@ -1394,11 +1389,11 @@ namespace BBCodeLanguageServer
                 {
                     symbols.Add(new SymbolInformationInfo()
                     {
-                        Kind = SymbolKind.Struct,
-                        Location = new Location()
+                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Struct,
+                        Location = new DocumentLocation()
                         {
-                            range = Convert1(item.Value.Name, item.Value.BracketStart, item.Value.BracketEnd),
-                            uri = e.Document.Uri,
+                            Range = new IngameCoding.Core.Position(item.Value.Name, item.Value.BracketStart, item.Value.BracketEnd),
+                            Uri = e.Document.Uri,
                         },
                         Name = item.Value.Name.text,
                     });
@@ -1407,11 +1402,11 @@ namespace BBCodeLanguageServer
                     {
                         symbols.Add(new SymbolInformationInfo()
                         {
-                            Kind = SymbolKind.Field,
-                            Location = new Location()
+                            Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Field,
+                            Location = new DocumentLocation()
                             {
-                                range = Convert1(field.type, field.name),
-                                uri = e.Document.Uri,
+                                Range = new IngameCoding.Core.Position(field.type, field.name),
+                                Uri = e.Document.Uri,
                             },
                             Name = field.name.text,
                         });

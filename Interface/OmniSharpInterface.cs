@@ -661,28 +661,6 @@ namespace BBCodeLanguageServer.Interface
                 {
                     builder.Push(token.Line - 1, token.Col - 2, token.Length, token.Type, token.Modifier);
                 }
-
-                /*
-                using var typesEnumerator = RotateEnum(SemanticTokenType.Defaults).GetEnumerator();
-                using var modifiersEnumerator = RotateEnum(SemanticTokenModifier.Defaults).GetEnumerator();
-                // you would normally get this from a common source that is managed by current open editor, current active editor, etc.
-                var content = await System.IO.File.ReadAllTextAsync(DocumentUri.GetFileSystemPath(identifier), cancellationToken).ConfigureAwait(false);
-                await Task.Yield();
-
-                foreach (var (line, text) in content.Split('\n').Select((text, line) => (line, text)))
-                {
-                    var parts = text.TrimEnd().Split(';', ' ', '.', '"', '(', ')');
-                    var index = 0;
-                    foreach (var part in parts)
-                    {
-                        typesEnumerator.MoveNext();
-                        modifiersEnumerator.MoveNext();
-                        if (string.IsNullOrWhiteSpace(part)) continue;
-                        index = text.IndexOf(part, index, StringComparison.Ordinal);
-                        builder.Push(line, index, part.Length, typesEnumerator.Current, modifiersEnumerator.Current);
-                    }
-                }
-                */
             }
 
             static IEnumerable<T> RotateEnum<T>(IEnumerable<T> values)

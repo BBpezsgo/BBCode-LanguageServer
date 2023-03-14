@@ -2,6 +2,8 @@
 
 namespace BBCodeLanguageServer.Interface
 {
+    using BBCodeLanguageServer.Interface.SystemExtensions;
+
     using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
     namespace SystemExtensions
@@ -31,6 +33,8 @@ namespace BBCodeLanguageServer.Interface
                 { self.Add(key, value); }
                 return self[key];
             }
+
+            internal static string Extension(this Uri uri) => uri.AbsolutePath[(uri.AbsolutePath.LastIndexOf(".") + 1)..].ToLower();
         }
     }
 
@@ -92,17 +96,37 @@ namespace BBCodeLanguageServer.Interface
         internal IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> Range;
         internal string Title;
 
+        internal string CommandName;
+        internal string[] CommandArgs;
+
         internal CodeLensInfo(string title, IngameCoding.Tokenizer.BaseToken range)
         {
             Title = title;
             Range = range.Position;
         }
 
-        CodeLens IConvertable<CodeLens>.Convert2() => new()
+        internal CodeLensInfo(string title, IngameCoding.Tokenizer.BaseToken range, string Command, params string[] CommandArgs)
+        {
+            this.Title = title;
+            this.Range = range.Position;
+            this.CommandName = Command;
+            this.CommandArgs = CommandArgs;
+        }
+
+        CodeLens IConvertable<CodeLens>.Convert2() => (CommandName == null) ? new()
         {
             Command = new Command()
             {
                 Title = Title,
+            },
+            Range = Range.Convert2(),
+        } : new()
+        {
+            Command = new Command()
+            {
+                Title = Title,
+                Name = CommandName,
+                Arguments = new Newtonsoft.Json.Linq.JArray(CommandArgs),
             },
             Range = Range.Convert2(),
         };
@@ -329,7 +353,7 @@ namespace BBCodeLanguageServer.Interface
         internal readonly string LanguageID;
         internal readonly string Content;
 
-        public DocumentItem(System.Uri uri, string code, string languageID) : this()
+        public DocumentItem(System.Uri uri, string code, string languageID)
         {
             Uri = uri;
             Content = code;
@@ -411,7 +435,7 @@ namespace BBCodeLanguageServer.Interface
         {
             this.Position = new IngameCoding.Core.SinglePosition(e.Position.Line + 1, e.Position.Character + 1);
             this.Position.Character++;
-            this.Document = new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), content, "bbc"));
+            this.Document = new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), content, e.TextDocument.Uri.ToUri().Extension()));
             this.Context = e.Context;
         }
     }

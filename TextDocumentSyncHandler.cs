@@ -1,4 +1,6 @@
-﻿using MediatR;
+﻿using BBCodeLanguageServer.Interface.SystemExtensions;
+
+using MediatR;
 
 using Microsoft.Language.Xml;
 
@@ -13,6 +15,19 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+namespace BBCodeLanguageServer
+{
+    internal static class DocumentSelectorGen
+    {
+        internal static DocumentSelector Get() => new(new DocumentFilter[2] {
+            new DocumentFilter() { Pattern = "**/*.bbc" },
+            new DocumentFilter() { Pattern = "**/*.bbct" }
+        });
+
+        internal static DocumentSelector ForLanguage() => DocumentSelector.ForLanguage("bbc", "bbct");
+    }
+}
+
 namespace BBCodeLanguageServer.Managers
 {
     class TextDocumentHandler : TextDocumentSyncHandlerBase
@@ -20,10 +35,7 @@ namespace BBCodeLanguageServer.Managers
         readonly ILanguageServerFacade Router;
         readonly Interface.Managers.BufferManager BufferManager;
 
-        readonly DocumentSelector DocumentSelector = new(new DocumentFilter()
-        {
-            Pattern = "**/*.bbc",
-        });
+        readonly DocumentSelector DocumentSelector = DocumentSelectorGen.Get();
 
         public TextDocumentHandler(ILanguageServerFacade router, Interface.Managers.BufferManager bufferManager)
         {
@@ -37,15 +49,14 @@ namespace BBCodeLanguageServer.Managers
             SyncKind = TextDocumentSyncKind.Full,
         };
 
-        public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri) => new(uri, "bbc");
+        public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri) => new(uri, uri.ToUri().Extension());
 
         public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
         {
             Logger.Log($"OnDocumentOpen({request.TextDocument.Uri.ToUri()})");
 
             BufferManager.UpdateBuffer(request.TextDocument.Uri.ToUri(), new StringBuffer(request.TextDocument.Text));
-
-            BufferManager.Interface.OnDocumentOpenedExternal(new Interface.Managers.BufferManager.DocumentEventArgs(request.TextDocument.Uri.ToUri()));
+            BufferManager.Interface.OnDocumentOpenedExternal(new Interface.Managers.BufferManager.DocumentEventArgs(request.TextDocument));
 
             return Unit.Task;
         }
@@ -59,7 +70,7 @@ namespace BBCodeLanguageServer.Managers
 
             BufferManager.UpdateBuffer(uri, new StringBuffer(text));
 
-            BufferManager.Interface.OnDocumentChangedExternal(new Interface.Managers.BufferManager.DocumentEventArgs(uri));
+            BufferManager.Interface.OnDocumentChangedExternal(new Interface.Managers.BufferManager.DocumentEventArgs(request.TextDocument));
 
             return Unit.Task;
         }

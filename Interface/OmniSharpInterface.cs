@@ -309,12 +309,12 @@ namespace BBCodeLanguageServer.Interface
         internal void OnDocumentChangedExternal(Managers.BufferManager.DocumentEventArgs e)
         {
             if (Server == null) return;
-            OnDocumentChanged?.Invoke(new DocumentItemEventArgs(new DocumentItem(e.Uri, GetDocumentContent(e.Uri), "bbc")));
+            OnDocumentChanged?.Invoke(new DocumentItemEventArgs(new DocumentItem(e.Uri, GetDocumentContent(e.Uri), e.LanguageId)));
         }
         internal void OnDocumentOpenedExternal(BufferManager.DocumentEventArgs e)
         {
             if (Server == null) return;
-            OnDocumentOpened?.Invoke(new DocumentItemEventArgs(new DocumentItem(e.Uri, GetDocumentContent(e.Uri), "bbc")));
+            OnDocumentOpened?.Invoke(new DocumentItemEventArgs(new DocumentItem(e.Uri, GetDocumentContent(e.Uri), e.LanguageId)));
         }
         internal FilePosition[] OnReferencesExternal(ReferenceParams e) => OnReferences?.Invoke(new FindReferencesEventArgs(e));
         internal void OnConfigChangedExternal(DidChangeConfigurationParams e) => OnConfigChanged?.Invoke(new ConfigEventArgs(e));
@@ -331,6 +331,8 @@ namespace BBCodeLanguageServer.Interface
 
     namespace Managers
     {
+        using BBCodeLanguageServer.Interface.SystemExtensions;
+
         using MediatR;
 
         using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -380,11 +382,22 @@ namespace BBCodeLanguageServer.Interface
 
             public class DocumentEventArgs : EventArgs
             {
-                public Uri Uri { get; }
+                public readonly Uri Uri;
+                public readonly int? Version;
+                public readonly string LanguageId;
 
-                public DocumentEventArgs(Uri uri)
+                public DocumentEventArgs(OptionalVersionedTextDocumentIdentifier textDocument)
                 {
-                    Uri = uri;
+                    Uri = textDocument.Uri.ToUri();
+                    Version = textDocument.Version;
+                    LanguageId = Uri.Extension();
+                }
+
+                public DocumentEventArgs(TextDocumentItem textDocument)
+                {
+                    Uri = textDocument.Uri.ToUri();
+                    Version = textDocument.Version;
+                    LanguageId = textDocument.LanguageId;
                 }
             }
         }
@@ -399,7 +412,7 @@ namespace BBCodeLanguageServer.Interface
 
                 try
                 {
-                    SymbolInformationInfo[] result = ServiceAppInterfaceOmniSharp.Instance.OnDocumentSymbolsExternal(new DocumentEventArgs(new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), ServiceAppInterfaceOmniSharp.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri()), "bbc"))));
+                    SymbolInformationInfo[] result = ServiceAppInterfaceOmniSharp.Instance.OnDocumentSymbolsExternal(new DocumentEventArgs(new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), ServiceAppInterfaceOmniSharp.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri()), e.TextDocument.Uri.ToUri().Extension()))));
                     return new SymbolInformationOrDocumentSymbolContainer(result.Convert2());
                 }
                 catch (ServiceException error)
@@ -414,7 +427,7 @@ namespace BBCodeLanguageServer.Interface
                 capability.HierarchicalDocumentSymbolSupport = true;
                 return new DocumentSymbolRegistrationOptions()
                 {
-                    DocumentSelector = DocumentSelector.ForLanguage("bbc"),
+                    DocumentSelector = DocumentSelector.ForLanguage("bbc", "bbct"),
                 };
             }
         }
@@ -444,7 +457,7 @@ namespace BBCodeLanguageServer.Interface
                 capability.ContextSupport = false;
                 return new CompletionRegistrationOptions()
                 {
-                    DocumentSelector = DocumentSelector.ForLanguage("bbc"),
+                    DocumentSelector = DocumentSelector.ForLanguage("bbc", "bbct"),
                     ResolveProvider = false,
                 };
             }
@@ -460,7 +473,7 @@ namespace BBCodeLanguageServer.Interface
 
                 try
                 {
-                    var result = ServiceAppInterfaceOmniSharp.Instance.OnCodeLensExternal(new DocumentEventArgs(new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), ServiceAppInterfaceOmniSharp.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri()), "bbc"))));
+                    var result = ServiceAppInterfaceOmniSharp.Instance.OnCodeLensExternal(new DocumentEventArgs(new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), ServiceAppInterfaceOmniSharp.Instance.GetDocumentContent(e.TextDocument.Uri.ToUri()), e.TextDocument.Uri.ToUri().Extension()))));
                     return new CodeLensContainer(result.Convert2());
                 }
                 catch (ServiceException error)
@@ -474,7 +487,7 @@ namespace BBCodeLanguageServer.Interface
             {
                 return new CodeLensRegistrationOptions()
                 {
-                    DocumentSelector = DocumentSelector.ForLanguage("bbc"),
+                    DocumentSelector = DocumentSelector.ForLanguage("bbc", "bbct"),
                     ResolveProvider = false,
                 };
             }

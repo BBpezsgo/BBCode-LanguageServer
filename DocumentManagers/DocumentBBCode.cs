@@ -11,9 +11,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace BBCodeLanguageServer
+namespace BBCodeLanguageServer.DocumentManagers
 {
-    internal class Doc
+    internal class DocumentBBCode : IDocument
     {
         readonly DocumentInterface App;
         string Text;
@@ -28,14 +28,14 @@ namespace BBCodeLanguageServer
 
         AnalysisResult BestAnalysisResult => HaveSuccesAlanysisResult ? LastSuccessAnalysisResult : AnalysisResult;
 
-        public Doc(DocumentItem document, DocumentInterface app)
+        public DocumentBBCode(DocumentItem document, DocumentInterface app)
         {
             App = app;
             AnalysisResult = AnalysisResult.Empty();
             OnChanged(document);
         }
 
-        internal void OnChanged(DocumentItem e)
+        public void OnChanged(DocumentItem e)
         {
             Text = e.Content;
             Url = e.Uri.ToString();
@@ -64,7 +64,7 @@ namespace BBCodeLanguageServer
             return null;
         }
 
-        internal void Validate(Document e)
+        void Validate(Document e)
         {
             var diagnostics = new List<DiagnosticInfo>();
             System.IO.FileInfo file = null;
@@ -253,7 +253,7 @@ namespace BBCodeLanguageServer
             // AnalysisResult.FileReferences = Analysis.FileReferences(file, path);
         }
 
-        internal CompletionInfo[] Completion(DocumentPositionContextEventArgs e)
+        CompletionInfo[] IDocument.Completion(DocumentPositionContextEventArgs e)
         {
             Logger.Log($"Completion()");
 
@@ -383,7 +383,7 @@ namespace BBCodeLanguageServer
             return result.ToArray();
         }
 
-        internal HoverInfo Hover(DocumentPositionEventArgs e)
+        HoverInfo IDocument.Hover(DocumentPositionEventArgs e)
         {
             static HoverContent InfoFunctionDefinition(FunctionDefinition funcDef, bool IsDefinition)
             {
@@ -914,7 +914,7 @@ namespace BBCodeLanguageServer
             return null;
         }
 
-        internal static HoverContent Hover(TypeToken token)
+        static HoverContent Hover(TypeToken token)
         {
             HoverContent info = token.typeName switch
             {
@@ -942,7 +942,7 @@ namespace BBCodeLanguageServer
             if (info == null) return null;
             return info;
         }
-        internal static HoverContent Hover(Token token)
+        static HoverContent Hover(Token token)
         {
             {
                 var info = InfoTokenSubSubtype(token);
@@ -1064,7 +1064,7 @@ namespace BBCodeLanguageServer
             _ => null,
         };
 
-        internal CodeLensInfo[] CodeLens(DocumentEventArgs e)
+        CodeLensInfo[] IDocument.CodeLens(DocumentEventArgs e)
         {
             string path = System.Net.WebUtility.UrlDecode(e.Document.Uri.AbsolutePath);
             List<CodeLensInfo> result = new();
@@ -1142,13 +1142,13 @@ namespace BBCodeLanguageServer
             return result.ToArray();
         }
 
-        internal SingleOrArray<FilePosition>? GotoDefinition(DocumentPositionEventArgs e)
+        SingleOrArray<FilePosition>? IDocument.GotoDefinition(DocumentPositionEventArgs e)
         {
             Logger.Log($"GotoDefinition()");
 
-            if (!this.AnalysisResult.TokenizingSuccess) return null;
-            if (this.AnalysisResult.ParserFatalError != null) return null;
-            if (!this.AnalysisResult.Parsed) return null;
+            if (!AnalysisResult.TokenizingSuccess) return null;
+            if (AnalysisResult.ParserFatalError != null) return null;
+            if (!AnalysisResult.Parsed) return null;
 
             var pos = e.Position;
             var token = GetTokenAt(pos);
@@ -1182,7 +1182,7 @@ namespace BBCodeLanguageServer
 
                         if (isContains == false) break;
 
-                        var usingFilePath = currentFile.Directory.FullName + "\\" + usingItem.PathString + "." + IngameCoding.Core.FileExtensions.Code;
+                        var usingFilePath = currentFile.Directory.FullName + "\\" + usingItem.PathString + "." + FileExtensions.Code;
 
                         if (System.IO.File.Exists(usingFilePath))
                         {
@@ -1210,7 +1210,7 @@ namespace BBCodeLanguageServer
                 Logger.Log($"Document uri scheme is not file");
             }
 
-            if (this.AnalysisResult.CompilerFatalError != null || !this.AnalysisResult.Compiled) return result;
+            if (AnalysisResult.CompilerFatalError != null || !AnalysisResult.Compiled) return result;
 
             StatementFinder.GetAllStatement(AnalysisResult.ParserResult, statement =>
             {
@@ -1297,7 +1297,7 @@ namespace BBCodeLanguageServer
             return result;
         }
 
-        internal SymbolInformationInfo[] Symbols(DocumentEventArgs e)
+        SymbolInformationInfo[] IDocument.Symbols(DocumentEventArgs e)
         {
             List<SymbolInformationInfo> symbols = new();
 
@@ -1314,7 +1314,7 @@ namespace BBCodeLanguageServer
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Namespace,
                         Location = new DocumentLocation()
                         {
-                            Range = new IngameCoding.Core.Position(item.Keyword, item.Name, item.BracketStart, item.BracketEnd),
+                            Range = new Position(item.Keyword, item.Name, item.BracketStart, item.BracketEnd),
                             Uri = e.Document.Uri,
                         },
                         Name = item.Name.text,
@@ -1334,7 +1334,7 @@ namespace BBCodeLanguageServer
                                 Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Event,
                                 Location = new DocumentLocation()
                                 {
-                                    Range = new IngameCoding.Core.Position(item.Type, item.Name, item.BracketStart, item.BracketEnd, attr.Name),
+                                    Range = new Position(item.Type, item.Name, item.BracketStart, item.BracketEnd, attr.Name),
                                     Uri = e.Document.Uri,
                                 },
                                 Name = "On" + eventName.FirstCharToUpper(),
@@ -1346,7 +1346,7 @@ namespace BBCodeLanguageServer
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Function,
                         Location = new DocumentLocation()
                         {
-                            Range = new IngameCoding.Core.Position(item.Type, item.Name, item.BracketStart, item.BracketEnd),
+                            Range = new Position(item.Type, item.Name, item.BracketStart, item.BracketEnd),
                             Uri = e.Document.Uri,
                         },
                         Name = item.Name.text,
@@ -1374,7 +1374,7 @@ namespace BBCodeLanguageServer
                                 Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Namespace,
                                 Location = new DocumentLocation()
                                 {
-                                    Range = new IngameCoding.Core.Position(item.Name),
+                                    Range = new Position(item.Name),
                                     Uri = e.Document.Uri,
                                 },
                                 Name = item2,
@@ -1392,7 +1392,7 @@ namespace BBCodeLanguageServer
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Struct,
                         Location = new DocumentLocation()
                         {
-                            Range = new IngameCoding.Core.Position(item.Value.Name, item.Value.BracketStart, item.Value.BracketEnd),
+                            Range = new Position(item.Value.Name, item.Value.BracketStart, item.Value.BracketEnd),
                             Uri = e.Document.Uri,
                         },
                         Name = item.Value.Name.text,
@@ -1405,7 +1405,7 @@ namespace BBCodeLanguageServer
                             Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Field,
                             Location = new DocumentLocation()
                             {
-                                Range = new IngameCoding.Core.Position(field.type, field.name),
+                                Range = new Position(field.type, field.name),
                                 Uri = e.Document.Uri,
                             },
                             Name = field.name.text,
@@ -1417,9 +1417,9 @@ namespace BBCodeLanguageServer
             return symbols.ToArray();
         }
 
-        internal FilePosition[] References(DocumentEventArgs e) => Array.Empty<FilePosition>();
+        FilePosition[] IDocument.References(DocumentEventArgs e) => Array.Empty<FilePosition>();
 
-        internal SignatureHelpInfo SignatureHelp(SignatureHelpEventArgs e)
+        SignatureHelpInfo IDocument.SignatureHelp(SignatureHelpEventArgs e)
         {
             if (!HaveSuccesAlanysisResult) return null;
             if (!BestAnalysisResult.Compiled) return null;
@@ -1439,7 +1439,7 @@ namespace BBCodeLanguageServer
             */
         }
 
-        internal SemanticToken[] GetSemanticTokens(DocumentEventArgs e)
+        SemanticToken[] IDocument.GetSemanticTokens(DocumentEventArgs e)
         {
             if (!HaveSuccesAlanysisResult) return Array.Empty<SemanticToken>();
             if (!BestAnalysisResult.Compiled) return Array.Empty<SemanticToken>();

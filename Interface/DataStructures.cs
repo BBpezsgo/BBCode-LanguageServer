@@ -63,7 +63,7 @@ namespace BBCodeLanguageServer.Interface
 
         internal static Position Convert2(this IngameCoding.Core.SinglePosition self) => new()
         {
-            Line = self.Line - 1,
+            Line = System.Math.Max(self.Line - 1, 0),
             Character = System.Math.Max(self.Character - 2, 0),
         };
 

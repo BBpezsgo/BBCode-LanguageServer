@@ -185,7 +185,7 @@ namespace BBCodeLanguageServer.DocumentManagers
 
         HoverInfo IDocument.Hover(DocumentPositionEventArgs e) => null;
         SingleOrArray<FilePosition>? IDocument.GotoDefinition(DocumentPositionEventArgs e) => null;
-        FilePosition[] IDocument.References(DocumentEventArgs e) => Array.Empty<FilePosition>();
+        FilePosition[] IDocument.References(FindReferencesEventArgs e) => Array.Empty<FilePosition>();
         SignatureHelpInfo IDocument.SignatureHelp(SignatureHelpEventArgs e) => null;
         SemanticToken[] IDocument.GetSemanticTokens(DocumentEventArgs e) => Array.Empty<SemanticToken>();
     }

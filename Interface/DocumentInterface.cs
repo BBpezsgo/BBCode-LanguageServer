@@ -11,7 +11,7 @@ namespace BBCodeLanguageServer.Interface
         internal void OnChanged(DocumentItem document);
         internal HoverInfo Hover(DocumentPositionEventArgs e);
         internal CodeLensInfo[] CodeLens(DocumentEventArgs e);
-        internal FilePosition[] References(DocumentEventArgs e);
+        internal FilePosition[] References(FindReferencesEventArgs e);
         internal SignatureHelpInfo SignatureHelp(SignatureHelpEventArgs e);
         internal SemanticToken[] GetSemanticTokens(DocumentEventArgs e);
         internal CompletionInfo[] Completion(DocumentPositionContextEventArgs e);
@@ -48,6 +48,7 @@ namespace BBCodeLanguageServer.Interface
             Interface.OnConfigChanged += DidChangeConfiguration;
             Interface.OnCompletion += Completion;
             Interface.OnHover += Hover;
+            Interface.OnReferences += References;
             Interface.OnCodeLens += CodeLens;
             Interface.OnSignatureHelp += SignatureHelp;
             Interface.OnSemanticTokensNeed += OnSemanticTokensNeed;
@@ -99,7 +100,7 @@ namespace BBCodeLanguageServer.Interface
         internal CompletionInfo[] Completion(DocumentPositionContextEventArgs e) => GetDoc(e.Document).Completion(e);
         internal HoverInfo Hover(DocumentPositionEventArgs e) => GetDoc(e.Document).Hover(e);
         internal CodeLensInfo[] CodeLens(DocumentEventArgs e) => GetDoc(e.Document).CodeLens(e);
-        internal FilePosition[] References(DocumentEventArgs e) => GetDoc(e.Document).References(e);
+        internal FilePosition[] References(FindReferencesEventArgs e) => GetDoc(e.Document).References(e);
         internal SignatureHelpInfo SignatureHelp(SignatureHelpEventArgs e) => GetDoc(e.Document).SignatureHelp(e);
         internal SemanticToken[] OnSemanticTokensNeed(DocumentEventArgs e) => GetDoc(e.Document).GetSemanticTokens(e);
     }

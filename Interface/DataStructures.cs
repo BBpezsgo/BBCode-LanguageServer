@@ -281,6 +281,13 @@ namespace BBCodeLanguageServer.Interface
             OriginRange = null;
         }
 
+        public FilePosition(IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> targetRange, string targetUri)
+        {
+            TargetRange = targetRange;
+            TargetUri = new System.Uri(targetUri);
+            OriginRange = null;
+        }
+
         public FilePosition(IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> originRange, IngameCoding.Core.Range<IngameCoding.Core.SinglePosition> targetRange, System.Uri targetUri)
         {
             TargetRange = targetRange;

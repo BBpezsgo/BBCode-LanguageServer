@@ -94,7 +94,7 @@ namespace BBCodeLanguageServer.DocumentManagers
             Tokenizer tokenizer = new(TokenizerSettings.Default);
             try
             {
-                (Tokens, _) = tokenizer.Parse(Text);
+                Tokens = tokenizer.Parse(Text);
             }
             catch (IngameCoding.Errors.Exception error)
             {

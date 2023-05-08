@@ -151,7 +151,10 @@ namespace BBCodeLanguageServer.DocumentManagers
 
             AnalysisResult = Analysis.Analyze(Text, file, path);
             Logger.Log($"Check file paths...");
-            AnalysisResult.CheckFilePaths(notSetMessage => Logger.Log($"{notSetMessage}"));
+            AnalysisResult.CheckFilePaths(notSetMessage =>
+            {
+                // Logger.Log($"{notSetMessage}");
+            });
 
             for (int i = 0; i < AnalysisResult.TokenizerInicodeChars.Length; i++)
             {
@@ -420,7 +423,7 @@ namespace BBCodeLanguageServer.DocumentManagers
         {
             static HoverContent InfoFunctionDefinition(FunctionDefinition funcDef, bool IsDefinition)
             {
-                var text = $"{funcDef.Type} {funcDef.FullName}(";
+                var text = $"{funcDef.TypeToken} {funcDef.FullName}(";
 
                 bool addComma = false;
 
@@ -429,7 +432,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     if (addComma) text += ", ";
 
                     if (funcDef.Parameters[i].withThisKeyword)
-                    { text = $"{funcDef.Type} {funcDef.Parameters[i].type}.{funcDef.FullName}("; continue; }
+                    { text = $"{funcDef.TypeToken} {funcDef.Parameters[i].type}.{funcDef.FullName}("; continue; }
 
                     text += $"{funcDef.Parameters[i].type} {funcDef.Parameters[i].name}";
                     addComma = true;
@@ -670,7 +673,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{def.Type.ToString()} {def.VariableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
+                                    Text = $"{refVariable.Type.ToStringWithNamespaces()} {def.VariableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
                                 });
                             }
                             else if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefParameter refParameter)
@@ -678,7 +681,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{refParameter.Type.ToString()} {variable.VariableName.text}; // Parameter",
+                                    Text = $"{refParameter.Type} {variable.VariableName.text}; // Parameter",
                                 });
                             }
                             else
@@ -709,7 +712,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{def.Type.ToString()} {def.VariableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
+                                    Text = $"{refVariable.Type.ToStringWithNamespaces()} {def.VariableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
                                 });
                             }
                             else
@@ -717,7 +720,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{newVariable.Type.ToString()} {newVariable.VariableName.text}; // Variable",
+                                    Text = $"{newVariable.Type} {newVariable.VariableName.text}; // Variable",
                                 });
                             }
 
@@ -1291,6 +1294,13 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new CodeLensInfo($"0 reference", func.Name));
                             }
                         }
+
+                        foreach (var pair in AnalysisResult.CompilerResult.compiledStructs)
+                        {
+                            var @struct = pair.Value;
+                            if (@struct.FilePath != path) continue;
+                            result.Add(new CodeLensInfo($"{@struct.References.Count} reference", @struct.Name, "editor.action.referenceSearch.trigger", "5"));
+                        }
                     }
                 }
                 else
@@ -1342,6 +1352,12 @@ namespace BBCodeLanguageServer.DocumentManagers
             {
                 Logger.Log($"No token at {pos.ToMinString()}");
                 return null;
+            }
+
+            if (token.Analysis != null && token.Analysis.Reference != null)
+            {
+                if (token.Analysis.Reference is TokenAnalysis.RefStruct refStruct) return new SingleOrArray<FilePosition>(new FilePosition(refStruct.Definition.Name.Position, refStruct.FilePath));
+                if (token.Analysis.Reference is TokenAnalysis.RefField refField) return new SingleOrArray<FilePosition>(new FilePosition(refField.NameToken.Position, refField.FilePath));
             }
 
             string currentFilePath = System.Net.WebUtility.UrlDecode(e.Document.Uri.AbsolutePath);
@@ -1438,20 +1454,6 @@ namespace BBCodeLanguageServer.DocumentManagers
                     {
                         Logger.Log($"GotoDef: Variable found {refVariable}");
                         result = new SingleOrArray<FilePosition>(new FilePosition(refVariable.Declaration.VariableName.Position, refVariable.Declaration.FilePath));
-                    }
-
-                    return true;
-                }
-                else if (statement is Statement_Field field)
-                {
-                    if (!field.FieldName.Position.Contains(pos)) return false;
-                    if (field.FieldName.Analysis == null) return true;
-                    if (field.FieldName.Analysis.Reference == null) return true;
-
-                    if (field.FieldName.Analysis.Reference is TokenAnalysis.RefField refField)
-                    {
-                        Logger.Log($"GotoDef: Field found {refField}");
-                        result = new SingleOrArray<FilePosition>(new FilePosition(refField.NameToken.Position, refField.FilePath));
                     }
 
                     return true;
@@ -1584,7 +1586,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Event,
                                 Location = new DocumentLocation()
                                 {
-                                    Range = new Position(item.Type, item.Name, item.BracketStart, item.BracketEnd, attr.Name),
+                                    Range = new Position(item.TypeToken, item.Name, item.BracketStart, item.BracketEnd, attr.Name),
                                     Uri = e.Document.Uri,
                                 },
                                 Name = "On" + eventName.FirstCharToUpper(),
@@ -1596,7 +1598,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Function,
                         Location = new DocumentLocation()
                         {
-                            Range = new Position(item.Type, item.Name, item.BracketStart, item.BracketEnd),
+                            Range = new Position(item.TypeToken, item.Name, item.BracketStart, item.BracketEnd),
                             Uri = e.Document.Uri,
                         },
                         Name = item.Name.text,
@@ -1675,15 +1677,20 @@ namespace BBCodeLanguageServer.DocumentManagers
 
             if (AnalysisResult.ParserFatalError == null && AnalysisResult.Parsed)
             {
-                foreach (var funcDef in AnalysisResult.ParserResult.Functions)
+                foreach (var pair in AnalysisResult.CompilerResult.compiledFunctions)
                 {
-                    if (!funcDef.Name.Position.Contains(e.Position)) continue;
+                    var functionDef = pair.Value;
+                    if (!functionDef.Name.Position.Contains(e.Position)) continue;
+                    foreach (var reference in functionDef.References) result.Add(new FilePosition(reference.Source, reference.SourceFile));
+                    return result.ToArray();
                 }
 
-                foreach (var pair in AnalysisResult.ParserResult.Structs)
+                foreach (var pair in AnalysisResult.compilerResult.compiledStructs)
                 {
                     var structDef = pair.Value;
                     if (!structDef.Name.Position.Contains(e.Position)) continue;
+                    foreach (var reference in structDef.References) result.Add(new FilePosition(reference.Source, reference.SourceFile));
+                    return result.ToArray();
                 }
             }
 
@@ -1726,6 +1733,8 @@ namespace BBCodeLanguageServer.DocumentManagers
                             switch (token.Analysis.SubSubtype)
                             {
                                 case TokenSubSubtype.Attribute:
+                                    result.Add(new SemanticToken(token,
+                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Type));
                                     break;
                                 case TokenSubSubtype.Type:
                                     break;

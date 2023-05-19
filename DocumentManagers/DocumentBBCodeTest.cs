@@ -170,7 +170,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 var testDefinition = ParserResult.Value.TestDefinitions[i];
                 result.Add(new SymbolInformationInfo()
                 {
-                    Name = $"Test {testDefinition.Name.text}",
+                    Name = $"Test {testDefinition.Name.Content}",
                     Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.File,
                     Location = new DocumentLocation()
                     {

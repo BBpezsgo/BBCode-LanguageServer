@@ -483,7 +483,7 @@ namespace BBCodeLanguageServer.Interface
         {
             this.Line = token.Position.Start.Line;
             this.Col = token.Position.Start.Character;
-            this.Length = token.text.Length;
+            this.Length = token.Content.Length;
             this.Type = type;
             this.Modifier = modifiers;
         }

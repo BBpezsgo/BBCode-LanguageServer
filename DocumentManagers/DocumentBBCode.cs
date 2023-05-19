@@ -291,7 +291,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 {
                     result.Add(new CompletionInfo()
                     {
-                        Label = function.Name.text,
+                        Label = function.Identifier.Content,
                         Detail = function.ReadableID(),
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Function,
                     });
@@ -301,7 +301,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 {
                     result.Add(new CompletionInfo()
                     {
-                        Label = @struct.Value.Name.text,
+                        Label = @struct.Value.Name.Content,
                         Detail = @struct.Value.FullName,
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Struct,
                     });
@@ -311,7 +311,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 {
                     result.Add(new CompletionInfo()
                     {
-                        Label = @class.Value.Name.text,
+                        Label = @class.Value.Name.Content,
                         Detail = @class.Value.FullName,
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Class,
                     });
@@ -321,8 +321,8 @@ namespace BBCodeLanguageServer.DocumentManagers
                 {
                     result.Add(new CompletionInfo()
                     {
-                        Label = variable.VariableName.text,
-                        Detail = $"(global var) {variable.Type.text} {variable.VariableName.text}",
+                        Label = variable.VariableName.Content,
+                        Detail = $"(global var) {variable.Type.Content} {variable.VariableName.Content}",
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Variable,
                     });
                 }
@@ -432,9 +432,9 @@ namespace BBCodeLanguageServer.DocumentManagers
                     if (addComma) text += ", ";
 
                     if (funcDef.Parameters[i].withThisKeyword)
-                    { text = $"{funcDef.TypeToken} {funcDef.Parameters[i].type}.{funcDef.FullName}("; continue; }
+                    { text = $"{funcDef.TypeToken} {funcDef.Parameters[i].Type}.{funcDef.FullName}("; continue; }
 
-                    text += $"{funcDef.Parameters[i].type} {funcDef.Parameters[i].name}";
+                    text += $"{funcDef.Parameters[i].Type} {funcDef.Parameters[i].Identifier}";
                     addComma = true;
                 }
 
@@ -532,7 +532,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     Contents = new HoverContent[] { new HoverContent()
                     {
                         Lang = "text",
-                        Text = $"Unicode character '{unicode.Text}'"
+                        Text = $"Unicode character '{unicode.Content}'"
                     }},
                 };
             }
@@ -547,7 +547,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                         if (statement is Statement_FunctionCall functionCall)
                         {
                             if (!functionCall.Identifier.Position.Contains(pos)) return false;
-                            if (functionCall.Identifier.text == "return") return false;
+                            if (functionCall.Identifier.Content == "return") return false;
 
                             Logger.Log($"Hover: Func. call found");
 
@@ -587,7 +587,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                     if (addComma) newContentText += $", ";
                                     if (param is Statement_Literal literalParam)
                                     {
-                                        switch (literalParam.Type.typeName)
+                                        switch (literalParam.Type.Type)
                                         {
                                             case BuiltinType.AUTO:
                                                 newContentText += $"var p{paramIndex}";
@@ -649,7 +649,7 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                             if (info != null)
                             {
-                                if (literal.Type.typeName == BuiltinType.STRING)
+                                if (literal.Type.Type == BuiltinType.STRING)
                                 { range.End.Character++; }
                                 result.Add(info);
                             }
@@ -673,7 +673,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{refVariable.Type.ToStringWithNamespaces()} {def.VariableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
+                                    Text = $"{refVariable.Type.ToStringWithNamespaces()} {def.VariableName.Content}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
                                 });
                             }
                             else if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefParameter refParameter)
@@ -681,7 +681,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{refParameter.Type} {variable.VariableName.text}; // Parameter",
+                                    Text = $"{refParameter.Type} {variable.VariableName.Content}; // Parameter",
                                 });
                             }
                             else
@@ -689,7 +689,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"var {variable.VariableName.text};",
+                                    Text = $"var {variable.VariableName.Content};",
                                 });
                             }
 
@@ -712,7 +712,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{refVariable.Type.ToStringWithNamespaces()} {def.VariableName.text}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
+                                    Text = $"{refVariable.Type.ToStringWithNamespaces()} {def.VariableName.Content}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
                                 });
                             }
                             else
@@ -720,7 +720,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"{newVariable.Type} {newVariable.VariableName.text}; // Variable",
+                                    Text = $"{newVariable.Type} {newVariable.VariableName.Content}; // Variable",
                                 });
                             }
 
@@ -752,7 +752,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                     result.Add(new()
                                     {
                                         Lang = "csharp",
-                                        Text = $"{refField.Type} {field.FieldName.text}; // Field",
+                                        Text = $"{refField.Type} {field.FieldName.Content}; // Field",
                                     });
                                 }
                             }
@@ -761,7 +761,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 result.Add(new()
                                 {
                                     Lang = "csharp",
-                                    Text = $"var {field.FieldName.text}; // Field",
+                                    Text = $"var {field.FieldName.Content}; // Field",
                                 });
                             }
 
@@ -809,25 +809,25 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                 foreach (var funcDef in AnalysisResult.ParserResult.Functions)
                 {
-                    if (!funcDef.Name.Position.Contains(pos))
+                    if (!funcDef.Identifier.Position.Contains(pos))
                     {
                         foreach (var paramDef in funcDef.Parameters)
                         {
-                            if (!paramDef.name.Position.Contains(pos)) continue;
+                            if (!paramDef.Identifier.Position.Contains(pos)) continue;
                             Logger.Log($"Hover: Param. def. found");
 
-                            if (InfoReachedUnit(funcDef.Name, out var reachedUnit_))
+                            if (InfoReachedUnit(funcDef.Identifier, out var reachedUnit_))
                             { result.Add(reachedUnit_); }
 
                             result.Add(new()
                             {
                                 Lang = "csharp",
-                                Text = $"{paramDef.type.text} {paramDef.name.text}; // Parameter",
+                                Text = $"{paramDef.Type.Content} {paramDef.Identifier.Content}; // Parameter",
                             });
 
                             return new HoverInfo()
                             {
-                                Range = paramDef.name.Position,
+                                Range = paramDef.Identifier.Position,
                                 Contents = result.ToArray(),
                             };
                         }
@@ -836,14 +836,14 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                     Logger.Log($"Hover: Func. def. found");
 
-                    if (InfoReachedUnit(funcDef.Name, out var reachedUnit))
+                    if (InfoReachedUnit(funcDef.Identifier, out var reachedUnit))
                     { result.Add(reachedUnit); }
 
                     result.Add(InfoFunctionDefinition(funcDef, true));
 
                     return new HoverInfo()
                     {
-                        Range = funcDef.Name.Position,
+                        Range = funcDef.Identifier.Position,
                         Contents = result.ToArray(),
                     };
                 }
@@ -855,22 +855,22 @@ namespace BBCodeLanguageServer.DocumentManagers
                     {
                         foreach (var field in structDef.Fields)
                         {
-                            if (!field.name.Position.Contains(pos)) continue;
+                            if (!field.Identifier.Position.Contains(pos)) continue;
 
-                            Logger.Log($"Hover: Struct field dec. found, {field.name.Position}");
+                            Logger.Log($"Hover: Struct field dec. found, {field.Identifier.Position}");
 
-                            if (InfoReachedUnit(field.name, out var reachedUnit3))
+                            if (InfoReachedUnit(field.Identifier, out var reachedUnit3))
                             { result.Add(reachedUnit3); }
 
                             result.Add(new()
                             {
                                 Lang = "csharp",
-                                Text = $"struct {structDef.Name.text}\n{{\n  {field.type} {field.name.text}; // Field\n}}",
+                                Text = $"struct {structDef.Name.Content}\n{{\n  {field.Type} {field.Identifier.Content}; // Field\n}}",
                             });
 
                             return new HoverInfo()
                             {
-                                Range = field.name.Position,
+                                Range = field.Identifier.Position,
                                 Contents = result.ToArray(),
                             };
                         }
@@ -898,22 +898,22 @@ namespace BBCodeLanguageServer.DocumentManagers
                     {
                         foreach (var field in classDef.Fields)
                         {
-                            if (!field.name.Position.Contains(pos)) continue;
+                            if (!field.Identifier.Position.Contains(pos)) continue;
 
-                            Logger.Log($"Hover: Class field dec. found, {field.name.Position}");
+                            Logger.Log($"Hover: Class field dec. found, {field.Identifier.Position}");
 
-                            if (InfoReachedUnit(field.name, out var reachedUnit3))
+                            if (InfoReachedUnit(field.Identifier, out var reachedUnit3))
                             { result.Add(reachedUnit3); }
 
                             result.Add(new()
                             {
                                 Lang = "csharp",
-                                Text = $"class {classDef.Name.text}\n{{\n  {field.type} {field.name.text}; // Field\n}}",
+                                Text = $"class {classDef.Name.Content}\n{{\n  {field.Type} {field.Identifier.Content}; // Field\n}}",
                             });
 
                             return new HoverInfo()
                             {
-                                Range = field.name.Position,
+                                Range = field.Identifier.Position,
                                 Contents = result.ToArray(),
                             };
                         }
@@ -950,7 +950,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     result.Add(new HoverContent()
                     {
                         Lang = "csharp",
-                        Text = $"namespace {namespaceDef.Name.text}",
+                        Text = $"namespace {namespaceDef.Name.Content}",
                     });
 
                     return new HoverInfo()
@@ -973,12 +973,12 @@ namespace BBCodeLanguageServer.DocumentManagers
                             if (InfoReachedUnit(pathToken, out var reachedUnit))
                             { result.Add(reachedUnit); }
 
-                            if (usingItem.Path.Length == 1 && pathToken.type == TokenType.LITERAL_STRING)
+                            if (usingItem.Path.Length == 1 && pathToken.TokenType == TokenType.LITERAL_STRING)
                             {
                                 result.Add(new HoverContent()
                                 {
                                     Lang = "csharp",
-                                    Text = $"using \"{pathToken.text}\";",
+                                    Text = $"using \"{pathToken.Content}\";",
                                 });
                             }
                             else
@@ -1051,7 +1051,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 result.Add(new HoverContent()
                 {
                     Lang = "text",
-                    Text = $"TypeToken: {typeToken.typeName} {typeToken.text}{(typeToken.IsList ? "[]" : "")}",
+                    Text = $"TypeToken: {typeToken.Type} {typeToken.Content}{(typeToken.IsList ? "[]" : "")}",
                 });
             }
             else
@@ -1081,7 +1081,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 result.Add(new HoverContent()
                 {
                     Lang = "text",
-                    Text = $"Token: {token.type} {token.text}",
+                    Text = $"Token: {token.TokenType} {token.Content}",
                 });
             }
 
@@ -1090,7 +1090,7 @@ namespace BBCodeLanguageServer.DocumentManagers
 
         static HoverContent Hover(TypeToken token)
         {
-            HoverContent info = token.typeName switch
+            HoverContent info = token.Type switch
             {
                 BuiltinType.AUTO => null,
                 BuiltinType.ANY => null,
@@ -1098,18 +1098,18 @@ namespace BBCodeLanguageServer.DocumentManagers
                 BuiltinType.STRUCT => new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"struct {token.text} // Type",
+                    Text = $"struct {token.Content} // Type",
                 },
                 BuiltinType.VOID => new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"{token.text} // Type",
+                    Text = $"{token.Content} // Type",
                 },
 
                 _ => new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"{token.text} // Type",
+                    Text = $"{token.Content} // Type",
                 },
             };
 
@@ -1123,12 +1123,12 @@ namespace BBCodeLanguageServer.DocumentManagers
                 if (token.Analysis.Reference is TokenAnalysis.RefVariable refVariable) return new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"{refVariable.Declaration.Type} {token.text}; // {(refVariable.IsGlobal ? "Global" : "Local")} variable",
+                    Text = $"{refVariable.Declaration.Type} {token.Content}; // {(refVariable.IsGlobal ? "Global" : "Local")} variable",
                 };
                 if (token.Analysis.Reference is TokenAnalysis.RefParameter refParameter) return new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"{refParameter.Type} {token.text}; // Parameter",
+                    Text = $"{refParameter.Type} {token.Content}; // Parameter",
                 };
             }
 
@@ -1158,8 +1158,8 @@ namespace BBCodeLanguageServer.DocumentManagers
                     "[", "]",
                     "=", ",",
                     ";",
-            }).Contains(t.text)) return null;
-            return t.type switch
+            }).Contains(t.Content)) return null;
+            return t.TokenType switch
             {
                 TokenType.LITERAL_FLOAT => null,
                 TokenType.LITERAL_NUMBER => null,
@@ -1175,22 +1175,22 @@ namespace BBCodeLanguageServer.DocumentManagers
             TokenSubtype.VariableName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"var {t.text}; // Variable or parameter",
+                Text = $"var {t.Content}; // Variable or parameter",
             },
             TokenSubtype.MethodName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"? {t.text}()",
+                Text = $"? {t.Content}()",
             },
             TokenSubtype.Type => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"{t.text} // Type",
+                Text = $"{t.Content} // Type",
             },
             TokenSubtype.Struct => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"struct {t.text}",
+                Text = $"struct {t.Content}",
             },
             TokenSubtype.None => null,
             TokenSubtype.Keyword => null,
@@ -1198,7 +1198,7 @@ namespace BBCodeLanguageServer.DocumentManagers
             TokenSubtype.Library => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"namespace {t.text}",
+                Text = $"namespace {t.Content}",
             },
             TokenSubtype.BuiltinType => null,
             TokenSubtype.Hash => null,
@@ -1210,44 +1210,44 @@ namespace BBCodeLanguageServer.DocumentManagers
             TokenSubSubtype.Attribute => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"{t.text} // Attribute",
+                Text = $"{t.Content} // Attribute",
             },
             TokenSubSubtype.Type => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"{t.text} // Type",
+                Text = $"{t.Content} // Type",
             },
             TokenSubSubtype.Struct => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"struct {t.text}",
+                Text = $"struct {t.Content}",
             },
             TokenSubSubtype.FunctionName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"? {t.text}()",
+                Text = $"? {t.Content}()",
             },
             TokenSubSubtype.VariableName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"var {t.text}; // Variable",
+                Text = $"var {t.Content}; // Variable",
             },
             TokenSubSubtype.ParameterName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"var {t.text}; // Parameter",
+                Text = $"var {t.Content}; // Parameter",
             },
             TokenSubSubtype.FieldName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"?.{t.text}; // Field",
+                Text = $"?.{t.Content}; // Field",
             },
             TokenSubSubtype.None => null,
             TokenSubSubtype.Keyword => null,
             TokenSubSubtype.Namespace => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"namespace {t.text}",
+                Text = $"namespace {t.Content}",
             },
             _ => null,
         };
@@ -1276,11 +1276,11 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                             int referenceCount = func.TimesUsedTotal;
 
-                            result.Add(new CodeLensInfo($"{referenceCount} reference", func.Name));
+                            result.Add(new CodeLensInfo($"{referenceCount} reference", func.Identifier));
 
                             if (func.CompiledAttributes.ContainsKey("CodeEntry"))
                             {
-                                result.Add(new CodeLensInfo($"This is the code entry", func.Name));
+                                result.Add(new CodeLensInfo($"This is the code entry", func.Identifier));
                             }
                         }
 
@@ -1291,7 +1291,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 if (FunctionsBruh.Contains(func.ID())) continue;
 
                                 FunctionsBruh.Add(func.ID());
-                                result.Add(new CodeLensInfo($"0 reference", func.Name));
+                                result.Add(new CodeLensInfo($"0 reference", func.Identifier));
                             }
                         }
 
@@ -1309,7 +1309,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     {
                         foreach (var func in AnalysisResult.ParserResult.Functions)
                         {
-                            result.Add(new CodeLensInfo($"? reference", func.Name));
+                            result.Add(new CodeLensInfo($"? reference", func.Identifier));
                         }
                     }
                 }
@@ -1416,9 +1416,9 @@ namespace BBCodeLanguageServer.DocumentManagers
             {
                 foreach (var field in @struct.Value.Fields)
                 {
-                    if (!field.type.Position.Contains(pos)) continue;
-                    if (field.type.Analysis.Reference == null) continue;
-                    if (field.type.Analysis.Reference is TokenAnalysis.RefStruct refStruct)
+                    if (!field.Type.Position.Contains(pos)) continue;
+                    if (field.Type.Analysis.Reference == null) continue;
+                    if (field.Type.Analysis.Reference is TokenAnalysis.RefStruct refStruct)
                     {
                         var uri = new Uri($"file:///" + refStruct.Definition.FilePath.Replace('\\', '/'));
                         return new SingleOrArray<FilePosition>(new FilePosition(refStruct.Definition.Name.Position, uri));
@@ -1432,14 +1432,14 @@ namespace BBCodeLanguageServer.DocumentManagers
                 if (statement is Statement_FunctionCall functionCall)
                 {
                     if (!functionCall.Identifier.Position.Contains(pos)) return false;
-                    if (functionCall.Identifier.text == "return") return false;
+                    if (functionCall.Identifier.Content == "return") return false;
                     if (functionCall.Identifier.Analysis == null) return true;
                     if (functionCall.Identifier.Analysis.Reference == null) return true;
 
                     if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
                     {
                         Logger.Log($"GotoDef: Func. call found {refFunction}");
-                        result = new SingleOrArray<FilePosition>(new FilePosition(refFunction.Definition.Name.Position, refFunction.Definition.FilePath));
+                        result = new SingleOrArray<FilePosition>(new FilePosition(refFunction.Definition.Identifier.Position, refFunction.Definition.FilePath));
                     }
 
                     return true;
@@ -1569,7 +1569,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                             Range = new Position(item.Keyword, item.Name, item.BracketStart, item.BracketEnd),
                             Uri = e.Document.Uri,
                         },
-                        Name = item.Name.text,
+                        Name = item.Name.Content,
                     });
                 }
 
@@ -1577,7 +1577,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 {
                     foreach (var attr in item.Attributes)
                     {
-                        if (attr.Name.text == "Catch")
+                        if (attr.Identifier.Content == "Catch")
                         {
                             if (attr.Parameters.Length != 1) continue;
                             if (attr.Parameters[0] is not string eventName) continue;
@@ -1586,7 +1586,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Event,
                                 Location = new DocumentLocation()
                                 {
-                                    Range = new Position(item.TypeToken, item.Name, item.BracketStart, item.BracketEnd, attr.Name),
+                                    Range = new Position(item.TypeToken, item.Identifier, item.BracketStart, item.BracketEnd, attr.Identifier),
                                     Uri = e.Document.Uri,
                                 },
                                 Name = "On" + eventName.FirstCharToUpper(),
@@ -1598,10 +1598,10 @@ namespace BBCodeLanguageServer.DocumentManagers
                         Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Function,
                         Location = new DocumentLocation()
                         {
-                            Range = new Position(item.TypeToken, item.Name, item.BracketStart, item.BracketEnd),
+                            Range = new Position(item.TypeToken, item.Identifier, item.BracketStart, item.BracketEnd),
                             Uri = e.Document.Uri,
                         },
-                        Name = item.Name.text,
+                        Name = item.Identifier.Content,
                     };
 
                     if (item.Parameters.Count > 0) funcSymbol.Name += "(";
@@ -1610,7 +1610,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     {
                         if (i > 0) { funcSymbol.Name += ", "; }
                         ParameterDefinition prm = item.Parameters[i];
-                        funcSymbol.Name += prm.type.text;
+                        funcSymbol.Name += prm.Type.Content;
                     }
 
                     if (item.Parameters.Count > 0) funcSymbol.Name += ")";
@@ -1626,7 +1626,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                 Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Namespace,
                                 Location = new DocumentLocation()
                                 {
-                                    Range = new Position(item.Name),
+                                    Range = new Position(item.Identifier),
                                     Uri = e.Document.Uri,
                                 },
                                 Name = item2,
@@ -1647,7 +1647,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                             Range = new Position(item.Value.Name, item.Value.BracketStart, item.Value.BracketEnd),
                             Uri = e.Document.Uri,
                         },
-                        Name = item.Value.Name.text,
+                        Name = item.Value.Name.Content,
                     });
 
                     foreach (var field in item.Value.Fields)
@@ -1657,10 +1657,10 @@ namespace BBCodeLanguageServer.DocumentManagers
                             Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Field,
                             Location = new DocumentLocation()
                             {
-                                Range = new Position(field.type, field.name),
+                                Range = new Position(field.Type, field.Identifier),
                                 Uri = e.Document.Uri,
                             },
-                            Name = field.name.text,
+                            Name = field.Identifier.Content,
                         });
                     }
                 }
@@ -1680,7 +1680,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 foreach (var pair in AnalysisResult.CompilerResult.compiledFunctions)
                 {
                     var functionDef = pair.Value;
-                    if (!functionDef.Name.Position.Contains(e.Position)) continue;
+                    if (!functionDef.Identifier.Position.Contains(e.Position)) continue;
                     foreach (var reference in functionDef.References) result.Add(new FilePosition(reference.Source, reference.SourceFile));
                     return result.ToArray();
                 }
@@ -1726,7 +1726,7 @@ namespace BBCodeLanguageServer.DocumentManagers
 
             foreach (var token in tokens)
             {
-                switch (token.type)
+                switch (token.TokenType)
                 {
                     case TokenType.IDENTIFIER:
                         {

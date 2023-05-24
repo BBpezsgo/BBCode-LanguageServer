@@ -6,6 +6,7 @@ using IngameCoding.BBCode.Compiler;
 using IngameCoding.BBCode.Parser;
 using IngameCoding.BBCode.Parser.Statements;
 using IngameCoding.Core;
+using IngameCoding.BBCode.Analysis;
 
 using System;
 using System.Collections.Generic;
@@ -446,17 +447,17 @@ namespace BBCodeLanguageServer.DocumentManagers
                     Text = text,
                 };
             }
-            static HoverContent InfoBuiltinFunction(TokenAnalysis.RefBuiltinFunction funcDef, bool IsDefinition)
+            static HoverContent InfoFunction(AnalysedToken_Function function, bool IsDefinition)
             {
-                var text = $"{funcDef.ReturnType} {funcDef.Name}(";
+                string text = $"{function.Type} {function.Name}(";
 
                 bool addComma = false;
 
-                for (int i = 0; i < funcDef.ParameterTypes.Length; i++)
+                for (int i = 0; i < function.ParameterTypes.Length; i++)
                 {
                     if (addComma) text += ", ";
 
-                    text += $"{funcDef.ParameterTypes[i]} {funcDef.ParameterNames[i]}";
+                    text += $"{function.ParameterTypes[i]} {function.ParameterNames[i]}";
                     addComma = true;
                 }
 
@@ -468,17 +469,17 @@ namespace BBCodeLanguageServer.DocumentManagers
                     Text = text,
                 };
             }
-            static HoverContent InfoBuiltinMethod(TokenAnalysis.RefBuiltinMethod funcDef, bool IsDefinition)
+            static HoverContent InfoBuiltinFunction(AnalysedToken_Function function, bool IsDefinition)
             {
-                var text = $"{funcDef.ReturnType} {funcDef.PrevType}.{funcDef.Name}(";
+                string text = $"{function.Type} {function.Name}(";
 
                 bool addComma = false;
 
-                for (int i = 0; i < funcDef.ParameterTypes.Length; i++)
+                for (int i = 0; i < function.ParameterTypes.Length; i++)
                 {
                     if (addComma) text += ", ";
 
-                    text += $"{funcDef.ParameterTypes[i]} {funcDef.ParameterNames[i]}";
+                    text += $"{function.ParameterTypes[i]} {function.ParameterNames[i]}";
                     addComma = true;
                 }
 
@@ -498,6 +499,51 @@ namespace BBCodeLanguageServer.DocumentManagers
                     Text = $"struct {structDef.FullName}",
                 };
             }
+            static HoverContent InfoMethod(AnalysedToken_Method function, bool IsDefinition)
+            {
+                string text = $"{function.Type} {function.PrevType}{function.Name}(";
+
+                bool addComma = false;
+
+                for (int i = 0; i < function.ParameterTypes.Length; i++)
+                {
+                    if (addComma) text += ", ";
+
+                    text += $"{function.ParameterTypes[i]} {function.ParameterNames[i]}";
+                    addComma = true;
+                }
+
+                text += ")";
+
+                return new HoverContent()
+                {
+                    Lang = "csharp",
+                    Text = text,
+                };
+            }
+            static HoverContent InfoBuiltinMethod(AnalysedToken_Method function, bool IsDefinition)
+            {
+                string text = $"{function.Type} {function.PrevType}{function.Name}(";
+
+                bool addComma = false;
+
+                for (int i = 0; i < function.ParameterTypes.Length; i++)
+                {
+                    if (addComma) text += ", ";
+
+                    text += $"{function.ParameterTypes[i]} {function.ParameterNames[i]}";
+                    addComma = true;
+                }
+
+                text += ")";
+
+                return new HoverContent()
+                {
+                    Lang = "csharp",
+                    Text = text,
+                };
+            }
+
             static bool InfoReachedUnit(Token token, out HoverContent result)
             {
                 if (!DEBUG) { result = null; return false; }
@@ -556,23 +602,35 @@ namespace BBCodeLanguageServer.DocumentManagers
                             if (InfoReachedUnit(functionCall.Identifier, out var reachedUnit))
                             { result.Add(reachedUnit); }
 
-                            Logger.Log($"{functionCall.Identifier.Analysis}");
+                            // Logger.Log($"{functionCall.Identifier.Analysis}");
 
-                            if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
+                            if (functionCall.Identifier is AnalysedToken_Function function)
                             {
-                                result.Add(InfoFunctionDefinition(refFunction.Definition, false));
+                                switch (function.Kind)
+                                {
+                                    case FunctionKind.UserDefined:
+                                        result.Add(InfoFunction(function, false));
+                                        break;
+                                    case FunctionKind.Builtin:
+                                        result.Add(InfoBuiltinFunction(function, false));
+                                        break;
+                                    default: break;
+                                }
                                 return true;
-                            }
-                            else if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefBuiltinFunction refBuiltinFunction)
+                            } else if (functionCall.Identifier is AnalysedToken_Method method)
                             {
-                                result.Add(InfoBuiltinFunction(refBuiltinFunction, false));
+                                switch (method.Kind)
+                                {
+                                    case FunctionKind.UserDefined:
+                                        result.Add(InfoMethod(method, false));
+                                        break;
+                                    case FunctionKind.Builtin:
+                                        result.Add(InfoBuiltinMethod(method, false));
+                                        break;
+                                    default: break;
+                                }
                                 return true;
-                            }
-                            else if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefBuiltinMethod refBuiltinMethod)
-                            {
-                                result.Add(InfoBuiltinMethod(refBuiltinMethod, false));
-                                return true;
-                            }
+                            }/*
                             else
                             {
                                 string newContentText = "";
@@ -622,14 +680,14 @@ namespace BBCodeLanguageServer.DocumentManagers
                                     addComma = true;
                                 }
 
-                                newContentText += $") // Function Call";
+                                newContentText += $")";
 
                                 result.Add(new HoverContent()
                                 {
                                     Lang = "csharp",
                                     Text = newContentText,
                                 });
-                            }
+                            }*/
 
                             return true;
                         }
@@ -667,22 +725,34 @@ namespace BBCodeLanguageServer.DocumentManagers
                             if (InfoReachedUnit(variable.VariableName, out var reachedUnit))
                             { result.Add(reachedUnit); }
 
-                            if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
+                            if (variable.VariableName is AnalysedToken_Variable variable1)
                             {
-                                var def = refVariable.Declaration;
-                                result.Add(new()
+                                switch (variable1.Kind)
                                 {
-                                    Lang = "csharp",
-                                    Text = $"{refVariable.Type.FullName} {def.VariableName.Content}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
-                                });
-                            }
-                            else if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefParameter refParameter)
-                            {
-                                result.Add(new()
-                                {
-                                    Lang = "csharp",
-                                    Text = $"{refParameter.Type} {variable.VariableName.Content}; // Parameter",
-                                });
+                                    case VariableKind.Local:
+                                        result.Add(new()
+                                        {
+                                            Lang = "csharp",
+                                            Text = $"{variable1.Type} {variable1.Name}; // Local Variable",
+                                        });
+                                        break;
+                                    case VariableKind.Global:
+                                        result.Add(new()
+                                        {
+                                            Lang = "csharp",
+                                            Text = $"{variable1.Type} {variable1.Name}; // Global Variable",
+                                        });
+                                        break;
+                                    case VariableKind.Parameter:
+                                        result.Add(new()
+                                        {
+                                            Lang = "csharp",
+                                            Text = $"{variable1.Type} {variable1.Name} // Parameter",
+                                        });
+                                        break;
+                                    default:
+                                        break;
+                                }
                             }
                             else
                             {
@@ -705,7 +775,7 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                             if (InfoReachedUnit(newVariable.VariableName, out var reachedUnit))
                             { result.Add(reachedUnit); }
-
+                            /*
                             if (newVariable.VariableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
                             {
                                 var def = refVariable.Declaration;
@@ -715,7 +785,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                                     Text = $"{refVariable.Type.FullName} {def.VariableName.Content}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
                                 });
                             }
-                            else
+                            else*/
                             {
                                 result.Add(new()
                                 {
@@ -737,23 +807,25 @@ namespace BBCodeLanguageServer.DocumentManagers
                             if (InfoReachedUnit(field.FieldName, out var reachedUnit))
                             { result.Add(reachedUnit); }
 
-                            if (field.FieldName.Analysis.Reference is TokenAnalysis.RefField refField)
+                            if (field.FieldName is AnalysedToken_Field field1)
                             {
-                                if (refField.UserDefinedName != null)
+                                switch (field1.Kind)
                                 {
-                                    result.Add(new()
-                                    {
-                                        Lang = "csharp",
-                                        Text = $"{refField.UserDefinedKind} {refField.UserDefinedName}\n{{\n  {refField.Type} {refField.Name}; // Field\n}}",
-                                    });
-                                }
-                                else
-                                {
-                                    result.Add(new()
-                                    {
-                                        Lang = "csharp",
-                                        Text = $"{refField.Type} {field.FieldName.Content}; // Field",
-                                    });
+                                    case ComplexTypeKind.Struct:
+                                        result.Add(new()
+                                        {
+                                            Lang = "csharp",
+                                            Text = $"struct {"?"}\n{{\n  {field1.Type} {field1.Name}; // Field\n}}",
+                                        });
+                                        break;
+                                    case ComplexTypeKind.Class:
+                                        result.Add(new()
+                                        {
+                                            Lang = "csharp",
+                                            Text = $"class {"?"}\n{{\n  {field1.Type} {field1.Name}; // Field\n}}",
+                                        });
+                                        break;
+                                    default: break;
                                 }
                             }
                             else
@@ -1111,7 +1183,7 @@ namespace BBCodeLanguageServer.DocumentManagers
             return info;
         }
         static HoverContent Hover(Token token)
-        {
+        {/*
             if (token.Analysis.Reference is not null)
             {
                 if (token.Analysis.Reference is TokenAnalysis.RefVariable refVariable) return new HoverContent()
@@ -1124,7 +1196,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     Lang = "csharp",
                     Text = $"{refParameter.Type} {token.Content}; // Parameter",
                 };
-            }
+            }*/
 
             {
                 var info = InfoTokenSubSubtype(token);
@@ -1169,18 +1241,10 @@ namespace BBCodeLanguageServer.DocumentManagers
             TokenSubtype.VariableName => new HoverContent()
             {
                 Lang = "csharp",
-                Text = $"var {t.Content}; // Variable or parameter",
+                Text = $"var {t.Content};",
             },
-            TokenSubtype.MethodName => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"? {t.Content}()",
-            },
-            TokenSubtype.Type => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"{t.Content} // Type",
-            },
+            TokenSubtype.MethodName => null,
+            TokenSubtype.Type => null,
             TokenSubtype.Struct => new HoverContent()
             {
                 Lang = "csharp",
@@ -1206,11 +1270,7 @@ namespace BBCodeLanguageServer.DocumentManagers
         };
         static HoverContent InfoTokenSubSubtype(Token t) => t.Analysis.SubSubtype switch
         {
-            TokenSubSubtype.Attribute => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"{t.Content} // Attribute",
-            },
+            TokenSubSubtype.Attribute => null,
             TokenSubSubtype.Type => new HoverContent()
             {
                 Lang = "csharp",
@@ -1221,11 +1281,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 Lang = "csharp",
                 Text = $"struct {t.Content}",
             },
-            TokenSubSubtype.FunctionName => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"? {t.Content}()",
-            },
+            TokenSubSubtype.FunctionName => null,
             TokenSubSubtype.VariableName => new HoverContent()
             {
                 Lang = "csharp",
@@ -1350,12 +1406,12 @@ namespace BBCodeLanguageServer.DocumentManagers
                 Logger.Log($"No token at {pos.ToMinString()}");
                 return null;
             }
-
+            /*
             if (token.Analysis != null && token.Analysis.Reference != null)
             {
                 if (token.Analysis.Reference is TokenAnalysis.RefStruct refStruct) return new SingleOrArray<FilePosition>(new FilePosition(refStruct.Definition.Name.Position, refStruct.FilePath));
                 if (token.Analysis.Reference is TokenAnalysis.RefField refField) return new SingleOrArray<FilePosition>(new FilePosition(refField.NameToken.Position, refField.FilePath));
-            }
+            }*/
 
             string currentFilePath = System.Net.WebUtility.UrlDecode(e.Document.Uri.AbsolutePath);
             SingleOrArray<FilePosition>? result = null;
@@ -1414,16 +1470,16 @@ namespace BBCodeLanguageServer.DocumentManagers
                 foreach (var field in @struct.Value.Fields)
                 {
                     if (!field.Type.Position.Contains(pos)) continue;
-                    if (field.Type.Analysis.Reference == null) continue;
+                    /*if (field.Type.Analysis.Reference == null) continue;
                     if (field.Type.Analysis.Reference is TokenAnalysis.RefStruct refStruct)
                     {
                         var uri = new Uri($"file:///" + refStruct.Definition.FilePath.Replace('\\', '/'));
                         return new SingleOrArray<FilePosition>(new FilePosition(refStruct.Definition.Name.Position, uri));
                     }
-                    return result;
+                    return result;*/
                 }
             }
-
+            /*
             StatementFinder.GetAllStatement(AnalysisResult.ParserResult, statement =>
             {
                 if (statement is Statement_FunctionCall functionCall)
@@ -1431,8 +1487,8 @@ namespace BBCodeLanguageServer.DocumentManagers
                     if (!functionCall.Identifier.Position.Contains(pos)) return false;
                     if (functionCall.Identifier.Content == "return") return false;
                     if (functionCall.Identifier.Analysis == null) return true;
-                    if (functionCall.Identifier.Analysis.Reference == null) return true;
-
+                    // if (functionCall.Identifier.Analysis.Reference == null) return true;
+                    
                     if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
                     {
                         Logger.Log($"GotoDef: Func. call found {refFunction}");
@@ -1441,7 +1497,7 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                     return true;
                 }
-                else if (statement is Statement_Variable variable)
+                    else if (statement is Statement_Variable variable)
                 {
                     if (!variable.VariableName.Position.Contains(pos)) return false;
                     if (variable.VariableName.Analysis == null) return true;
@@ -1456,9 +1512,9 @@ namespace BBCodeLanguageServer.DocumentManagers
                     return true;
                 }
 
-                return false;
+            return false;
             });
-
+            */
             /*
             StatementFinder.GetAllStatement(AnalysisResult.ParserResult, statement =>
             {

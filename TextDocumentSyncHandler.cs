@@ -19,12 +19,11 @@ namespace BBCodeLanguageServer
 {
     internal static class DocumentSelectorGen
     {
-        internal static DocumentSelector Get() => new(new DocumentFilter[2] {
-            new DocumentFilter() { Pattern = "**/*.bbc" },
-            new DocumentFilter() { Pattern = "**/*.bbct" }
+        internal static DocumentSelector Get() => new(new DocumentFilter[] {
+            new DocumentFilter() { Pattern = "**/*.bbc" }
         });
 
-        internal static DocumentSelector ForLanguage() => DocumentSelector.ForLanguage("bbc", "bbct");
+        internal static DocumentSelector ForLanguage() => DocumentSelector.ForLanguage("bbc");
     }
 }
 

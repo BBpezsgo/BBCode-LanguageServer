@@ -327,7 +327,7 @@ namespace BBCodeLanguageServer.Interface
         };
     }
 
-    internal struct SingleOrArray<T>
+    internal readonly struct SingleOrArray<T>
     {
         internal readonly T[] v;
 
@@ -344,7 +344,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct DocumentItemEventArgs
+    internal readonly struct DocumentItemEventArgs
     {
         internal readonly DocumentItem Document;
 
@@ -354,7 +354,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct DocumentItem
+    internal readonly struct DocumentItem
     {
         internal readonly System.Uri Uri;
         internal readonly string LanguageID;
@@ -368,7 +368,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct Document
+    internal readonly struct Document
     {
         internal readonly System.Uri Uri;
 
@@ -383,7 +383,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct DocumentEventArgs
+    internal readonly struct DocumentEventArgs
     {
         internal readonly Document Document;
 
@@ -397,7 +397,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct DocumentPositionEventArgs
+    internal readonly struct DocumentPositionEventArgs
     {
         internal readonly IngameCoding.Core.SinglePosition Position;
         internal readonly Document Document;
@@ -417,7 +417,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct FindReferencesEventArgs
+    internal readonly struct FindReferencesEventArgs
     {
         internal readonly bool IncludeDeclaration;
         internal readonly IngameCoding.Core.SinglePosition Position;
@@ -432,7 +432,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct DocumentPositionContextEventArgs
+    internal readonly struct DocumentPositionContextEventArgs
     {
         internal readonly IngameCoding.Core.SinglePosition Position;
         internal readonly Document Document;
@@ -447,7 +447,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct ConfigEventArgs
+    internal readonly struct ConfigEventArgs
     {
         internal readonly dynamic Config;
 
@@ -457,7 +457,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct SignatureHelpEventArgs
+    internal readonly struct SignatureHelpEventArgs
     {
         internal readonly IngameCoding.Core.SinglePosition Position;
         internal readonly Document Document;
@@ -471,7 +471,7 @@ namespace BBCodeLanguageServer.Interface
         }
     }
 
-    internal struct SemanticToken
+    internal readonly struct SemanticToken
     {
         internal readonly int Line;
         internal readonly int Col;

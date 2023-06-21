@@ -427,7 +427,7 @@ namespace BBCodeLanguageServer.Interface
                 capability.HierarchicalDocumentSymbolSupport = true;
                 return new DocumentSymbolRegistrationOptions()
                 {
-                    DocumentSelector = DocumentSelector.ForLanguage("bbc", "bbct"),
+                    DocumentSelector = DocumentSelector.ForLanguage("bbc"),
                 };
             }
         }
@@ -457,7 +457,7 @@ namespace BBCodeLanguageServer.Interface
                 capability.ContextSupport = false;
                 return new CompletionRegistrationOptions()
                 {
-                    DocumentSelector = DocumentSelector.ForLanguage("bbc", "bbct"),
+                    DocumentSelector = DocumentSelector.ForLanguage("bbc"),
                     ResolveProvider = false,
                 };
             }
@@ -487,7 +487,7 @@ namespace BBCodeLanguageServer.Interface
             {
                 return new CodeLensRegistrationOptions()
                 {
-                    DocumentSelector = DocumentSelector.ForLanguage("bbc", "bbct"),
+                    DocumentSelector = DocumentSelector.ForLanguage("bbc"),
                     ResolveProvider = false,
                 };
             }

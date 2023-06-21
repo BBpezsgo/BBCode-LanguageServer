@@ -1,12 +1,10 @@
 ﻿using BBCodeLanguageServer.Interface;
-using BBCodeLanguageServer.Interface.SystemExtensions;
 
 using IngameCoding.BBCode;
 using IngameCoding.BBCode.Compiler;
 using IngameCoding.BBCode.Parser;
-using IngameCoding.BBCode.Parser.Statements;
 using IngameCoding.Core;
-using IngameCoding.BBCode.Analysis;
+using IngameCoding.Errors;
 
 using System;
 using System.Collections.Generic;
@@ -21,18 +19,17 @@ namespace BBCodeLanguageServer.DocumentManagers
         string Url;
         string LanguageId;
 
-        static readonly bool DEBUG = false;
+        Token[] Tokens;
 
-        protected AnalysisResult AnalysisResult;
-        AnalysisResult LastSuccessAnalysisResult;
-        bool HaveSuccesAlanysisResult;
-
-        AnalysisResult BestAnalysisResult => HaveSuccesAlanysisResult ? LastSuccessAnalysisResult : AnalysisResult;
+        CompiledClass[] Classes;
+        CompiledStruct[] Structs;
+        CompiledEnum[] Enums;
+        CompiledFunction[] Functions;
+        CompiledGeneralFunction[] GeneralFunctions;
 
         public DocumentBBCode(DocumentItem document, DocumentInterface app)
         {
             App = app;
-            AnalysisResult = AnalysisResult.Empty();
             OnChanged(document);
         }
 
@@ -47,384 +44,170 @@ namespace BBCodeLanguageServer.DocumentManagers
 
         Token GetTokenAt(SinglePosition position)
         {
-            if (AnalysisResult.Tokens == null) return null;
-            if (AnalysisResult.Tokens.Length == 0) return null;
+            if (Tokens == null) return null;
+            if (Tokens.Length == 0) return null;
 
-            Logger.Log($"Search token at {position}");
-
-            foreach (var token in AnalysisResult.Tokens)
-            {
-                var contains = token.Position.Contains(position);
-                // Logger.Log($"{position.ToMinString()} in {token.Position.ToMinString()} ? {contains}");
-                if (contains)
-                {
-                    return token;
-                }
-            }
+            foreach (var token in Tokens)
+            { if (token.Position.Contains(position)) return token; }
 
             return null;
         }
 
         void Validate(Document e)
         {
-            var diagnostics = new List<DiagnosticInfo>();
-            System.IO.FileInfo file = null;
+            List<DiagnosticInfo> diagnostics = new();
             string path = System.Net.WebUtility.UrlDecode(e.Uri.AbsolutePath);
 
             Logger.Log($"Validate({path})");
 
-            if (e.Uri.Scheme == "file")
+            if (e.Uri.Scheme != "file") return;
+
+            if (!System.IO.File.Exists(path))
             {
-                if (System.IO.File.Exists(path))
-                {
-                    file = new System.IO.FileInfo(path);
-                }
-                else
-                {
-                    Logger.Log($"{path} not found");
-                }
-            }
-            else
-            {
+                Logger.Log($"{path} not found");
                 return;
             }
 
-            static DiagnosticInfo DiagnostizeException(IngameCoding.Errors.Exception exception, string source)
+            System.IO.FileInfo file = new(path);
+
+            try
+            {
+                EasyCompiler.Result result = EasyCompiler.Compile(
+                    file,
+                    new Dictionary<string, BuiltinFunction>(),
+                    TokenizerSettings.Default,
+                    ParserSettings.Default,
+                    Compiler.CompilerSettings.Default,
+                    null,
+                    null);
+
+                List<Error> errors = new();
+                List<Warning> warnings = new();
+
+                if (result.CompilerResult.Warnings != null)
+                { warnings.AddRange(result.CompilerResult.Warnings); }
+                if (result.CompilerResult.Errors != null)
+                { errors.AddRange(result.CompilerResult.Errors); }
+
+                if (result.CodeGeneratorResult.Warnings != null)
+                { warnings.AddRange(result.CodeGeneratorResult.Warnings); }
+                if (result.CodeGeneratorResult.Errors != null)
+                { errors.AddRange(result.CodeGeneratorResult.Errors); }
+
+                for (int i = 0; i < errors.Count; i++)
+                {
+                    Error error = errors[i];
+
+                    if (error.File == null || error.File != path) continue;
+
+                    diagnostics.Add(new DiagnosticInfo
+                    {
+                        severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
+                        range = error.Position,
+                        message = error.Message,
+                    });
+                }
+
+                for (int i = 0; i < warnings.Count; i++)
+                {
+                    Warning warning = warnings[i];
+
+                    if (warning.File == null || warning.File != path) continue;
+
+                    diagnostics.Add(new DiagnosticInfo
+                    {
+                        severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
+                        range = warning.Position,
+                        message = warning.Message,
+                    });
+                }
+
+                if (result.CodeGeneratorResult.Informations != null) for (int i = 0; i < result.CodeGeneratorResult.Informations.Length; i++)
+                    {
+                        Information information = result.CodeGeneratorResult.Informations[i];
+
+                        if (information.File == null || information.File != path) continue;
+
+                        diagnostics.Add(new DiagnosticInfo
+                        {
+                            severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Information,
+                            range = information.Position,
+                            message = information.Message,
+                        });
+                    }
+
+                if (result.CodeGeneratorResult.Hints != null) for (int i = 0; i < result.CodeGeneratorResult.Hints.Length; i++)
+                    {
+                        Hint hint = result.CodeGeneratorResult.Hints[i];
+
+                        if (hint.File == null || hint.File != path) continue;
+
+                        diagnostics.Add(new DiagnosticInfo
+                        {
+                            severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Hint,
+                            range = hint.Position,
+                            message = hint.Message,
+                        });
+                    }
+
+                Functions = result.CodeGeneratorResult.Functions ?? result.CompilerResult.Functions;
+                GeneralFunctions = result.CodeGeneratorResult.GeneralFunctions ?? result.CompilerResult.GeneralFunctions;
+                
+                Enums = result.CompilerResult.Enums;
+
+                Classes = result.CodeGeneratorResult.Classes ?? result.CompilerResult.Classes;
+                Structs = result.CodeGeneratorResult.Structs ?? result.CompilerResult.Structs;
+
+                Tokens = result.TokenizerResult;
+            }
+            catch (IngameCoding.Errors.Exception exception)
             {
                 var range = exception.Position;
 
-                Logger.Log($"{source} Error: {exception.MessageAll}\n  at {range.ToMinString()}");
+                Logger.Log($"Exception: {exception.MessageAll}\n  at {range.ToMinString()}");
 
-                return new DiagnosticInfo
+                diagnostics.Add(new DiagnosticInfo
                 {
                     severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
                     range = range,
                     message = exception.Message,
-                    source = source,
-                };
-            }
-            static DiagnosticInfo DiagnostizeError(IngameCoding.Errors.Error error, string source)
-            {
-                var range = error.Position;
-
-                Logger.Log($"{source} Error: {error.MessageAll}\n  at {range.ToMinString()}");
-
-                return new DiagnosticInfo
-                {
-                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
-                    range = range,
-                    message = error.Message,
-                    source = source,
-                };
-            }
-            static DiagnosticInfo DiagnostizeHint(IngameCoding.Errors.Hint hint, string source)
-            {
-                var range = hint.Position;
-
-                Logger.Log($"{source}: {hint.MessageAll}\n  at {range.ToMinString()}");
-
-                return new DiagnosticInfo
-                {
-                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Hint,
-                    range = range,
-                    message = hint.Message,
-                    source = source,
-                };
-            }
-            static DiagnosticInfo DiagnostizeInformation(IngameCoding.Errors.Information information, string source)
-            {
-                var range = information.Position;
-
-                Logger.Log(
-                    $"{source}: {information.MessageAll}\n" +
-                    $"  at {range.ToMinString()}\n" +
-                    $"  in {information.File}"
-                    );
-
-                return new DiagnosticInfo
-                {
-                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Information,
-                    range = range,
-                    message = information.Message,
-                    source = source,
-                };
-            }
-
-            AnalysisResult = Analysis.Analyze(Text, file, path);
-            Logger.Log($"Check file paths...");
-            AnalysisResult.CheckFilePaths(notSetMessage =>
-            {
-                // Logger.Log($"{notSetMessage}");
-            });
-
-            for (int i = 0; i < AnalysisResult.TokenizerInicodeChars.Length; i++)
-            {
-                var unicode = AnalysisResult.TokenizerInicodeChars[i];
-                Logger.Log($"Unicode token {unicode.Position.ToMinString()}");
-            }
-
-            Logger.Log($"File references: {AnalysisResult.FileReferences.Length}");
-
-            if (!AnalysisResult.TokenizingSuccess)
-            {
-                diagnostics.Add(DiagnostizeException(AnalysisResult.TokenizerFatalError, "Tokenizer"));
-            }
-            else if (!AnalysisResult.ParsingSuccess)
-            {
-                if (AnalysisResult.ParserFatalError != null)
-                {
-                    if (AnalysisResult.ParserFatalError.File == path || AnalysisResult.ParserFatalError.File == null)
-                    {
-                        diagnostics.Add(DiagnostizeException(AnalysisResult.ParserFatalError, "Parser"));
-                    }
-                    else
-                    {
-                        Logger.Log($"Parser Error: {AnalysisResult.ParserFatalError.MessageAll}\n in {AnalysisResult.ParserFatalError.File}\n {AnalysisResult.ParserFatalError.StackTrace}");
-                    }
-                }
-
-                for (int i = 0; i < AnalysisResult.ParserErrors.Length; i++)
-                {
-                    var error = AnalysisResult.ParserErrors[i];
-                    if (error.File != path && error.File != null) continue;
-                    diagnostics.Add(DiagnostizeError(error, "Parser"));
-                }
-            }
-            else if (!AnalysisResult.CompilingSuccess)
-            {
-                if (AnalysisResult.CompilerFatalError != null)
-                {
-                    if (AnalysisResult.CompilerFatalError.File == path || AnalysisResult.CompilerFatalError.File == null)
-                    {
-                        diagnostics.Add(DiagnostizeException(AnalysisResult.CompilerFatalError, "Compiler"));
-                    }
-                }
-
-                for (int i = 0; i < AnalysisResult.CompilerErrors.Length; i++)
-                {
-                    var error = AnalysisResult.CompilerErrors[i];
-                    if (error.File != path && error.File != null) continue;
-
-                    if (error.Message.StartsWith("Builtin function '") && error.Message.EndsWith("' not found"))
-                    {
-                        Logger.Log($"Compiler Warning: {AnalysisResult.CompilerErrors[i]}");
-                        diagnostics.Add(new DiagnosticInfo
-                        {
-                            severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
-                            range = error.Position,
-                            message = error.Message,
-                            source = "Compiler",
-                        });
-                        continue;
-                    }
-
-                    diagnostics.Add(DiagnostizeError(error, "Compiler"));
-                }
-            }
-            else
-            {
-                LastSuccessAnalysisResult = AnalysisResult;
-                HaveSuccesAlanysisResult = true;
-            }
-
-            for (int i = 0; i < AnalysisResult.Warnings.Length; i++)
-            {
-                var warning = AnalysisResult.Warnings[i];
-
-                if (warning.File != path && warning.File != null) continue;
-
-                diagnostics.Add(new DiagnosticInfo
-                {
-                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
-                    range = warning.Position,
-                    message = warning.Message,
                 });
-            }
 
-            for (int i = 0; i < AnalysisResult.TokenizerWarnings.Length; i++)
-            {
-                var warning = AnalysisResult.TokenizerWarnings[i];
-                Logger.Log($"Tokenizer warning: {warning.MessageAll}");
-                if (warning.File != path) continue;
-
-                diagnostics.Add(new DiagnosticInfo
+                if (exception.InnerException is IngameCoding.Errors.Exception innerException)
                 {
-                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
-                    range = warning.Position,
-                    message = warning.Message,
-                    source = "Tokenizer",
-                });
-            }
+                    range = innerException.Position;
 
-            for (int i = 0; i < AnalysisResult.Hints.Length; i++)
-            {
-                var hint = AnalysisResult.Hints[i];
-
-                if (hint.File != path && hint.File != null) continue;
-
-                diagnostics.Add(DiagnostizeHint(hint, "Compiler"));
-            }
-
-            for (int i = 0; i < AnalysisResult.Informations.Length; i++)
-            {
-                var information = AnalysisResult.Informations[i];
-
-                if (information.File != path && information.File != null) continue;
-
-                diagnostics.Add(DiagnostizeInformation(information, "Compiler"));
+                    diagnostics.Add(new DiagnosticInfo
+                    {
+                        severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
+                        range = range,
+                        message = innerException.Message,
+                    });
+                }
             }
 
             for (int i = diagnostics.Count - 1; i >= 0; i--) if (diagnostics[i].range.ToMinString() == "0:0") diagnostics.RemoveAt(i);
 
             App.Interface.PublishDiagnostics(e.Uri, diagnostics.ToArray());
-            // AnalysisResult.FileReferences = Analysis.FileReferences(file, path);
         }
 
         CompletionInfo[] IDocument.Completion(DocumentPositionContextEventArgs e)
         {
             Logger.Log($"Completion()");
 
-            List<CompletionInfo> result = new();
-
-            if (BestAnalysisResult.ParsingSuccess && BestAnalysisResult.Parsed)
-            {
-                foreach (var function in BestAnalysisResult.ParserResult.Functions)
-                {
-                    result.Add(new CompletionInfo()
-                    {
-                        Label = function.Identifier.Content,
-                        Detail = function.ReadableID(),
-                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Function,
-                    });
-                }
-
-                foreach (var @struct in BestAnalysisResult.ParserResult.Structs)
-                {
-                    result.Add(new CompletionInfo()
-                    {
-                        Label = @struct.Value.Name.Content,
-                        Detail = @struct.Value.FullName,
-                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Struct,
-                    });
-                }
-
-                foreach (var @class in BestAnalysisResult.ParserResult.Classes)
-                {
-                    result.Add(new CompletionInfo()
-                    {
-                        Label = @class.Value.Name.Content,
-                        Detail = @class.Value.FullName,
-                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Class,
-                    });
-                }
-
-                foreach (var variable in BestAnalysisResult.ParserResult.GlobalVariables)
-                {
-                    result.Add(new CompletionInfo()
-                    {
-                        Label = variable.VariableName.Content,
-                        Detail = $"(global var) {variable.Type.Content} {variable.VariableName.Content}",
-                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Variable,
-                    });
-                }
-            }
-
-            result.Add(new CompletionInfo()
-            {
-                Label = "int",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "float",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "bool",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "string",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "new",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "void",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "struct",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "namespace",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "var",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-
-            result.Add(new CompletionInfo()
-            {
-                Label = "return",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "if",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "elseif",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "else",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "for",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "while",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-
-            result.Add(new CompletionInfo()
-            {
-                Label = "true",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-            result.Add(new CompletionInfo()
-            {
-                Label = "false",
-                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Keyword,
-            });
-
-            return result.ToArray();
+            return Array.Empty<CompletionInfo>();
         }
 
         HoverInfo IDocument.Hover(DocumentPositionEventArgs e)
         {
+            SinglePosition pos = e.Position;
+
+            Logger.Log($"Hover({pos.ToMinString()})");
+
+            /*
             static HoverContent InfoFunctionDefinition(FunctionDefinition funcDef, bool IsDefinition)
             {
-                var text = $"{funcDef.Type} {funcDef.FullName}(";
+                var text = $"{funcDef.Type} {funcDef.Identifier.Content}(";
 
                 bool addComma = false;
 
@@ -433,7 +216,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     if (addComma) text += ", ";
 
                     if (funcDef.Parameters[i].withThisKeyword)
-                    { text = $"{funcDef.Type} {funcDef.Parameters[i].Type}.{funcDef.FullName}("; continue; }
+                    { text = $"{funcDef.Type} {funcDef.Parameters[i].Type}.{funcDef.Identifier.Content}("; continue; }
 
                     text += $"{funcDef.Parameters[i].Type} {funcDef.Parameters[i].Identifier}";
                     addComma = true;
@@ -496,7 +279,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 return new HoverContent()
                 {
                     Lang = "csharp",
-                    Text = $"struct {structDef.FullName}",
+                    Text = $"struct {structDef.Name.Content}",
                 };
             }
             static HoverContent InfoMethod(AnalysedToken_Method function, bool IsDefinition)
@@ -544,44 +327,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                 };
             }
 
-            static bool InfoReachedUnit(Token token, out HoverContent result)
-            {
-                if (!DEBUG) { result = null; return false; }
-                if (!token.Analysis.CompilerReached)
-                {
-                    result = new HoverContent()
-                    {
-                        Lang = "text",
-                        Text = token.Analysis.ParserReached ? "Not Compiled" : "Not Parsed",
-                    };
-                    return true;
-                }
-                result = null;
-                return false;
-            }
-
-            SinglePosition pos = e.Position;
-
-            Logger.Log($"Hover({pos.ToMinString()})");
-
             List<HoverContent> result = new();
-
-            for (int i = 0; i < AnalysisResult.TokenizerInicodeChars.Length; i++)
-            {
-                var unicode = AnalysisResult.TokenizerInicodeChars[i];
-                if (!unicode.Position.Contains(pos)) continue;
-                Logger.Log($"Hover: Unicode token found");
-
-                return new HoverInfo()
-                {
-                    Range = unicode.Position,
-                    Contents = new HoverContent[] { new HoverContent()
-                    {
-                        Lang = "text",
-                        Text = $"Unicode character '{unicode.Content}'"
-                    }},
-                };
-            }
 
             if (AnalysisResult.ParserFatalError == null && AnalysisResult.Parsed)
             {
@@ -599,11 +345,6 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                             range = functionCall.Identifier.Position;
 
-                            if (InfoReachedUnit(functionCall.Identifier, out var reachedUnit))
-                            { result.Add(reachedUnit); }
-
-                            // Logger.Log($"{functionCall.Identifier.Analysis}");
-
                             if (functionCall.Identifier is AnalysedToken_Function function)
                             {
                                 switch (function.Kind)
@@ -617,7 +358,8 @@ namespace BBCodeLanguageServer.DocumentManagers
                                     default: break;
                                 }
                                 return true;
-                            } else if (functionCall.Identifier is AnalysedToken_Method method)
+                            }
+                            else if (functionCall.Identifier is AnalysedToken_Method method)
                             {
                                 switch (method.Kind)
                                 {
@@ -630,86 +372,6 @@ namespace BBCodeLanguageServer.DocumentManagers
                                     default: break;
                                 }
                                 return true;
-                            }/*
-                            else
-                            {
-                                string newContentText = "";
-
-                                newContentText += $"? {functionCall.TargetNamespacePathPrefix}{functionCall.Identifier}(";
-
-                                bool addComma = false;
-                                int paramIndex = 0;
-                                foreach (var param in functionCall.Parameters)
-                                {
-                                    paramIndex++;
-                                    if (addComma) newContentText += $", ";
-                                    if (param is Statement_Literal literalParam)
-                                    {
-                                        switch (literalParam.Type.Type)
-                                        {
-                                            case TypeTokenType.AUTO:
-                                                newContentText += $"var p{paramIndex}";
-                                                break;
-                                            case TypeTokenType.INT:
-                                                newContentText += $"int p{paramIndex}";
-                                                break;
-                                            case TypeTokenType.FLOAT:
-                                                newContentText += $"float p{paramIndex}";
-                                                break;
-                                            case TypeTokenType.VOID:
-                                                newContentText += $"void p{paramIndex}";
-                                                break;
-                                            case TypeTokenType.STRING:
-                                                newContentText += $"string p{paramIndex}";
-                                                break;
-                                            case TypeTokenType.BOOLEAN:
-                                                newContentText += $"bool p{paramIndex}";
-                                                break;
-                                            case TypeTokenType.USER_DEFINED:
-                                                newContentText += $"? p{paramIndex}";
-                                                break;
-                                            case TypeTokenType.ANY:
-                                                newContentText += $"any p{paramIndex}";
-                                                break;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        newContentText += $"? p{paramIndex}";
-                                    }
-                                    addComma = true;
-                                }
-
-                                newContentText += $")";
-
-                                result.Add(new HoverContent()
-                                {
-                                    Lang = "csharp",
-                                    Text = newContentText,
-                                });
-                            }*/
-
-                            return true;
-                        }
-                        else if (statement is Statement_Literal literal)
-                        {
-                            if (literal.ValueToken == null) return false;
-                            if (!literal.ValueToken.Position.Contains(pos)) return false;
-
-                            Logger.Log($"Hover: Literal found");
-
-                            range = literal.ValueToken.Position;
-
-                            if (InfoReachedUnit(literal.ValueToken, out var reachedUnit))
-                            { result.Add(reachedUnit); }
-
-                            var info = Hover(literal.ValueToken);
-
-                            if (info != null)
-                            {
-                                if (literal.Type.Type == TypeTokenType.STRING)
-                                { range.End.Character++; }
-                                result.Add(info);
                             }
 
                             return true;
@@ -718,12 +380,9 @@ namespace BBCodeLanguageServer.DocumentManagers
                         {
                             if (!variable.VariableName.Position.Contains(pos)) return false;
 
-                            Logger.Log($"Hover: Variable found {variable.VariableName.Analysis}");
+                            Logger.Log($"Hover: Variable found {variable.VariableName}");
 
                             range = variable.VariableName.Position;
-
-                            if (InfoReachedUnit(variable.VariableName, out var reachedUnit))
-                            { result.Add(reachedUnit); }
 
                             if (variable.VariableName is AnalysedToken_Variable variable1)
                             {
@@ -769,30 +428,15 @@ namespace BBCodeLanguageServer.DocumentManagers
                         {
                             if (!newVariable.VariableName.Position.Contains(pos)) return false;
 
-                            Logger.Log($"Hover: NewVariable found {newVariable.VariableName.Analysis}");
+                            Logger.Log($"Hover: NewVariable found {newVariable.VariableName}");
 
                             range = newVariable.VariableName.Position;
 
-                            if (InfoReachedUnit(newVariable.VariableName, out var reachedUnit))
-                            { result.Add(reachedUnit); }
-                            /*
-                            if (newVariable.VariableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
+                            result.Add(new()
                             {
-                                var def = refVariable.Declaration;
-                                result.Add(new()
-                                {
-                                    Lang = "csharp",
-                                    Text = $"{refVariable.Type.FullName} {def.VariableName.Content}; // {(refVariable.IsGlobal ? "Global Variable" : "Local Variable")}",
-                                });
-                            }
-                            else*/
-                            {
-                                result.Add(new()
-                                {
-                                    Lang = "csharp",
-                                    Text = $"{newVariable.Type} {newVariable.VariableName.Content}; // Variable",
-                                });
-                            }
+                                Lang = "csharp",
+                                Text = $"{newVariable.Type} {newVariable.VariableName.Content}; // Variable",
+                            });
 
                             return true;
                         }
@@ -800,12 +444,9 @@ namespace BBCodeLanguageServer.DocumentManagers
                         {
                             if (!field.FieldName.Position.Contains(pos)) return false;
 
-                            Logger.Log($"Hover: Field found {field.FieldName.Analysis}");
+                            Logger.Log($"Hover: Field found {field.FieldName}");
 
                             range = field.FieldName.Position;
-
-                            if (InfoReachedUnit(field.FieldName, out var reachedUnit))
-                            { result.Add(reachedUnit); }
 
                             if (field.FieldName is AnalysedToken_Field field1)
                             {
@@ -839,38 +480,12 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                             return true;
                         }
-                        else if (statement is Statement_NewInstance newStruct)
-                        {
-                            /*
-                            if (!newStruct.structName.Position.Contains(pos)) return false;
-
-                            result.Add(new MarkedString()
-                            {
-                                language = "text",
-                                value = "Statement: New Struct",
-                            });
-
-                            range = GetRange(newStruct.structName);
-                            range.start.character--;
-                            range.end.character--;
-
-                            result.Add(new()
-                            {
-                                language = "csharp",
-                                value = $"new {newStruct.TargetNamespacePathPrefix}{newStruct.structName}",
-                            });
-
-                            return true;
-                            */
-                        }
 
                         return false;
                     });
 
                     if (result.Count > 0 && !range.IsUnset())
                     {
-                        // if (range.IsUnset())
-                        // { throw new ServiceException($"Hover range is null"); }
                         return new HoverInfo()
                         {
                             Range = range,
@@ -888,13 +503,10 @@ namespace BBCodeLanguageServer.DocumentManagers
                             if (!paramDef.Identifier.Position.Contains(pos)) continue;
                             Logger.Log($"Hover: Param. def. found");
 
-                            if (InfoReachedUnit(funcDef.Identifier, out var reachedUnit_))
-                            { result.Add(reachedUnit_); }
-
                             result.Add(new()
                             {
                                 Lang = "csharp",
-                                Text = $"{paramDef.Type.Content} {paramDef.Identifier.Content}; // Parameter",
+                                Text = $"{paramDef.Type.Identifier} {paramDef.Identifier.Content}; // Parameter",
                             });
 
                             return new HoverInfo()
@@ -908,9 +520,6 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                     Logger.Log($"Hover: Func. def. found");
 
-                    if (InfoReachedUnit(funcDef.Identifier, out var reachedUnit))
-                    { result.Add(reachedUnit); }
-
                     result.Add(InfoFunctionDefinition(funcDef, true));
 
                     return new HoverInfo()
@@ -922,7 +531,7 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                 foreach (var pair in AnalysisResult.ParserResult.Structs)
                 {
-                    var structDef = pair.Value;
+                    var structDef = pair;
                     if (!structDef.Name.Position.Contains(pos))
                     {
                         foreach (var field in structDef.Fields)
@@ -930,9 +539,6 @@ namespace BBCodeLanguageServer.DocumentManagers
                             if (!field.Identifier.Position.Contains(pos)) continue;
 
                             Logger.Log($"Hover: Struct field dec. found, {field.Identifier.Position}");
-
-                            if (InfoReachedUnit(field.Identifier, out var reachedUnit3))
-                            { result.Add(reachedUnit3); }
 
                             result.Add(new()
                             {
@@ -951,9 +557,6 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                     Logger.Log($"Hover: Struct def. found, {structDef.Name.Position}");
 
-                    if (InfoReachedUnit(structDef.Name, out var reachedUnit))
-                    { result.Add(reachedUnit); }
-
                     result.Add(InfoStructDefinition(structDef));
 
                     return new HoverInfo()
@@ -965,7 +568,7 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                 foreach (var pair in AnalysisResult.ParserResult.Classes)
                 {
-                    var classDef = pair.Value;
+                    var classDef = pair;
                     if (!classDef.Name.Position.Contains(pos))
                     {
                         foreach (var field in classDef.Fields)
@@ -973,9 +576,6 @@ namespace BBCodeLanguageServer.DocumentManagers
                             if (!field.Identifier.Position.Contains(pos)) continue;
 
                             Logger.Log($"Hover: Class field dec. found, {field.Identifier.Position}");
-
-                            if (InfoReachedUnit(field.Identifier, out var reachedUnit3))
-                            { result.Add(reachedUnit3); }
 
                             result.Add(new()
                             {
@@ -994,13 +594,10 @@ namespace BBCodeLanguageServer.DocumentManagers
 
                     Logger.Log($"Hover: Class def. found, {classDef.Name.Position}");
 
-                    if (InfoReachedUnit(classDef.Name, out var reachedUnit))
-                    { result.Add(reachedUnit); }
-
                     result.Add(new HoverContent()
                     {
                         Lang = "csharp",
-                        Text = $"class {classDef.FullName}",
+                        Text = $"class {classDef.Name.Content}",
                     });
 
                     return new HoverInfo()
@@ -1010,29 +607,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     };
                 }
 
-                foreach (var namespaceDef in AnalysisResult.ParserResult.Namespaces)
-                {
-                    if (!namespaceDef.Name.Position.Contains(pos)) continue;
-
-                    Logger.Log($"Hover: Namespace def. found, {namespaceDef.Name.Position}");
-
-                    if (InfoReachedUnit(namespaceDef.Name, out var reachedUnit))
-                    { result.Add(reachedUnit); }
-
-                    result.Add(new HoverContent()
-                    {
-                        Lang = "csharp",
-                        Text = $"namespace {namespaceDef.Name.Content}",
-                    });
-
-                    return new HoverInfo()
-                    {
-                        Range = namespaceDef.Name.Position,
-                        Contents = result.ToArray(),
-                    };
-                }
-
-                for (int i = 0; i < AnalysisResult.ParserResult.Usings.Count; i++)
+                for (int i = 0; i < AnalysisResult.ParserResult.Usings.Length; i++)
                 {
                     UsingDefinition usingItem = AnalysisResult.ParserResult.Usings[i];
 
@@ -1041,9 +616,6 @@ namespace BBCodeLanguageServer.DocumentManagers
                         if (pathToken.Position.Contains(pos))
                         {
                             Logger.Log($"Hover: Using def. found, {pathToken.Position}");
-
-                            if (InfoReachedUnit(pathToken, out var reachedUnit))
-                            { result.Add(reachedUnit); }
 
                             if (usingItem.Path.Length == 1 && pathToken.TokenType == TokenType.LITERAL_STRING)
                             {
@@ -1082,308 +654,48 @@ namespace BBCodeLanguageServer.DocumentManagers
                     if (usingItem.Keyword.Position.Contains(pos)) break;
                 }
             }
-
-            Logger.Log($"Hover: Fallback to token");
-
-            Token token = GetTokenAt(pos);
-
-            if (token == null)
-            {
-                Logger.Log($"Hover: No token at {pos.ToMinString()}");
-                return null;
-            }
-
-            if (InfoReachedUnit(token, out var reachedUnit2))
-            { result.Add(reachedUnit2); }
-
-            if (false && token is TypeToken typeToken)
-            {
-                Logger.Log($"Hover: TypeToken found");
-
-                try
-                {
-                    var info = Hover(typeToken);
-                    if (info != null)
-                    {
-                        result.Add(info);
-
-                        return new HoverInfo()
-                        {
-                            Range = token.Position,
-                            Contents = result.ToArray(),
-                        };
-                    }
-                }
-                catch (Exception error)
-                {
-                    Logger.Warn($"{error}");
-                }
-
-                result.Add(new HoverContent()
-                {
-                    Lang = "text",
-                    Text = $"TypeToken: {typeToken.Type} {typeToken.Content}{(typeToken.IsList ? "[]" : "")}",
-                });
-            }
-            else
-            {
-                Logger.Log($"Hover: Token found");
-
-                try
-                {
-
-                    var info = Hover(token);
-                    if (info != null)
-                    {
-                        result.Add(info);
-
-                        return new HoverInfo()
-                        {
-                            Range = token.Position,
-                            Contents = result.ToArray(),
-                        };
-                    }
-                }
-                catch (Exception error)
-                {
-                    Logger.Warn($"{error}");
-                }
-
-                result.Add(new HoverContent()
-                {
-                    Lang = "text",
-                    Text = $"Token: {token.TokenType} {token.Content}",
-                });
-            }
+            */
 
             return null;
         }
-
-        static HoverContent Hover(TypeToken token)
-        {
-            HoverContent info = token.Type switch
-            {
-                TypeTokenType.AUTO => null,
-                TypeTokenType.ANY => null,
-
-                TypeTokenType.USER_DEFINED => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{token.Content} // Type",
-                },
-
-                _ => new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{token.Content} // Type",
-                },
-            };
-
-            if (info == null) return null;
-            return info;
-        }
-        static HoverContent Hover(Token token)
-        {/*
-            if (token.Analysis.Reference is not null)
-            {
-                if (token.Analysis.Reference is TokenAnalysis.RefVariable refVariable) return new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{refVariable.Declaration.Type} {token.Content}; // {(refVariable.IsGlobal ? "Global" : "Local")} variable",
-                };
-                if (token.Analysis.Reference is TokenAnalysis.RefParameter refParameter) return new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"{refParameter.Type} {token.Content}; // Parameter",
-                };
-            }*/
-
-            {
-                var info = InfoTokenSubSubtype(token);
-                if (info != null) return info;
-            }
-
-            {
-                var info = InfoTokenSubtype(token);
-                if (info != null) return info;
-            }
-
-            {
-                var info = InfoToken(token);
-                if (info != null) return info;
-            }
-
-            return null;
-        }
-
-        static HoverContent InfoToken(Token t)
-        {
-            if ((new string[]
-            {
-                    "{", "}",
-                    "[", "]",
-                    "=", ",",
-                    ";",
-            }).Contains(t.Content)) return null;
-            return t.TokenType switch
-            {
-                TokenType.LITERAL_FLOAT => null,
-                TokenType.LITERAL_NUMBER => null,
-                TokenType.LITERAL_HEX => null,
-                TokenType.LITERAL_BIN => null,
-                TokenType.LITERAL_STRING => null,
-                TokenType.OPERATOR => null,
-                _ => null,
-            };
-        }
-        static HoverContent InfoTokenSubtype(Token t) => t.Analysis.Subtype switch
-        {
-            TokenSubtype.VariableName => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"var {t.Content};",
-            },
-            TokenSubtype.MethodName => null,
-            TokenSubtype.Type => null,
-            TokenSubtype.Struct => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"struct {t.Content}",
-            },
-            TokenSubtype.Class => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"class {t.Content}",
-            },
-            TokenSubtype.None => null,
-            TokenSubtype.Keyword => null,
-            TokenSubtype.Statement => null,
-            TokenSubtype.Library => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"namespace {t.Content}",
-            },
-            TokenSubtype.BuiltinType => null,
-            TokenSubtype.Hash => null,
-            TokenSubtype.HashParameter => null,
-            _ => null,
-        };
-        static HoverContent InfoTokenSubSubtype(Token t) => t.Analysis.SubSubtype switch
-        {
-            TokenSubSubtype.Attribute => null,
-            TokenSubSubtype.Type => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"{t.Content} // Type",
-            },
-            TokenSubSubtype.Struct => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"struct {t.Content}",
-            },
-            TokenSubSubtype.FunctionName => null,
-            TokenSubSubtype.VariableName => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"var {t.Content}; // Variable",
-            },
-            TokenSubSubtype.ParameterName => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"var {t.Content}; // Parameter",
-            },
-            TokenSubSubtype.FieldName => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"?.{t.Content}; // Field",
-            },
-            TokenSubSubtype.None => null,
-            TokenSubSubtype.Keyword => null,
-            TokenSubSubtype.Namespace => new HoverContent()
-            {
-                Lang = "csharp",
-                Text = $"namespace {t.Content}",
-            },
-            _ => null,
-        };
 
         CodeLensInfo[] IDocument.CodeLens(DocumentEventArgs e)
         {
-            string path = System.Net.WebUtility.UrlDecode(e.Document.Uri.AbsolutePath);
+            return Array.Empty<CodeLensInfo>();
+
             List<CodeLensInfo> result = new();
 
-            if (!AnalysisResult.Compiled) return Array.Empty<CodeLensInfo>();
-
-            if (AnalysisResult.ParserFatalError == null && AnalysisResult.TokenizingSuccess)
+            if (Functions != null)
             {
-                if (AnalysisResult.CompilerFatalError == null)
+                foreach (var function in Functions)
                 {
-                    if (AnalysisResult.CompilerResult.compiledFunctions != null)
-                    {
-                        List<string> FunctionsBruh = new();
-
-                        foreach (var func in AnalysisResult.CompilerResult.compiledFunctions)
-                        {
-                            if (func.FilePath != path) continue;
-
-                            FunctionsBruh.Add(func.ID());
-
-                            int referenceCount = func.TimesUsedTotal;
-
-                            result.Add(new CodeLensInfo($"{referenceCount} reference", func.Identifier));
-
-                            if (func.CompiledAttributes.ContainsKey("CodeEntry"))
-                            {
-                                result.Add(new CodeLensInfo($"This is the code entry", func.Identifier));
-                            }
-                        }
-
-                        if (AnalysisResult.ParserResult.Functions != null)
-                        {
-                            foreach (var func in AnalysisResult.ParserResult.Functions)
-                            {
-                                if (FunctionsBruh.Contains(func.ID())) continue;
-
-                                FunctionsBruh.Add(func.ID());
-                                result.Add(new CodeLensInfo($"0 reference", func.Identifier));
-                            }
-                        }
-
-                        foreach (var @struct in AnalysisResult.CompilerResult.compiledStructs)
-                        {
-                            if (@struct.FilePath != path) continue;
-                            result.Add(new CodeLensInfo($"{@struct.References.Count} reference", @struct.Name, "editor.action.referenceSearch.trigger", "5"));
-                        }
-                    }
+                    if (function.CompiledAttributes.ContainsKey("CodeEntry"))
+                    { result.Add(new CodeLensInfo($"This is the code entry", function.Identifier)); }
+                    result.Add(new CodeLensInfo($"{function.TimesUsedTotal} reference", function.Identifier));
                 }
-                else
+            }
+
+            if (GeneralFunctions != null)
+            {
+                foreach (var function in GeneralFunctions)
                 {
-                    if (AnalysisResult.ParserResult.Functions != null)
-                    {
-                        foreach (var func in AnalysisResult.ParserResult.Functions)
-                        {
-                            result.Add(new CodeLensInfo($"? reference", func.Identifier));
-                        }
-                    }
+                    result.Add(new CodeLensInfo($"{function.TimesUsedTotal} reference", function.Identifier));
                 }
+            }
 
-                for (int i = 0; i < AnalysisResult.ParserResult.Usings.Count; i++)
+            if (Classes != null)
+            {
+                foreach (var @class in Classes)
                 {
-                    var usingDef = AnalysisResult.ParserResult.Usings[i];
-                    var usingAnly = AnalysisResult.ParserResult.UsingsAnalytics[i];
+                    result.Add(new CodeLensInfo($"{@class.References.Count} reference", @class.Name));
+                }
+            }
 
-                    if (usingDef.DownloadTime.HasValue)
-                    {
-                        result.Add(new CodeLensInfo($"Downloaded in {Math.Floor(usingDef.DownloadTime.Value + .9d)} ms", usingDef.Keyword));
-                    }
-
-                    if (usingAnly.Found)
-                    {
-                        if (usingAnly.ParseTime == -1d)
-                        { result.Add(new CodeLensInfo($"Not parsed", usingDef.Keyword)); }
-                        else
-                        { result.Add(new CodeLensInfo($"Parsed in {Math.Floor(usingAnly.ParseTime + .9d)} ms", usingDef.Keyword)); }
-                    }
+            if (Structs != null)
+            {
+                foreach (var @struct in Structs)
+                {
+                    result.Add(new CodeLensInfo($"{@struct.References.Count} reference", @struct.Name));
                 }
             }
 
@@ -1392,489 +704,96 @@ namespace BBCodeLanguageServer.DocumentManagers
 
         SingleOrArray<FilePosition>? IDocument.GotoDefinition(DocumentPositionEventArgs e)
         {
-            Logger.Log($"GotoDefinition()");
+            Logger.Log($"GotoDefinition({e.Position.ToMinString()})");
 
-            if (!AnalysisResult.TokenizingSuccess) return null;
-            if (AnalysisResult.ParserFatalError != null) return null;
-            if (!AnalysisResult.Parsed) return null;
-
-            var pos = e.Position;
-            var token = GetTokenAt(pos);
-
-            if (token == null)
-            {
-                Logger.Log($"No token at {pos.ToMinString()}");
-                return null;
-            }
-            /*
-            if (token.Analysis != null && token.Analysis.Reference != null)
-            {
-                if (token.Analysis.Reference is TokenAnalysis.RefStruct refStruct) return new SingleOrArray<FilePosition>(new FilePosition(refStruct.Definition.Name.Position, refStruct.FilePath));
-                if (token.Analysis.Reference is TokenAnalysis.RefField refField) return new SingleOrArray<FilePosition>(new FilePosition(refField.NameToken.Position, refField.FilePath));
-            }*/
-
-            string currentFilePath = System.Net.WebUtility.UrlDecode(e.Document.Uri.AbsolutePath);
-            SingleOrArray<FilePosition>? result = null;
-
-            if (e.Document.Uri.Scheme == "file")
-            {
-                if (System.IO.File.Exists(currentFilePath))
-                {
-                    var currentFile = new System.IO.FileInfo(currentFilePath);
-
-                    foreach (var usingItem in AnalysisResult.ParserResult.Usings)
-                    {
-                        bool isContains = false;
-                        foreach (var item in usingItem.Path)
-                        {
-                            if (item.Position.Contains(pos))
-                            {
-                                isContains = true;
-                                break;
-                            }
-                        }
-
-                        if (isContains == false) break;
-
-                        var usingFilePath = usingItem.CompiledUri ?? currentFile.Directory.FullName + "\\" + usingItem.PathString + "." + FileExtensions.Code;
-
-                        if (System.IO.File.Exists(usingFilePath))
-                        {
-                            Logger.Log($"Using file found {usingFilePath}");
-                            return new SingleOrArray<FilePosition>(new FilePosition(
-                                Range<SinglePosition>.Create(usingItem.Path),
-                                new Range<SinglePosition>(new SinglePosition(1, 1), new SinglePosition(5, 5)),
-                                new Uri($"file:///" + usingFilePath.Replace('\\', '/'))
-                                ));
-                        }
-                        else
-                        {
-                            Logger.Log($"Using file not found");
-                        }
-                    }
-                }
-                else
-                {
-                    Logger.Log($"{currentFilePath} not found");
-                }
-            }
-            else
-            {
-                Logger.Log($"Document uri scheme is not file");
-            }
-
-            if (AnalysisResult.CompilerFatalError != null || !AnalysisResult.Compiled) return result;
-
-            foreach (var @struct in AnalysisResult.ParserResult.Structs)
-            {
-                foreach (var field in @struct.Value.Fields)
-                {
-                    if (!field.Type.Position.Contains(pos)) continue;
-                    /*if (field.Type.Analysis.Reference == null) continue;
-                    if (field.Type.Analysis.Reference is TokenAnalysis.RefStruct refStruct)
-                    {
-                        var uri = new Uri($"file:///" + refStruct.Definition.FilePath.Replace('\\', '/'));
-                        return new SingleOrArray<FilePosition>(new FilePosition(refStruct.Definition.Name.Position, uri));
-                    }
-                    return result;*/
-                }
-            }
-            /*
-            StatementFinder.GetAllStatement(AnalysisResult.ParserResult, statement =>
-            {
-                if (statement is Statement_FunctionCall functionCall)
-                {
-                    if (!functionCall.Identifier.Position.Contains(pos)) return false;
-                    if (functionCall.Identifier.Content == "return") return false;
-                    if (functionCall.Identifier.Analysis == null) return true;
-                    // if (functionCall.Identifier.Analysis.Reference == null) return true;
-                    
-                    if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
-                    {
-                        Logger.Log($"GotoDef: Func. call found {refFunction}");
-                        result = new SingleOrArray<FilePosition>(new FilePosition(refFunction.Definition.Identifier.Position, refFunction.Definition.FilePath));
-                    }
-
-                    return true;
-                }
-                    else if (statement is Statement_Variable variable)
-                {
-                    if (!variable.VariableName.Position.Contains(pos)) return false;
-                    if (variable.VariableName.Analysis == null) return true;
-                    if (variable.VariableName.Analysis.Reference == null) return true;
-
-                    if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
-                    {
-                        Logger.Log($"GotoDef: Variable found {refVariable}");
-                        result = new SingleOrArray<FilePosition>(new FilePosition(refVariable.Declaration.VariableName.Position, refVariable.Declaration.FilePath));
-                    }
-
-                    return true;
-                }
-
-            return false;
-            });
-            */
-            /*
-            StatementFinder.GetAllStatement(AnalysisResult.ParserResult, statement =>
-            {
-                if (statement is Statement_FunctionCall functionCall)
-                {
-                    if (functionCall.Identifier.Position.Contains(pos))
-                    {
-                        if (functionCall.Identifier.Analysis.Reference is TokenAnalysis.RefFunction refFunction)
-                        {
-                            if (refFunction.Definition.FilePath == null)
-                            {
-                                Logger.Warn($"Function.Definition.FilePath is null");
-                                return true;
-                            }
-                            var uri = new Uri($"file:///" + refFunction.Definition.FilePath.Replace('\\', '/'));
-                            result = new SingleOrArray<FilePosition>(new FilePosition(refFunction.Definition.Name.Position, uri));
-
-                            Logger.Log($"FuncCall Ref found {uri}");
-                        }
-                        else
-                        {
-                            Logger.Log($"FuncCall Ref is null");
-                        }
-                        return true;
-                    }
-                }
-                else if (statement is Statement_NewInstance newStruct)
-                {
-                    if (newStruct.TypeName.Position.Contains(pos))
-                    {
-                        if (newStruct.TypeName.Analysis.Reference is TokenAnalysis.RefStruct refStruct)
-                        {
-                            var uri = new Uri($"file:///" + refStruct.Definition.FilePath.Replace('\\', '/'));
-                            result = new SingleOrArray<FilePosition>(new FilePosition(refStruct.Definition.Name.Position, uri));
-
-                            Logger.Log($"Struct Ref found {refStruct.Definition.Name.Position} {uri}");
-                        }
-                        else
-                        {
-                            Logger.Log($"Struct Ref is null");
-                        }
-                        return true;
-                    }
-                }
-                else if (statement is Statement_Field field)
-                {
-                    if (!field.FieldName.Position.Contains(pos)) return false;
-
-                    if (field.FieldName.Analysis.Reference is TokenAnalysis.RefField refField)
-                    {
-                        var uri = new Uri($"file:///" + refField.FilePath.Replace('\\', '/'));
-                        result = new SingleOrArray<FilePosition>(new FilePosition(refField.NameToken.Position, uri));
-
-                        Logger.Log($"Field Ref found {refField.NameToken.Position} {uri}");
-                    }
-                    else
-                    {
-                        Logger.Log($"Field Ref is null");
-                    }
-
-                    return true;
-                }
-                else if (statement is Statement_Variable variable)
-                {
-                    if (!variable.VariableName.Position.Contains(pos)) return false;
-
-                    if (variable.VariableName.Analysis.Reference is TokenAnalysis.RefVariable refVariable)
-                    {
-                        var uri = new Uri($"file:///" + refVariable.Declaration.FilePath.Replace('\\', '/'));
-                        result = new SingleOrArray<FilePosition>(new FilePosition(refVariable.Declaration.VariableName.Position, uri));
-
-                        Logger.Log($"Variable Ref found {refVariable} {uri}");
-                    }
-                    else
-                    {
-                        Logger.Log($"Variable Ref is null");
-                    }
-
-                    return true;
-                }
-                return false;
-            });
-            */
-
-            return result;
+            return null;
         }
 
         SymbolInformationInfo[] IDocument.Symbols(DocumentEventArgs e)
         {
-            List<SymbolInformationInfo> symbols = new();
+            Logger.Log($"Symbols()");
 
-            if (AnalysisResult.ParserFatalError == null && AnalysisResult.TokenizingSuccess && AnalysisResult.Parsed)
-            {
-                var parserResult = AnalysisResult.ParserResult;
-
-                List<string> Namespaces = new();
-
-                foreach (var item in parserResult.Namespaces)
-                {
-                    symbols.Add(new SymbolInformationInfo()
-                    {
-                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Namespace,
-                        Location = new DocumentLocation()
-                        {
-                            Range = new Position(item.Keyword, item.Name, item.BracketStart, item.BracketEnd),
-                            Uri = e.Document.Uri,
-                        },
-                        Name = item.Name.Content,
-                    });
-                }
-
-                foreach (var item in parserResult.Functions)
-                {
-                    foreach (var attr in item.Attributes)
-                    {
-                        if (attr.Identifier.Content == "Catch")
-                        {
-                            if (attr.Parameters.Length != 1) continue;
-                            if (attr.Parameters[0] is not string eventName) continue;
-                            symbols.Add(new SymbolInformationInfo()
-                            {
-                                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Event,
-                                Location = new DocumentLocation()
-                                {
-                                    Range = new Position(item.Type, item.Identifier, item.BracketStart, item.BracketEnd, attr.Identifier),
-                                    Uri = e.Document.Uri,
-                                },
-                                Name = "On" + eventName.FirstCharToUpper(),
-                            });
-                        }
-                    }
-                    SymbolInformationInfo funcSymbol = new()
-                    {
-                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Function,
-                        Location = new DocumentLocation()
-                        {
-                            Range = new Position(item.Type, item.Identifier, item.BracketStart, item.BracketEnd),
-                            Uri = e.Document.Uri,
-                        },
-                        Name = item.Identifier.Content,
-                    };
-
-                    if (item.Parameters.Length > 0) funcSymbol.Name += "(";
-
-                    for (int i = 0; i < item.Parameters.Length; i++)
-                    {
-                        if (i > 0) { funcSymbol.Name += ", "; }
-                        ParameterDefinition prm = item.Parameters[i];
-                        funcSymbol.Name += prm.Type.Content;
-                    }
-
-                    if (item.Parameters.Length > 0) funcSymbol.Name += ")";
-
-                    if (item.NamespacePath.Length > 0 && false)
-                    {
-                        foreach (var item2 in item.NamespacePath)
-                        {
-                            if (Namespaces.Contains(item2)) continue;
-                            Namespaces.Add(item2);
-                            symbols.Add(new SymbolInformationInfo()
-                            {
-                                Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Namespace,
-                                Location = new DocumentLocation()
-                                {
-                                    Range = new Position(item.Identifier),
-                                    Uri = e.Document.Uri,
-                                },
-                                Name = item2,
-                            });
-                        }
-                    }
-
-                    symbols.Add(funcSymbol);
-                }
-
-                foreach (var item in parserResult.Structs)
-                {
-                    symbols.Add(new SymbolInformationInfo()
-                    {
-                        Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Struct,
-                        Location = new DocumentLocation()
-                        {
-                            Range = new Position(item.Value.Name, item.Value.BracketStart, item.Value.BracketEnd),
-                            Uri = e.Document.Uri,
-                        },
-                        Name = item.Value.Name.Content,
-                    });
-
-                    foreach (var field in item.Value.Fields)
-                    {
-                        symbols.Add(new SymbolInformationInfo()
-                        {
-                            Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Field,
-                            Location = new DocumentLocation()
-                            {
-                                Range = new Position(field.Type, field.Identifier),
-                                Uri = e.Document.Uri,
-                            },
-                            Name = field.Identifier.Content,
-                        });
-                    }
-                }
-            }
-
-            return symbols.ToArray();
+            return Array.Empty<SymbolInformationInfo>();
         }
 
         FilePosition[] IDocument.References(FindReferencesEventArgs e)
         {
-            List<FilePosition> result = new();
-
             Logger.Log($"References({e.Position.ToMinString()})");
 
-            if (AnalysisResult.ParserFatalError == null && AnalysisResult.Parsed)
-            {
-                foreach (var functionDef in AnalysisResult.CompilerResult.compiledFunctions)
-                {
-                    if (!functionDef.Identifier.Position.Contains(e.Position)) continue;
-                    foreach (var reference in functionDef.References) result.Add(new FilePosition(reference.Source, reference.SourceFile));
-                    return result.ToArray();
-                }
-
-                foreach (var structDef in AnalysisResult.compilerResult.compiledStructs)
-                {
-                    if (!structDef.Name.Position.Contains(e.Position)) continue;
-                    foreach (var reference in structDef.References) result.Add(new FilePosition(reference.Source, reference.SourceFile));
-                    return result.ToArray();
-                }
-            }
-
-            return result.ToArray();
+            return Array.Empty<FilePosition>();
         }
 
         SignatureHelpInfo IDocument.SignatureHelp(SignatureHelpEventArgs e)
         {
-            if (!HaveSuccesAlanysisResult) return null;
-            if (!BestAnalysisResult.Compiled) return null;
             return null;
-            /*
-            List<SignatureInfo> signatures = new();
-            foreach (var func in BestAnalysisResult.CompilerResult.compiledFunctions)
-            {
-                ParameterInfo[] parameters = new ParameterInfo[func.Value.ParameterCount];
-                for (int i = 0; i < func.Value.Parameters.Count; i++)
-                {
-                    parameters[i] = new ParameterInfo(func.Value.Parameters[i].name.text, null);
-                }
-                signatures.Add(new SignatureInfo(0, func.Key, null, parameters));
-            }
-            return new SignatureHelpInfo(0, 0, signatures.ToArray());
-            */
         }
 
         SemanticToken[] IDocument.GetSemanticTokens(DocumentEventArgs e)
         {
-            if (!AnalysisResult.TokenizingSuccess || !AnalysisResult.Tokenized) return Array.Empty<SemanticToken>();
+            if (Tokens == null) return Array.Empty<SemanticToken>();
 
-            var tokens = AnalysisResult.Tokens;
             List<SemanticToken> result = new();
 
-            foreach (var token in tokens)
+            foreach (var token in Tokens)
             {
-                switch (token.TokenType)
+                switch (token.AnalysedType)
                 {
-                    case TokenType.IDENTIFIER:
-                        {
-                            switch (token.Analysis.SubSubtype)
-                            {
-                                case TokenSubSubtype.Attribute:
-                                    result.Add(new SemanticToken(token,
-                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Type));
-                                    break;
-                                case TokenSubSubtype.Type:
-                                    break;
-                                case TokenSubSubtype.Struct:
-                                    result.Add(new SemanticToken(token,
-                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Struct));
-                                    break;
-                                case TokenSubSubtype.Keyword:
-                                    break;
-                                case TokenSubSubtype.FunctionName:
-                                    break;
-                                case TokenSubSubtype.VariableName:
-                                    result.Add(new SemanticToken(token,
-                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Variable));
-                                    break;
-                                case TokenSubSubtype.FieldName:
-                                    break;
-                                case TokenSubSubtype.ParameterName:
-                                    result.Add(new SemanticToken(token,
-                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Parameter));
-                                    break;
-                                case TokenSubSubtype.Namespace:
-                                    result.Add(new SemanticToken(token,
-                                        OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Namespace));
-                                    break;
-
-                                case TokenSubSubtype.None:
-                                default:
-                                    switch (token.Analysis.Subtype)
-                                    {
-                                        case TokenSubtype.MethodName:
-                                            break;
-                                        case TokenSubtype.Keyword:
-                                            break;
-                                        case TokenSubtype.Type:
-                                            break;
-                                        case TokenSubtype.VariableName:
-                                            result.Add(new SemanticToken(token,
-                                                OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Variable));
-                                            break;
-                                        case TokenSubtype.Statement:
-                                            break;
-                                        case TokenSubtype.Library:
-                                            result.Add(new SemanticToken(token,
-                                                OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Namespace));
-                                            break;
-                                        case TokenSubtype.Struct:
-                                            result.Add(new SemanticToken(token,
-                                                OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Struct));
-                                            break;
-                                        case TokenSubtype.BuiltinType:
-                                            break;
-                                        case TokenSubtype.Hash:
-                                            break;
-                                        case TokenSubtype.HashParameter:
-                                            break;
-                                        case TokenSubtype.Class:
-                                            result.Add(new SemanticToken(token,
-                                                OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Class));
-                                            break;
-                                        case TokenSubtype.None:
-                                        default:
-                                            break;
-                                    }
-                                    break;
-                            }
-                        }
+                    case TokenAnalysedType.Attribute:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Type));
+                        break;
+                    case TokenAnalysedType.Type:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Type));
+                        break;
+                    case TokenAnalysedType.Struct:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Struct));
+                        break;
+                    case TokenAnalysedType.Keyword:
+                        break;
+                    case TokenAnalysedType.FunctionName:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Function));
+                        break;
+                    case TokenAnalysedType.VariableName:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Variable));
+                        break;
+                    case TokenAnalysedType.ParameterName:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Parameter));
+                        break;
+                    case TokenAnalysedType.Namespace:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Namespace));
+                        break;
+                    case TokenAnalysedType.Library:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Namespace));
+                        break;
+                    case TokenAnalysedType.Class:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Class));
+                        break;
+                    case TokenAnalysedType.Statement:
+                        break;
+                    case TokenAnalysedType.BuiltinType:
+                        break;
+                    case TokenAnalysedType.Enum:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Enum));
+                        break;
+                    case TokenAnalysedType.EnumMember:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.EnumMember));
                         break;
 
-                    case TokenType.LITERAL_NUMBER:
-                    case TokenType.LITERAL_HEX:
-                    case TokenType.LITERAL_BIN:
-                    case TokenType.LITERAL_FLOAT:
-                        break;
+                    case TokenAnalysedType.Hash:
+                    case TokenAnalysedType.HashParameter:
 
-                    case TokenType.LITERAL_STRING:
-                        break;
-
-                    case TokenType.OPERATOR:
-                        break;
-
-                    case TokenType.STRING_ESCAPE_SEQUENCE:
-                    case TokenType.POTENTIAL_FLOAT:
-                    case TokenType.POTENTIAL_COMMENT:
-                    case TokenType.POTENTIAL_END_MULTILINE_COMMENT:
-                    case TokenType.COMMENT:
-                    case TokenType.COMMENT_MULTILINE:
-                    case TokenType.WHITESPACE:
-                    case TokenType.LINEBREAK:
+                    case TokenAnalysedType.None:
+                    case TokenAnalysedType.FieldName:
                     default:
                         break;
                 }

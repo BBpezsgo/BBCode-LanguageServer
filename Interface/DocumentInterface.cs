@@ -24,7 +24,6 @@ namespace BBCodeLanguageServer.Interface
         internal static IDocument GenerateDocument(DocumentItem document, DocumentInterface documentInterface)
         {
             if (document.LanguageID == "bbc") return new DocumentBBCode(document, documentInterface);
-            if (document.LanguageID == "bbct") return new DocumentBBCodeTest(document, documentInterface);
             throw new Exception($"Unknown language {document.LanguageID}");
         }
     }

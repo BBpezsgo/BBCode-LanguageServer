@@ -662,7 +662,7 @@ namespace BBCodeLanguageServer.DocumentManagers
         CodeLensInfo[] IDocument.CodeLens(DocumentEventArgs e)
         {
             return Array.Empty<CodeLensInfo>();
-
+            /*
             List<CodeLensInfo> result = new();
 
             if (Functions != null)
@@ -700,6 +700,7 @@ namespace BBCodeLanguageServer.DocumentManagers
             }
 
             return result.ToArray();
+            */
         }
 
         SingleOrArray<FilePosition>? IDocument.GotoDefinition(DocumentPositionEventArgs e)

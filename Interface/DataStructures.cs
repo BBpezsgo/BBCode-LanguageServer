@@ -1,5 +1,7 @@
 ﻿using IngameCoding.BBCode;
 
+#pragma warning disable CS0649
+
 namespace BBCodeLanguageServer.Interface
 {
     using BBCodeLanguageServer.Interface.SystemExtensions;

@@ -25,4 +25,8 @@
     <ProjectReference Include="..\..\BBCode\BBCodeInterpreter.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Source\" />
+  </ItemGroup>
+
 </Project>

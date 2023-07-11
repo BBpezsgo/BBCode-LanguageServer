@@ -1,15 +1,8 @@
-﻿using BBCodeLanguageServer.Interface;
-
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-
-using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using OmniSharp.Extensions.LanguageServer.Server;
+﻿using ProgrammingLanguage.LanguageServer.Interface;
 
 using System;
-using System.Threading.Tasks;
 
-namespace BBCodeLanguageServer
+namespace ProgrammingLanguage.LanguageServer
 {
     class Program
     {

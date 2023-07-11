@@ -1,11 +1,12 @@
-﻿namespace BBCodeLanguageServer.Interface
+﻿namespace ProgrammingLanguage.LanguageServer.Interface
 {
-    internal interface IInterface
+    public interface IInterface
     {
         internal event ServiceAppEvent OnInitialize;
         internal event ServiceAppEvent<DocumentItemEventArgs> OnDocumentChanged;
         internal event ServiceAppEvent<DocumentItemEventArgs> OnDocumentOpened;
         internal event ServiceAppEvent<DocumentEventArgs> OnDocumentClosed;
+        internal event ServiceAppEvent<DocumentEventArgs> OnDocumentSaved;
         internal event ServiceAppEvent<ConfigEventArgs> OnConfigChanged;
         internal event ServiceAppEvent<DocumentEventArgs, CodeLensInfo[]> OnCodeLens;
         internal event ServiceAppEvent<DocumentPositionContextEventArgs, CompletionInfo[]> OnCompletion;

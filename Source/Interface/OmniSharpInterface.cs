@@ -1,4 +1,4 @@
-﻿using BBCodeLanguageServer.Interface.Managers;
+﻿using ProgrammingLanguage.LanguageServer.Interface.Managers;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,13 +12,13 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using System;
 using System.Threading.Tasks;
 
-namespace BBCodeLanguageServer.Interface
+namespace ProgrammingLanguage.LanguageServer.Interface
 {
-    internal class ServiceAppInterfaceOmniSharp : IInterface
+    public class ServiceAppInterfaceOmniSharp : IInterface
     {
         internal ILanguageServer Server;
         internal IServiceProvider ServiceProvider;
-        internal Managers.BufferManager BufferManager;
+        internal BufferManager BufferManager;
         Logger2 logger;
 
         internal static ServiceAppInterfaceOmniSharp Instance { get; private set; }
@@ -27,6 +27,7 @@ namespace BBCodeLanguageServer.Interface
         event ServiceAppEvent<DocumentItemEventArgs> OnDocumentChanged;
         event ServiceAppEvent<DocumentItemEventArgs> OnDocumentOpened;
         event ServiceAppEvent<DocumentEventArgs> OnDocumentClosed;
+        event ServiceAppEvent<DocumentEventArgs> OnDocumentSaved;
         event ServiceAppEvent<ConfigEventArgs> OnConfigChanged;
         event ServiceAppEvent<SignatureHelpEventArgs, SignatureHelpInfo> OnSignatureHelp;
         event ServiceAppEvent<DocumentEventArgs, CodeLensInfo[]> OnCodeLens;
@@ -37,7 +38,7 @@ namespace BBCodeLanguageServer.Interface
         event ServiceAppEvent<FindReferencesEventArgs, FilePosition[]> OnReferences;
         event ServiceAppEvent<DocumentEventArgs, SemanticToken[]> OnSemanticTokensNeed;
 
-        internal ServiceAppInterfaceOmniSharp()
+        public ServiceAppInterfaceOmniSharp()
         {
             Instance = this;
         }
@@ -61,6 +62,11 @@ namespace BBCodeLanguageServer.Interface
         {
             add => OnDocumentClosed += value;
             remove => OnDocumentClosed -= value;
+        }
+        event ServiceAppEvent<DocumentEventArgs> IInterface.OnDocumentSaved
+        {
+            add => OnDocumentSaved += value;
+            remove => OnDocumentSaved -= value;
         }
         event ServiceAppEvent<ConfigEventArgs> IInterface.OnConfigChanged
         {
@@ -117,7 +123,7 @@ namespace BBCodeLanguageServer.Interface
             throw new ServiceException($"Document {uri} is not buffered");
         }
 
-        internal async Task CreateAsync()
+        public async Task CreateAsync()
         {
             logger = new Logger2();
             Logger.Setup(logger);
@@ -208,7 +214,7 @@ namespace BBCodeLanguageServer.Interface
                .WithServices(this.ConfigureServices);
 
             options
-               .WithHandler<BBCodeLanguageServer.Managers.TextDocumentHandler>()
+               .WithHandler<ProgrammingLanguage.LanguageServer.Managers.TextDocumentHandler>()
                .WithHandler<Managers.DocumentSymbolHandler>()
                .WithHandler<Managers.CodeLensHandler>()
                .WithHandler<Managers.CompletionHandler>()
@@ -300,6 +306,7 @@ namespace BBCodeLanguageServer.Interface
         internal void OnDocumentSavedExternal(DidSaveTextDocumentParams e)
         {
             if (Server == null) return;
+            OnDocumentSaved?.Invoke(new DocumentEventArgs(new Document(e.TextDocument)));
         }
         internal void OnDocumentClosedExternal(DidCloseTextDocumentParams e)
         {
@@ -331,18 +338,16 @@ namespace BBCodeLanguageServer.Interface
 
     namespace Managers
     {
-        using BBCodeLanguageServer.Interface.SystemExtensions;
+        using ProgrammingLanguage.LanguageServer.Interface.SystemExtensions;
 
         using MediatR;
 
-        using OmniSharp.Extensions.LanguageServer.Protocol;
         using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
         using OmniSharp.Extensions.LanguageServer.Protocol.Document;
         using OmniSharp.Extensions.LanguageServer.Protocol.Models;
         using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 
         using System.Collections.Generic;
-        using System.Linq;
         using System.Threading;
         using System.Threading.Tasks;
 
@@ -640,32 +645,24 @@ namespace BBCodeLanguageServer.Interface
         {
             public override async Task<SemanticTokens> Handle(SemanticTokensParams request, CancellationToken cancellationToken)
             {
-                Logger.Info($"SemanticTokensHandler.Handle()");
-
                 var result = await base.Handle(request, cancellationToken).ConfigureAwait(false);
                 return result;
             }
 
             public override async Task<SemanticTokens> Handle(SemanticTokensRangeParams request, CancellationToken cancellationToken)
             {
-                Logger.Info($"SemanticTokensHandler.Handle_Range()");
-
                 var result = await base.Handle(request, cancellationToken).ConfigureAwait(false);
                 return result;
             }
 
             public override async Task<SemanticTokensFullOrDelta> Handle(SemanticTokensDeltaParams request, CancellationToken cancellationToken)
             {
-                Logger.Info($"SemanticTokensHandler.Handle_Delta()");
-
                 var result = await base.Handle(request, cancellationToken).ConfigureAwait(false);
                 return result;
             }
 
             protected override async Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken)
             {
-                Logger.Info($"SemanticTokensHandler.Tokenize()");
-
                 var tokens = ServiceAppInterfaceOmniSharp.Instance.OnSemanticTokensNeedExternal(identifier);
 
                 await Task.Yield();
@@ -687,15 +684,11 @@ namespace BBCodeLanguageServer.Interface
 
             protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams @params, CancellationToken cancellationToken)
             {
-                Logger.Info($"SemanticTokensHandler.GetSemanticTokensDocument()");
-
                 return Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
             }
 
             protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)
             {
-                Logger.Info($"SemanticTokensHandler.CreateRegistrationOptions()");
-
                 return new SemanticTokensRegistrationOptions
                 {
                     DocumentSelector = DocumentSelector.ForLanguage("bbc"),

@@ -1,4 +1,4 @@
-﻿using BBCodeLanguageServer.Interface.SystemExtensions;
+﻿using ProgrammingLanguage.LanguageServer.Interface.SystemExtensions;
 
 using MediatR;
 
@@ -15,7 +15,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace BBCodeLanguageServer
+namespace ProgrammingLanguage.LanguageServer
 {
     internal static class DocumentSelectorGen
     {
@@ -27,7 +27,7 @@ namespace BBCodeLanguageServer
     }
 }
 
-namespace BBCodeLanguageServer.Managers
+namespace ProgrammingLanguage.LanguageServer.Managers
 {
     class TextDocumentHandler : TextDocumentSyncHandlerBase
     {

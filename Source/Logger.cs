@@ -1,11 +1,26 @@
 ﻿using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
-namespace BBCodeLanguageServer
+using System;
+using System.IO;
+
+namespace ProgrammingLanguage.LanguageServer
 {
-    internal class Logger
+    public class Logger
     {
         static ILogger Instance;
-        
+
+        static string _fileName;
+        static string FileName
+        {
+            get
+            {
+                if (_fileName == null)
+                { _fileName = $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.txt"; }
+                return _fileName;
+            }
+        }
+        const string LOG_PATH = @"D:\Program Files\BBCodeProject\LanguageServer\";
+
         /*
         Proxy proxy;
 
@@ -30,12 +45,42 @@ namespace BBCodeLanguageServer
         }
         */
 
-        public static void Error(string message) => Instance?.Send(MessageType.Error, message);
-        public static void Warn(string message) => Instance?.Send(MessageType.Warning, message);
-        public static void Info(string message) => Instance?.Send(MessageType.Info, message);
-        public static void Log(string message) => Instance?.Send(MessageType.Log, message);
+        public static void Error(string message)
+        {
+            if (Directory.Exists(LOG_PATH))
+            { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [ERROR] {message}"); }
 
-        internal static void Setup(ILogger logger) => Instance = logger;
+            Instance?.Send(MessageType.Error, message);
+        }
+
+        public static void Warn(string message)
+        {
+            if (Directory.Exists(LOG_PATH))
+            { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [WARN] {message}"); }
+
+            Instance?.Send(MessageType.Warning, message);
+        }
+
+        public static void Info(string message)
+        {
+            if (Directory.Exists(LOG_PATH))
+            { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [INFO] {message}"); }
+
+            Instance?.Send(MessageType.Info, message);
+        }
+
+        public static void Log(string message)
+        {
+            if (Directory.Exists(LOG_PATH))
+            { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [LOG] {message}"); }
+
+            Instance?.Send(MessageType.Log, message);
+        }
+
+        internal static void Setup(ILogger logger)
+        {
+            Instance = logger;
+        }
     }
 
     internal interface ILogger

@@ -1,22 +1,25 @@
-﻿using BBCodeLanguageServer.Interface;
+﻿using ProgrammingLanguage.LanguageServer.Interface;
 
-using IngameCoding.BBCode;
-using IngameCoding.BBCode.Compiler;
-using IngameCoding.BBCode.Parser;
-using IngameCoding.Core;
-using IngameCoding.Errors;
+using ProgrammingLanguage.BBCode;
+using ProgrammingLanguage.BBCode.Analysis;
+using ProgrammingLanguage.BBCode.Compiler;
+using ProgrammingLanguage.BBCode.Parser;
+using ProgrammingLanguage.BBCode.Parser.Statements;
+using ProgrammingLanguage.Core;
+using ProgrammingLanguage.Errors;
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace BBCodeLanguageServer.DocumentManagers
+namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 {
     internal class DocumentBBCode : IDocument
     {
+        public Uri Uri { get; private set; }
+
         readonly DocumentInterface App;
         string Text;
-        string Url;
         string LanguageId;
 
         Token[] Tokens;
@@ -36,10 +39,15 @@ namespace BBCodeLanguageServer.DocumentManagers
         public void OnChanged(DocumentItem e)
         {
             Text = e.Content;
-            Url = e.Uri.ToString();
+            Uri = e.Uri;
             LanguageId = e.LanguageID;
 
             Validate(new Document(e));
+        }
+
+        public void OnSaved(Document e)
+        {
+            Validate(e);
         }
 
         Token GetTokenAt(SinglePosition position)
@@ -159,8 +167,10 @@ namespace BBCodeLanguageServer.DocumentManagers
                 Structs = result.CodeGeneratorResult.Structs ?? result.CompilerResult.Structs;
 
                 Tokens = result.TokenizerResult;
+
+                Logger.Log($"Succesfully compiled ({file.Name})");
             }
-            catch (IngameCoding.Errors.Exception exception)
+            catch (ProgrammingLanguage.Errors.Exception exception)
             {
                 var range = exception.Position;
 
@@ -173,7 +183,7 @@ namespace BBCodeLanguageServer.DocumentManagers
                     message = exception.Message,
                 });
 
-                if (exception.InnerException is IngameCoding.Errors.Exception innerException)
+                if (exception.InnerException is ProgrammingLanguage.Errors.Exception innerException)
                 {
                     range = innerException.Position;
 
@@ -200,9 +210,9 @@ namespace BBCodeLanguageServer.DocumentManagers
 
         HoverInfo IDocument.Hover(DocumentPositionEventArgs e)
         {
-            SinglePosition pos = e.Position;
+            Logger.Log($"Hover({e.Position.ToMinString()})");
 
-            Logger.Log($"Hover({pos.ToMinString()})");
+            HoverInfo result = null;
 
             /*
             static HoverContent InfoFunctionDefinition(FunctionDefinition funcDef, bool IsDefinition)
@@ -656,13 +666,11 @@ namespace BBCodeLanguageServer.DocumentManagers
             }
             */
 
-            return null;
+            return result;
         }
 
         CodeLensInfo[] IDocument.CodeLens(DocumentEventArgs e)
         {
-            return Array.Empty<CodeLensInfo>();
-            /*
             List<CodeLensInfo> result = new();
 
             if (Functions != null)
@@ -671,10 +679,12 @@ namespace BBCodeLanguageServer.DocumentManagers
                 {
                     if (function.CompiledAttributes.ContainsKey("CodeEntry"))
                     { result.Add(new CodeLensInfo($"This is the code entry", function.Identifier)); }
+
                     result.Add(new CodeLensInfo($"{function.TimesUsedTotal} reference", function.Identifier));
                 }
             }
 
+            /*
             if (GeneralFunctions != null)
             {
                 foreach (var function in GeneralFunctions)
@@ -698,9 +708,9 @@ namespace BBCodeLanguageServer.DocumentManagers
                     result.Add(new CodeLensInfo($"{@struct.References.Count} reference", @struct.Name));
                 }
             }
+            */
 
             return result.ToArray();
-            */
         }
 
         SingleOrArray<FilePosition>? IDocument.GotoDefinition(DocumentPositionEventArgs e)

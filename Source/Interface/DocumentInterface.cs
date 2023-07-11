@@ -133,7 +133,7 @@ namespace ProgrammingLanguage.LanguageServer.Interface
                 if (!System.IO.File.Exists(path))
                 { throw new ServiceException($"File \"{path}\" not found"); }
 
-                DocumentItem newDocItem = new DocumentItem(uri, System.IO.File.ReadAllText(path), path.Split('.').Last().ToLower());
+                DocumentItem newDocItem = new(uri, System.IO.File.ReadAllText(path), path.Split('.').Last().ToLower());
                 DidOpenTextDocument(new DocumentItemEventArgs(newDocItem));
 
                 return GetDocument(uri);

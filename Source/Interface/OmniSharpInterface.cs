@@ -673,6 +673,7 @@ namespace ProgrammingLanguage.LanguageServer.Interface
                 }
             }
 
+            /*
             static IEnumerable<T> RotateEnum<T>(IEnumerable<T> values)
             {
                 while (true)
@@ -681,6 +682,7 @@ namespace ProgrammingLanguage.LanguageServer.Interface
                         yield return item;
                 }
             }
+            */
 
             protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams @params, CancellationToken cancellationToken)
             {

@@ -47,32 +47,52 @@ namespace ProgrammingLanguage.LanguageServer
 
         public static void Error(string message)
         {
-            if (Directory.Exists(LOG_PATH))
-            { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [ERROR] {message}"); }
+            try
+            {
+                if (Directory.Exists(LOG_PATH))
+                { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [ERROR] {message}"); }
+            }
+            catch (IOException)
+            { }
 
             Instance?.Send(MessageType.Error, message);
         }
 
         public static void Warn(string message)
         {
-            if (Directory.Exists(LOG_PATH))
-            { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [WARN] {message}"); }
+            try
+            {
+                if (Directory.Exists(LOG_PATH))
+                { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [WARN] {message}"); }
+            }
+            catch (IOException)
+            { }
 
             Instance?.Send(MessageType.Warning, message);
         }
 
         public static void Info(string message)
         {
-            if (Directory.Exists(LOG_PATH))
-            { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [INFO] {message}"); }
+            try
+            {
+                if (Directory.Exists(LOG_PATH))
+                { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [INFO] {message}"); }
+            }
+            catch (IOException)
+            { }
 
             Instance?.Send(MessageType.Info, message);
         }
 
         public static void Log(string message)
         {
-            if (Directory.Exists(LOG_PATH))
-            { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [LOG] {message}"); }
+            try
+            {
+                if (Directory.Exists(LOG_PATH))
+                { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [LOG] {message}"); }
+            }
+            catch (IOException)
+            { }
 
             Instance?.Send(MessageType.Log, message);
         }

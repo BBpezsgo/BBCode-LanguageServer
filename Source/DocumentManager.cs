@@ -1,10 +1,11 @@
-﻿using ProgrammingLanguage.LanguageServer.Interface;
-
-using ProgrammingLanguage.BBCode;
+﻿using ProgrammingLanguage.BBCode;
+using ProgrammingLanguage.BBCode.Analysis;
 using ProgrammingLanguage.BBCode.Compiler;
 using ProgrammingLanguage.BBCode.Parser;
+using ProgrammingLanguage.BBCode.Parser.Statement;
 using ProgrammingLanguage.Core;
 using ProgrammingLanguage.Errors;
+using ProgrammingLanguage.LanguageServer.Interface;
 
 using System;
 using System.Collections.Generic;
@@ -158,7 +159,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 
                 Functions = result.CodeGeneratorResult.Functions ?? result.CompilerResult.Functions;
                 GeneralFunctions = result.CodeGeneratorResult.GeneralFunctions ?? result.CompilerResult.GeneralFunctions;
-                
+
                 Enums = result.CompilerResult.Enums;
 
                 Classes = result.CodeGeneratorResult.Classes ?? result.CompilerResult.Classes;
@@ -168,7 +169,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 
                 Logger.Log($"Succesfully compiled ({file.Name})");
             }
-            catch (ProgrammingLanguage.Errors.Exception exception)
+            catch (Errors.Exception exception)
             {
                 var range = exception.Position;
 
@@ -181,7 +182,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
                     message = exception.Message,
                 });
 
-                if (exception.InnerException is ProgrammingLanguage.Errors.Exception innerException)
+                if (exception.InnerException is Errors.Exception innerException)
                 {
                     range = innerException.Position;
 
@@ -210,461 +211,96 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
         {
             Logger.Log($"Hover({e.Position.ToMinString()})");
 
-            HoverInfo result = null;
-
-            /*
-            static HoverContent InfoFunctionDefinition(FunctionDefinition funcDef, bool IsDefinition)
-            {
-                var text = $"{funcDef.Type} {funcDef.Identifier.Content}(";
-
-                bool addComma = false;
-
-                for (int i = 0; i < funcDef.Parameters.Length; i++)
-                {
-                    if (addComma) text += ", ";
-
-                    if (funcDef.Parameters[i].withThisKeyword)
-                    { text = $"{funcDef.Type} {funcDef.Parameters[i].Type}.{funcDef.Identifier.Content}("; continue; }
-
-                    text += $"{funcDef.Parameters[i].Type} {funcDef.Parameters[i].Identifier}";
-                    addComma = true;
-                }
-
-                text += ")";
-
-                return new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = text,
-                };
-            }
-            static HoverContent InfoFunction(AnalysedToken_Function function, bool IsDefinition)
-            {
-                string text = $"{function.Type} {function.Name}(";
-
-                bool addComma = false;
-
-                for (int i = 0; i < function.ParameterTypes.Length; i++)
-                {
-                    if (addComma) text += ", ";
-
-                    text += $"{function.ParameterTypes[i]} {function.ParameterNames[i]}";
-                    addComma = true;
-                }
-
-                text += ")";
-
-                return new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = text,
-                };
-            }
-            static HoverContent InfoBuiltinFunction(AnalysedToken_Function function, bool IsDefinition)
-            {
-                string text = $"{function.Type} {function.Name}(";
-
-                bool addComma = false;
-
-                for (int i = 0; i < function.ParameterTypes.Length; i++)
-                {
-                    if (addComma) text += ", ";
-
-                    text += $"{function.ParameterTypes[i]} {function.ParameterNames[i]}";
-                    addComma = true;
-                }
-
-                text += ")";
-
-                return new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = text,
-                };
-            }
-            static HoverContent InfoStructDefinition(StructDefinition structDef)
-            {
-                return new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = $"struct {structDef.Name.Content}",
-                };
-            }
-            static HoverContent InfoMethod(AnalysedToken_Method function, bool IsDefinition)
-            {
-                string text = $"{function.Type} {function.PrevType}{function.Name}(";
-
-                bool addComma = false;
-
-                for (int i = 0; i < function.ParameterTypes.Length; i++)
-                {
-                    if (addComma) text += ", ";
-
-                    text += $"{function.ParameterTypes[i]} {function.ParameterNames[i]}";
-                    addComma = true;
-                }
-
-                text += ")";
-
-                return new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = text,
-                };
-            }
-            static HoverContent InfoBuiltinMethod(AnalysedToken_Method function, bool IsDefinition)
-            {
-                string text = $"{function.Type} {function.PrevType}{function.Name}(";
-
-                bool addComma = false;
-
-                for (int i = 0; i < function.ParameterTypes.Length; i++)
-                {
-                    if (addComma) text += ", ";
-
-                    text += $"{function.ParameterTypes[i]} {function.ParameterNames[i]}";
-                    addComma = true;
-                }
-
-                text += ")";
-
-                return new HoverContent()
-                {
-                    Lang = "csharp",
-                    Text = text,
-                };
-            }
-
             List<HoverContent> result = new();
+            Range<SinglePosition> range = new(e.Position, e.Position);
 
-            if (AnalysisResult.ParserFatalError == null && AnalysisResult.Parsed)
+            StatementFinder.GetAllStatement(this.Functions, statement =>
             {
+                if (!statement.GetPosition().Range.Contains(e.Position)) return false;
+
+                if (statement is FunctionCall functionCall)
                 {
-                    Range<SinglePosition> range = new();
+                    if (!functionCall.Identifier.Position.Contains(e.Position)) return false;
 
-                    StatementFinder.GetAllStatement(AnalysisResult.ParserResult, statement =>
+                    if (functionCall.Identifier is AnalysedToken_UserDefinedFunction userDefinedFunction)
                     {
-                        if (statement is Statement_FunctionCall functionCall)
+                        string text = "";
+                        text += userDefinedFunction.Definition.Type.ToString();
+                        text += ' ';
+                        text += userDefinedFunction.Definition.Identifier.ToString();
+                        text += '(';
+                        for (int i = 0; i < userDefinedFunction.Definition.Parameters.Length; i++)
                         {
-                            if (!functionCall.Identifier.Position.Contains(pos)) return false;
-                            if (functionCall.Identifier.Content == "return") return false;
-
-                            Logger.Log($"Hover: Func. call found");
-
-                            range = functionCall.Identifier.Position;
-
-                            if (functionCall.Identifier is AnalysedToken_Function function)
+                            if (i > 0)
+                            { text += ", "; }
+                            foreach (var modifier in userDefinedFunction.Definition.Parameters[i].Modifiers)
                             {
-                                switch (function.Kind)
-                                {
-                                    case FunctionKind.UserDefined:
-                                        result.Add(InfoFunction(function, false));
-                                        break;
-                                    case FunctionKind.Builtin:
-                                        result.Add(InfoBuiltinFunction(function, false));
-                                        break;
-                                    default: break;
-                                }
-                                return true;
+                                text += modifier.ToString();
+                                text += ' ';
                             }
-                            else if (functionCall.Identifier is AnalysedToken_Method method)
-                            {
-                                switch (method.Kind)
-                                {
-                                    case FunctionKind.UserDefined:
-                                        result.Add(InfoMethod(method, false));
-                                        break;
-                                    case FunctionKind.Builtin:
-                                        result.Add(InfoBuiltinMethod(method, false));
-                                        break;
-                                    default: break;
-                                }
-                                return true;
-                            }
-
-                            return true;
+                            text += userDefinedFunction.Definition.Parameters[i].Type.ToString();
+                            text += ' ';
+                            text += userDefinedFunction.Definition.Parameters[i].Identifier.ToString();
                         }
-                        else if (statement is Statement_Variable variable)
+                        text += ')';
+
+                        result.Add(new HoverContent(text, "csharp"));
+
+                        if (userDefinedFunction.Definition.IsBuiltin)
                         {
-                            if (!variable.VariableName.Position.Contains(pos)) return false;
-
-                            Logger.Log($"Hover: Variable found {variable.VariableName}");
-
-                            range = variable.VariableName.Position;
-
-                            if (variable.VariableName is AnalysedToken_Variable variable1)
-                            {
-                                switch (variable1.Kind)
-                                {
-                                    case VariableKind.Local:
-                                        result.Add(new()
-                                        {
-                                            Lang = "csharp",
-                                            Text = $"{variable1.Type} {variable1.Name}; // Local Variable",
-                                        });
-                                        break;
-                                    case VariableKind.Global:
-                                        result.Add(new()
-                                        {
-                                            Lang = "csharp",
-                                            Text = $"{variable1.Type} {variable1.Name}; // Global Variable",
-                                        });
-                                        break;
-                                    case VariableKind.Parameter:
-                                        result.Add(new()
-                                        {
-                                            Lang = "csharp",
-                                            Text = $"{variable1.Type} {variable1.Name} // Parameter",
-                                        });
-                                        break;
-                                    default:
-                                        break;
-                                }
-                            }
-                            else
-                            {
-                                result.Add(new()
-                                {
-                                    Lang = "csharp",
-                                    Text = $"var {variable.VariableName.Content};",
-                                });
-                            }
-
-                            return true;
-                        }
-                        else if (statement is Statement_NewVariable newVariable)
-                        {
-                            if (!newVariable.VariableName.Position.Contains(pos)) return false;
-
-                            Logger.Log($"Hover: NewVariable found {newVariable.VariableName}");
-
-                            range = newVariable.VariableName.Position;
-
-                            result.Add(new()
-                            {
-                                Lang = "csharp",
-                                Text = $"{newVariable.Type} {newVariable.VariableName.Content}; // Variable",
-                            });
-
-                            return true;
-                        }
-                        else if (statement is Statement_Field field)
-                        {
-                            if (!field.FieldName.Position.Contains(pos)) return false;
-
-                            Logger.Log($"Hover: Field found {field.FieldName}");
-
-                            range = field.FieldName.Position;
-
-                            if (field.FieldName is AnalysedToken_Field field1)
-                            {
-                                switch (field1.Kind)
-                                {
-                                    case ComplexTypeKind.Struct:
-                                        result.Add(new()
-                                        {
-                                            Lang = "csharp",
-                                            Text = $"struct {"?"}\n{{\n  {field1.Type} {field1.Name}; // Field\n}}",
-                                        });
-                                        break;
-                                    case ComplexTypeKind.Class:
-                                        result.Add(new()
-                                        {
-                                            Lang = "csharp",
-                                            Text = $"class {"?"}\n{{\n  {field1.Type} {field1.Name}; // Field\n}}",
-                                        });
-                                        break;
-                                    default: break;
-                                }
-                            }
-                            else
-                            {
-                                result.Add(new()
-                                {
-                                    Lang = "csharp",
-                                    Text = $"var {field.FieldName.Content}; // Field",
-                                });
-                            }
-
-                            return true;
+                            result.Add(new HoverContent($"Builtin Function \"{userDefinedFunction.Definition.BuiltinName}\""));
                         }
 
-                        return false;
-                    });
-
-                    if (result.Count > 0 && !range.IsUnset())
-                    {
-                        return new HoverInfo()
-                        {
-                            Range = range,
-                            Contents = result.ToArray(),
-                        };
-                    }
-                }
-
-                foreach (var funcDef in AnalysisResult.ParserResult.Functions)
-                {
-                    if (!funcDef.Identifier.Position.Contains(pos))
-                    {
-                        foreach (var paramDef in funcDef.Parameters)
-                        {
-                            if (!paramDef.Identifier.Position.Contains(pos)) continue;
-                            Logger.Log($"Hover: Param. def. found");
-
-                            result.Add(new()
-                            {
-                                Lang = "csharp",
-                                Text = $"{paramDef.Type.Identifier} {paramDef.Identifier.Content}; // Parameter",
-                            });
-
-                            return new HoverInfo()
-                            {
-                                Range = paramDef.Identifier.Position,
-                                Contents = result.ToArray(),
-                            };
-                        }
-                        continue;
+                        range = functionCall.Identifier.Position;
+                        return true;
                     }
 
-                    Logger.Log($"Hover: Func. def. found");
-
-                    result.Add(InfoFunctionDefinition(funcDef, true));
-
-                    return new HoverInfo()
-                    {
-                        Range = funcDef.Identifier.Position,
-                        Contents = result.ToArray(),
-                    };
+                    return false;
                 }
 
-                foreach (var pair in AnalysisResult.ParserResult.Structs)
+                if (statement is Identifier identifier)
                 {
-                    var structDef = pair;
-                    if (!structDef.Name.Position.Contains(pos))
+                    if (identifier.VariableName is AnalysedToken_Variable variable)
                     {
-                        foreach (var field in structDef.Fields)
+                        string text = "";
+                        text += variable.Type;
+                        text += ' ';
+                        text += variable.Name;
+                        text += ';';
+
+                        result.Add(new HoverContent(text, "csharp"));
+
+                        switch (variable.Kind)
                         {
-                            if (!field.Identifier.Position.Contains(pos)) continue;
-
-                            Logger.Log($"Hover: Struct field dec. found, {field.Identifier.Position}");
-
-                            result.Add(new()
-                            {
-                                Lang = "csharp",
-                                Text = $"struct {structDef.Name.Content}\n{{\n  {field.Type} {field.Identifier.Content}; // Field\n}}",
-                            });
-
-                            return new HoverInfo()
-                            {
-                                Range = field.Identifier.Position,
-                                Contents = result.ToArray(),
-                            };
+                            case VariableKind.Local:
+                                result.Add(new HoverContent("Local Variable"));
+                                break;
+                            case VariableKind.Global:
+                                result.Add(new HoverContent("Global Variable"));
+                                break;
+                            case VariableKind.Parameter:
+                                result.Add(new HoverContent("Parameter"));
+                                break;
                         }
-                        continue;
+
+                        range = identifier.VariableName.Position;
+                        return true;
                     }
 
-                    Logger.Log($"Hover: Struct def. found, {structDef.Name.Position}");
-
-                    result.Add(InfoStructDefinition(structDef));
-
-                    return new HoverInfo()
-                    {
-                        Range = structDef.Name.Position,
-                        Contents = result.ToArray(),
-                    };
+                    return false;
                 }
 
-                foreach (var pair in AnalysisResult.ParserResult.Classes)
-                {
-                    var classDef = pair;
-                    if (!classDef.Name.Position.Contains(pos))
-                    {
-                        foreach (var field in classDef.Fields)
-                        {
-                            if (!field.Identifier.Position.Contains(pos)) continue;
+                return false;
+            });
 
-                            Logger.Log($"Hover: Class field dec. found, {field.Identifier.Position}");
+            if (result == null)
+            { return null; }
 
-                            result.Add(new()
-                            {
-                                Lang = "csharp",
-                                Text = $"class {classDef.Name.Content}\n{{\n  {field.Type} {field.Identifier.Content}; // Field\n}}",
-                            });
-
-                            return new HoverInfo()
-                            {
-                                Range = field.Identifier.Position,
-                                Contents = result.ToArray(),
-                            };
-                        }
-                        continue;
-                    }
-
-                    Logger.Log($"Hover: Class def. found, {classDef.Name.Position}");
-
-                    result.Add(new HoverContent()
-                    {
-                        Lang = "csharp",
-                        Text = $"class {classDef.Name.Content}",
-                    });
-
-                    return new HoverInfo()
-                    {
-                        Range = classDef.Name.Position,
-                        Contents = result.ToArray(),
-                    };
-                }
-
-                for (int i = 0; i < AnalysisResult.ParserResult.Usings.Length; i++)
-                {
-                    UsingDefinition usingItem = AnalysisResult.ParserResult.Usings[i];
-
-                    foreach (var pathToken in usingItem.Path)
-                    {
-                        if (pathToken.Position.Contains(pos))
-                        {
-                            Logger.Log($"Hover: Using def. found, {pathToken.Position}");
-
-                            if (usingItem.Path.Length == 1 && pathToken.TokenType == TokenType.LITERAL_STRING)
-                            {
-                                result.Add(new HoverContent()
-                                {
-                                    Lang = "csharp",
-                                    Text = $"using \"{pathToken.Content}\";",
-                                });
-                            }
-                            else
-                            {
-                                result.Add(new HoverContent()
-                                {
-                                    Lang = "csharp",
-                                    Text = $"using {usingItem.PathString};",
-                                });
-                            }
-
-                            if (!string.IsNullOrEmpty(usingItem.CompiledUri))
-                            {
-                                result.Add(new HoverContent()
-                                {
-                                    Lang = "text",
-                                    Text = usingItem.CompiledUri,
-                                });
-                            }
-
-                            return new HoverInfo()
-                            {
-                                Range = Range<SinglePosition>.Create(usingItem.Path),
-                                Contents = result.ToArray(),
-                            };
-                        }
-                    }
-
-                    if (usingItem.Keyword.Position.Contains(pos)) break;
-                }
-            }
-            */
-
-            return result;
+            return new HoverInfo()
+            {
+                Contents = result.ToArray(),
+                Range = range,
+            };
         }
 
         CodeLensInfo[] IDocument.CodeLens(DocumentEventArgs e)
@@ -675,38 +311,15 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
             {
                 foreach (var function in Functions)
                 {
+                    if (function.FilePath != e.Document.Uri.AbsolutePath)
+                    { continue; }
+
                     if (function.CompiledAttributes.ContainsKey("CodeEntry"))
                     { result.Add(new CodeLensInfo($"This is the code entry", function.Identifier)); }
 
                     result.Add(new CodeLensInfo($"{function.TimesUsedTotal} reference", function.Identifier));
                 }
             }
-
-            /*
-            if (GeneralFunctions != null)
-            {
-                foreach (var function in GeneralFunctions)
-                {
-                    result.Add(new CodeLensInfo($"{function.TimesUsedTotal} reference", function.Identifier));
-                }
-            }
-
-            if (Classes != null)
-            {
-                foreach (var @class in Classes)
-                {
-                    result.Add(new CodeLensInfo($"{@class.References.Count} reference", @class.Name));
-                }
-            }
-
-            if (Structs != null)
-            {
-                foreach (var @struct in Structs)
-                {
-                    result.Add(new CodeLensInfo($"{@struct.References.Count} reference", @struct.Name));
-                }
-            }
-            */
 
             return result.ToArray();
         }

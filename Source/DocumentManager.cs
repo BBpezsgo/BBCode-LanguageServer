@@ -60,22 +60,100 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
             return null;
         }
 
-        void Validate(Document e)
+        static (Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints) CollectErrors(EasyCompiler.Result compilerResult)
+        {
+            List<Error> errors = new();
+            List<Warning> warnings = new();
+            List<Information> informations = new();
+            List<Hint> hints = new();
+
+            if (compilerResult.CompilerResult.Warnings != null)
+            { warnings.AddRange(compilerResult.CompilerResult.Warnings); }
+
+            if (compilerResult.CompilerResult.Errors != null)
+            { errors.AddRange(compilerResult.CompilerResult.Errors); }
+
+            if (compilerResult.CodeGeneratorResult.Warnings != null)
+            { warnings.AddRange(compilerResult.CodeGeneratorResult.Warnings); }
+
+            if (compilerResult.CodeGeneratorResult.Errors != null)
+            { errors.AddRange(compilerResult.CodeGeneratorResult.Errors); }
+
+            if (compilerResult.CodeGeneratorResult.Informations != null)
+            { informations.AddRange(compilerResult.CodeGeneratorResult.Informations); }
+
+            if (compilerResult.CodeGeneratorResult.Hints != null)
+            { hints.AddRange(compilerResult.CodeGeneratorResult.Hints); }
+
+            return (errors.ToArray(), warnings.ToArray(), informations.ToArray(), hints.ToArray());
+        }
+
+        static DiagnosticInfo[] GetDiagnosticInfos(Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints, string currentPath)
         {
             List<DiagnosticInfo> diagnostics = new();
-            string path = System.Net.WebUtility.UrlDecode(e.Uri.AbsolutePath);
 
-            Logger.Log($"Validate({path})");
-
-            if (e.Uri.Scheme != "file") return;
-
-            if (!System.IO.File.Exists(path))
+            for (int i = 0; i < errors.Length; i++)
             {
-                Logger.Log($"{path} not found");
-                return;
+                Error error = errors[i];
+
+                if (error.File == null || error.File != currentPath) continue;
+
+                diagnostics.Add(new DiagnosticInfo
+                {
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
+                    range = error.Position,
+                    message = error.Message,
+                });
             }
 
-            System.IO.FileInfo file = new(path);
+            for (int i = 0; i < warnings.Length; i++)
+            {
+                Warning warning = warnings[i];
+
+                if (warning.File == null || warning.File != currentPath) continue;
+
+                diagnostics.Add(new DiagnosticInfo
+                {
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
+                    range = warning.Position,
+                    message = warning.Message,
+                });
+            }
+
+            for (int i = 0; i < informations.Length; i++)
+            {
+                Information information = informations[i];
+
+                if (information.File == null || information.File != currentPath) continue;
+
+                diagnostics.Add(new DiagnosticInfo
+                {
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Information,
+                    range = information.Position,
+                    message = information.Message,
+                });
+            }
+
+            for (int i = 0; i < hints.Length; i++)
+            {
+                Hint hint = hints[i];
+
+                if (hint.File == null || hint.File != currentPath) continue;
+
+                diagnostics.Add(new DiagnosticInfo
+                {
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Hint,
+                    range = hint.Position,
+                    message = hint.Message,
+                });
+            }
+
+            return diagnostics.ToArray();
+        }
+
+        List<DiagnosticInfo> Compile(System.IO.FileInfo file)
+        {
+            List<DiagnosticInfo> diagnostics = new();
 
             try
             {
@@ -88,74 +166,9 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
                     null,
                     null);
 
-                List<Error> errors = new();
-                List<Warning> warnings = new();
+                (Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints) = CollectErrors(result);
 
-                if (result.CompilerResult.Warnings != null)
-                { warnings.AddRange(result.CompilerResult.Warnings); }
-                if (result.CompilerResult.Errors != null)
-                { errors.AddRange(result.CompilerResult.Errors); }
-
-                if (result.CodeGeneratorResult.Warnings != null)
-                { warnings.AddRange(result.CodeGeneratorResult.Warnings); }
-                if (result.CodeGeneratorResult.Errors != null)
-                { errors.AddRange(result.CodeGeneratorResult.Errors); }
-
-                for (int i = 0; i < errors.Count; i++)
-                {
-                    Error error = errors[i];
-
-                    if (error.File == null || error.File != path) continue;
-
-                    diagnostics.Add(new DiagnosticInfo
-                    {
-                        severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
-                        range = error.Position,
-                        message = error.Message,
-                    });
-                }
-
-                for (int i = 0; i < warnings.Count; i++)
-                {
-                    Warning warning = warnings[i];
-
-                    if (warning.File == null || warning.File != path) continue;
-
-                    diagnostics.Add(new DiagnosticInfo
-                    {
-                        severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
-                        range = warning.Position,
-                        message = warning.Message,
-                    });
-                }
-
-                if (result.CodeGeneratorResult.Informations != null) for (int i = 0; i < result.CodeGeneratorResult.Informations.Length; i++)
-                    {
-                        Information information = result.CodeGeneratorResult.Informations[i];
-
-                        if (information.File == null || information.File != path) continue;
-
-                        diagnostics.Add(new DiagnosticInfo
-                        {
-                            severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Information,
-                            range = information.Position,
-                            message = information.Message,
-                        });
-                    }
-
-                if (result.CodeGeneratorResult.Hints != null) for (int i = 0; i < result.CodeGeneratorResult.Hints.Length; i++)
-                    {
-                        Hint hint = result.CodeGeneratorResult.Hints[i];
-
-                        if (hint.File == null || hint.File != path) continue;
-
-                        diagnostics.Add(new DiagnosticInfo
-                        {
-                            severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Hint,
-                            range = hint.Position,
-                            message = hint.Message,
-                        });
-                    }
+                diagnostics.AddRange(GetDiagnosticInfos(errors, warnings, informations, hints, file.FullName));
 
                 Functions = result.CodeGeneratorResult.Functions ?? result.CompilerResult.Functions;
                 GeneralFunctions = result.CodeGeneratorResult.GeneralFunctions ?? result.CompilerResult.GeneralFunctions;
@@ -171,7 +184,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
             }
             catch (Errors.Exception exception)
             {
-                var range = exception.Position;
+                Position range = exception.Position;
 
                 Logger.Log($"Exception: {exception.MessageAll}\n  at {range.ToMinString()}");
 
@@ -194,6 +207,27 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
                     });
                 }
             }
+
+            return diagnostics;
+        }
+
+        void Validate(Document e)
+        {
+            string path = System.Net.WebUtility.UrlDecode(e.Uri.AbsolutePath);
+
+            Logger.Log($"Validate({path})");
+
+            if (e.Uri.Scheme != "file") return;
+
+            if (!System.IO.File.Exists(path))
+            {
+                Logger.Log($"{path} not found");
+                return;
+            }
+
+            System.IO.FileInfo file = new(path);
+
+            List<DiagnosticInfo> diagnostics = Compile(file);
 
             for (int i = diagnostics.Count - 1; i >= 0; i--) if (diagnostics[i].range.ToMinString() == "0:0") diagnostics.RemoveAt(i);
 

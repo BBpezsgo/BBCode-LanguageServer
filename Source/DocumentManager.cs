@@ -159,7 +159,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
             {
                 EasyCompiler.Result result = EasyCompiler.Compile(
                     file,
-                    new Dictionary<string, BuiltinFunction>(),
+                    new Dictionary<string, ExternalFunctionBase>(),
                     TokenizerSettings.Default,
                     ParserSettings.Default,
                     Compiler.CompilerSettings.Default,
@@ -280,9 +280,9 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 
                         result.Add(new HoverContent(text, "csharp"));
 
-                        if (userDefinedFunction.Definition.IsBuiltin)
+                        if (userDefinedFunction.Definition.IsExternal)
                         {
-                            result.Add(new HoverContent($"Builtin Function \"{userDefinedFunction.Definition.BuiltinName}\""));
+                            result.Add(new HoverContent($"External Function \"{userDefinedFunction.Definition.ExternalFunctionName}\""));
                         }
 
                         range = functionCall.Identifier.Position;

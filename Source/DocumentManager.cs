@@ -294,7 +294,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 
                 if (statement is Identifier identifier)
                 {
-                    if (identifier.VariableName is AnalysedToken_Variable variable)
+                    if (identifier.Name is AnalysedToken_Variable variable)
                     {
                         string text = "";
                         text += variable.Type;
@@ -317,7 +317,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
                                 break;
                         }
 
-                        range = identifier.VariableName.Position;
+                        range = identifier.Name.Position;
                         return true;
                     }
 

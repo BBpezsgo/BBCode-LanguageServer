@@ -186,7 +186,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
             {
                 Position range = exception.Position;
 
-                Logger.Log($"Exception: {exception.MessageAll}\n  at {range.ToMinString()}");
+                Logger.Log($"Exception: {exception}\n  at {range.ToMinString()}");
 
                 diagnostics.Add(new DiagnosticInfo
                 {

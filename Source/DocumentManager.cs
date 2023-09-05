@@ -1,4 +1,7 @@
-﻿using ProgrammingLanguage.BBCode;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using ProgrammingLanguage.BBCode;
 using ProgrammingLanguage.BBCode.Analysis;
 using ProgrammingLanguage.BBCode.Compiler;
 using ProgrammingLanguage.BBCode.Parser;
@@ -6,10 +9,6 @@ using ProgrammingLanguage.BBCode.Parser.Statement;
 using ProgrammingLanguage.Core;
 using ProgrammingLanguage.Errors;
 using ProgrammingLanguage.LanguageServer.Interface;
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 {
@@ -207,6 +206,10 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
                     });
                 }
             }
+            catch (System.Exception exception)
+            {
+                Logger.Log($"System Exception: {exception}");
+            }
 
             return diagnostics;
         }
@@ -238,7 +241,80 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
         {
             Logger.Log($"Completion()");
 
-            return Array.Empty<CompletionInfo>();
+            List<CompletionInfo> result = new();
+
+            foreach (CompiledFunction function in Functions)
+            {
+                if (function.Context != null) continue;
+
+                result.Add(new CompletionInfo()
+                {
+                    Deprecated = false,
+                    Detail = function.ExternalFunctionName ?? null,
+                    Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Function,
+                    Label = function.Identifier.Content,
+                    Preselect = false,
+                });
+            }
+
+            foreach (CompiledEnum @enum in Enums)
+            {
+                result.Add(new CompletionInfo()
+                {
+                    Deprecated = false,
+                    Detail = null,
+                    Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Enum,
+                    Label = @enum.Identifier.Content,
+                    Preselect = false,
+                });
+            }
+
+            foreach (CompiledClass @class in Classes)
+            {
+                result.Add(new CompletionInfo()
+                {
+                    Deprecated = false,
+                    Detail = null,
+                    Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Class,
+                    Label = @class.Name.Content,
+                    Preselect = false,
+                });
+            }
+
+            foreach (CompiledStruct @struct in Structs)
+            {
+                result.Add(new CompletionInfo()
+                {
+                    Deprecated = false,
+                    Detail = null,
+                    Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Struct,
+                    Label = @struct.Name.Content,
+                    Preselect = false,
+                });
+            }
+
+            SinglePosition position = e.Position;
+            foreach (CompiledFunction function in Functions)
+            {
+                if (function.Block.GetPosition().Range.Contains(position))
+                {
+                    foreach (var parameter in function.Parameters)
+                    {
+                        result.Add(new CompletionInfo()
+                        {
+                            Deprecated = false,
+                            Detail = null,
+                            Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Variable,
+                            Label = parameter.Identifier.Content,
+                            Preselect = false,
+                        });
+                    }
+
+                    break;
+                }
+            }
+
+            return result.ToArray();
         }
 
         HoverInfo IDocument.Hover(DocumentPositionEventArgs e)
@@ -341,18 +417,15 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
         {
             List<CodeLensInfo> result = new();
 
-            if (Functions != null)
+            foreach (CompiledFunction function in Functions)
             {
-                foreach (var function in Functions)
-                {
-                    if (function.FilePath != e.Document.Uri.AbsolutePath)
-                    { continue; }
+                if (function.FilePath != e.Document.Uri.AbsolutePath)
+                { continue; }
 
-                    if (function.CompiledAttributes.ContainsKey("CodeEntry"))
-                    { result.Add(new CodeLensInfo($"This is the code entry", function.Identifier)); }
+                if (function.CompiledAttributes.ContainsKey("CodeEntry"))
+                { result.Add(new CodeLensInfo($"This is the code entry", function.Identifier)); }
 
-                    result.Add(new CodeLensInfo($"{function.TimesUsedTotal} reference", function.Identifier));
-                }
+                result.Add(new CodeLensInfo($"{function.TimesUsedTotal} reference", function.Identifier));
             }
 
             return result.ToArray();
@@ -444,7 +517,10 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.EnumMember));
                         break;
-
+                    case TokenAnalysedType.TypeParameter:
+                        result.Add(new SemanticToken(token,
+                            OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.TypeParameter));
+                        break;
                     case TokenAnalysedType.Hash:
                     case TokenAnalysedType.HashParameter:
 

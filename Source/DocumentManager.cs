@@ -465,7 +465,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 
             foreach (var token in Tokens)
             {
-                switch (token.AnalysedType)
+                switch (token.AnalyzedType)
                 {
                     case TokenAnalysedType.Attribute:
                         result.Add(new SemanticToken(token,

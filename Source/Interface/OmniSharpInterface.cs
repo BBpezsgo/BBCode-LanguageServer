@@ -1,19 +1,17 @@
-﻿using ProgrammingLanguage.LanguageServer.Interface.Managers;
-
+﻿using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using OmniSharp.Extensions.LanguageServer.Server;
 
-using System;
-using System.Threading.Tasks;
-
-namespace ProgrammingLanguage.LanguageServer.Interface
+namespace LanguageServer.Interface
 {
+    using Managers;
+
     public class ServiceAppInterfaceOmniSharp : IInterface
     {
         internal ILanguageServer Server;
@@ -214,7 +212,7 @@ namespace ProgrammingLanguage.LanguageServer.Interface
                .WithServices(this.ConfigureServices);
 
             options
-               .WithHandler<ProgrammingLanguage.LanguageServer.Managers.TextDocumentHandler>()
+               .WithHandler<LanguageServer.Managers.TextDocumentHandler>()
                .WithHandler<Managers.DocumentSymbolHandler>()
                .WithHandler<Managers.CodeLensHandler>()
                .WithHandler<Managers.CompletionHandler>()
@@ -338,18 +336,15 @@ namespace ProgrammingLanguage.LanguageServer.Interface
 
     namespace Managers
     {
-        using ProgrammingLanguage.LanguageServer.Interface.SystemExtensions;
-
+        using System.Collections.Generic;
+        using System.Threading;
+        using System.Threading.Tasks;
+        using LanguageServer.Interface.SystemExtensions;
         using MediatR;
-
         using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
         using OmniSharp.Extensions.LanguageServer.Protocol.Document;
         using OmniSharp.Extensions.LanguageServer.Protocol.Models;
         using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
-
-        using System.Collections.Generic;
-        using System.Threading;
-        using System.Threading.Tasks;
 
         class DiagnosticsHandler
         {

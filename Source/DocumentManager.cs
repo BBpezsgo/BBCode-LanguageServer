@@ -1,17 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using ProgrammingLanguage.BBCode;
-using ProgrammingLanguage.BBCode.Analysis;
-using ProgrammingLanguage.BBCode.Compiler;
-using ProgrammingLanguage.BBCode.Parser;
-using ProgrammingLanguage.BBCode.Parser.Statement;
-using ProgrammingLanguage.Core;
-using ProgrammingLanguage.Errors;
-using ProgrammingLanguage.LanguageServer.Interface;
+using LanguageCore.BBCode;
+using LanguageCore.BBCode.Compiler;
+using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Runtime;
+using LanguageCore.Tokenizing;
 
-namespace ProgrammingLanguage.LanguageServer.DocumentManagers
+namespace LanguageServer.DocumentManagers
 {
+    using Interface;
+    using LanguageCore;
+
     internal class DocumentBBCode : IDocument
     {
         public Uri Uri { get; private set; }
@@ -59,7 +60,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
             return null;
         }
 
-        static (Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints) CollectErrors(EasyCompiler.Result compilerResult)
+        static (Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints) CollectErrors(LanguageCore.BBCode.EasyCompiler.Result compilerResult)
         {
             List<Error> errors = new();
             List<Warning> warnings = new();
@@ -181,7 +182,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 
                 Logger.Log($"Succesfully compiled ({file.Name})");
             }
-            catch (Errors.Exception exception)
+            catch (Exception exception)
             {
                 Position range = exception.Position;
 
@@ -194,7 +195,7 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
                     message = exception.Message,
                 });
 
-                if (exception.InnerException is Errors.Exception innerException)
+                if (exception.InnerException is Exception innerException)
                 {
                     range = innerException.Position;
 
@@ -323,88 +324,6 @@ namespace ProgrammingLanguage.LanguageServer.DocumentManagers
 
             List<HoverContent> result = new();
             Range<SinglePosition> range = new(e.Position, e.Position);
-
-            StatementFinder.GetAllStatement(this.Functions, statement =>
-            {
-                if (!statement.GetPosition().Range.Contains(e.Position)) return false;
-
-                if (statement is FunctionCall functionCall)
-                {
-                    if (!functionCall.Identifier.Position.Contains(e.Position)) return false;
-
-                    if (functionCall.Identifier is AnalysedToken_UserDefinedFunction userDefinedFunction)
-                    {
-                        string text = "";
-                        text += userDefinedFunction.Definition.Type.ToString();
-                        text += ' ';
-                        text += userDefinedFunction.Definition.Identifier.ToString();
-                        text += '(';
-                        for (int i = 0; i < userDefinedFunction.Definition.Parameters.Length; i++)
-                        {
-                            if (i > 0)
-                            { text += ", "; }
-                            foreach (var modifier in userDefinedFunction.Definition.Parameters[i].Modifiers)
-                            {
-                                text += modifier.ToString();
-                                text += ' ';
-                            }
-                            text += userDefinedFunction.Definition.Parameters[i].Type.ToString();
-                            text += ' ';
-                            text += userDefinedFunction.Definition.Parameters[i].Identifier.ToString();
-                        }
-                        text += ')';
-
-                        result.Add(new HoverContent(text, "csharp"));
-
-                        if (userDefinedFunction.Definition.IsExternal)
-                        {
-                            result.Add(new HoverContent($"External Function \"{userDefinedFunction.Definition.ExternalFunctionName}\""));
-                        }
-
-                        range = functionCall.Identifier.Position;
-                        return true;
-                    }
-
-                    return false;
-                }
-
-                if (statement is Identifier identifier)
-                {
-                    if (identifier.Name is AnalysedToken_Variable variable)
-                    {
-                        string text = "";
-                        text += variable.Type;
-                        text += ' ';
-                        text += variable.Name;
-                        text += ';';
-
-                        result.Add(new HoverContent(text, "csharp"));
-
-                        switch (variable.Kind)
-                        {
-                            case VariableKind.Local:
-                                result.Add(new HoverContent("Local Variable"));
-                                break;
-                            case VariableKind.Global:
-                                result.Add(new HoverContent("Global Variable"));
-                                break;
-                            case VariableKind.Parameter:
-                                result.Add(new HoverContent("Parameter"));
-                                break;
-                        }
-
-                        range = identifier.Name.Position;
-                        return true;
-                    }
-
-                    return false;
-                }
-
-                return false;
-            });
-
-            if (result == null)
-            { return null; }
 
             return new HoverInfo()
             {

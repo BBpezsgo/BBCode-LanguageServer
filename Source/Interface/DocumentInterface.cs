@@ -1,11 +1,11 @@
-﻿using ProgrammingLanguage.LanguageServer.DocumentManagers;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ProgrammingLanguage.LanguageServer.Interface
+namespace LanguageServer.Interface
 {
+    using DocumentManagers;
+
     internal interface IDocument
     {
         internal Uri Uri { get; }
@@ -28,7 +28,7 @@ namespace ProgrammingLanguage.LanguageServer.Interface
         internal static IDocument GenerateDocument(DocumentItem document, DocumentInterface documentInterface)
         {
             if (document.LanguageID == "bbc") return new DocumentBBCode(document, documentInterface);
-            throw new Exception($"Unknown language {document.LanguageID}");
+            throw new System.Exception($"Unknown language {document.LanguageID}");
         }
     }
 

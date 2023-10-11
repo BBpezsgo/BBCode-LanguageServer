@@ -1,9 +1,9 @@
-﻿using ProgrammingLanguage.LanguageServer.Interface;
+﻿using System;
 
-using System;
-
-namespace ProgrammingLanguage.LanguageServer
+namespace LanguageServer
 {
+    using Interface;
+
     class Program
     {
 #if true

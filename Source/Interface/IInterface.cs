@@ -1,4 +1,4 @@
-﻿namespace ProgrammingLanguage.LanguageServer.Interface
+﻿namespace LanguageServer.Interface
 {
     public interface IInterface
     {

@@ -1,12 +1,13 @@
-﻿using ProgrammingLanguage.BBCode;
+﻿using LanguageCore.BBCode;
+using LanguageCore.Tokenizing;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 #pragma warning disable CS0649
 
-namespace ProgrammingLanguage.LanguageServer.Interface
+namespace LanguageServer.Interface
 {
-    using ProgrammingLanguage.LanguageServer.Interface.SystemExtensions;
-
-    using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+    using LanguageCore;
+    using SystemExtensions;
 
     namespace SystemExtensions
     {
@@ -57,19 +58,19 @@ namespace ProgrammingLanguage.LanguageServer.Interface
 
     internal static class Extensions
     {
-        internal static Range Convert2(this ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition> self) => new()
+        internal static Range Convert2(this Range<SinglePosition> self) => new()
         {
             Start = self.Start.Convert2(),
             End = self.End.Convert2(),
         };
 
-        internal static Position Convert2(this ProgrammingLanguage.Core.SinglePosition self) => new()
+        internal static OmniSharp.Extensions.LanguageServer.Protocol.Models.Position Convert2(this SinglePosition self) => new()
         {
             Line = System.Math.Max(self.Line - 1, 0),
             Character = System.Math.Max(self.Character - 2, 0),
         };
 
-        internal static Range Convert2(this ProgrammingLanguage.Core.Position self) => new()
+        internal static Range Convert2(this LanguageCore.Position self) => new()
         {
             Start = self.Start.Convert2(),
             End = self.End.Convert2(),
@@ -95,19 +96,19 @@ namespace ProgrammingLanguage.LanguageServer.Interface
 
     internal class CodeLensInfo : IConvertable<CodeLens>
     {
-        internal ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition> Range;
+        internal Range<SinglePosition> Range;
         internal string Title;
 
         internal string CommandName;
         internal string[] CommandArgs;
 
-        internal CodeLensInfo(string title, ProgrammingLanguage.Tokenizer.BaseToken range)
+        internal CodeLensInfo(string title, BaseToken range)
         {
             Title = title;
             Range = range.Position;
         }
 
-        internal CodeLensInfo(string title, ProgrammingLanguage.Tokenizer.BaseToken range, string Command, params string[] CommandArgs)
+        internal CodeLensInfo(string title, BaseToken range, string Command, params string[] CommandArgs)
         {
             this.Title = title;
             this.Range = range.Position;
@@ -260,7 +261,7 @@ namespace ProgrammingLanguage.LanguageServer.Interface
             set => Contents = new HoverContent[1] { value };
         }
         internal HoverContent[] Contents;
-        internal ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition> Range;
+        internal Range<SinglePosition> Range;
 
         Hover IConvertable<Hover>.Convert2() => new()
         {
@@ -275,41 +276,41 @@ namespace ProgrammingLanguage.LanguageServer.Interface
         /// Span of the origin of this link.<br/><br/>
         /// Used as the underlined span for mouse interaction. Defaults to the word range at the mouse position.
         /// </summary>
-        internal ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition>? OriginRange;
+        internal Range<SinglePosition>? OriginRange;
         /// <summary>
         /// The full target range of this link. If the target for example is a symbol
         /// then target range is the range enclosing this symbol not including
         /// leading/trailing whitespace but everything else like comments.
         /// This information is typically used to highlight the range in the editor.
         /// </summary>
-        internal ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition> TargetRange;
+        internal Range<SinglePosition> TargetRange;
         /// <summary>
         /// The target resource identifier of this link.
         /// </summary>
         internal System.Uri TargetUri;
 
-        public FilePosition(ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition> targetRange, System.Uri targetUri)
+        public FilePosition(Range<SinglePosition> targetRange, System.Uri targetUri)
         {
             TargetRange = targetRange;
             TargetUri = targetUri;
             OriginRange = null;
         }
 
-        public FilePosition(ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition> targetRange, string targetUri)
+        public FilePosition(Range<SinglePosition> targetRange, string targetUri)
         {
             TargetRange = targetRange;
             TargetUri = new System.Uri(targetUri);
             OriginRange = null;
         }
 
-        public FilePosition(ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition> originRange, ProgrammingLanguage.Core.Range<ProgrammingLanguage.Core.SinglePosition> targetRange, System.Uri targetUri)
+        public FilePosition(Range<SinglePosition> originRange, Range<SinglePosition> targetRange, System.Uri targetUri)
         {
             TargetRange = targetRange;
             TargetUri = targetUri;
             OriginRange = originRange;
         }
 
-        LocationOrLocationLink IConvertable<LocationOrLocationLink>.Convert2() => 
+        LocationOrLocationLink IConvertable<LocationOrLocationLink>.Convert2() =>
             OriginRange.HasValue ?
             new(new LocationLink()
             {
@@ -328,7 +329,7 @@ namespace ProgrammingLanguage.LanguageServer.Interface
     internal class DiagnosticInfo : IConvertable<Diagnostic>
     {
         internal DiagnosticSeverity severity;
-        internal ProgrammingLanguage.Core.Position range;
+        internal LanguageCore.Position range;
         internal string message;
         internal string source;
 
@@ -413,19 +414,19 @@ namespace ProgrammingLanguage.LanguageServer.Interface
 
     internal readonly struct DocumentPositionEventArgs
     {
-        internal readonly ProgrammingLanguage.Core.SinglePosition Position;
+        internal readonly SinglePosition Position;
         internal readonly Document Document;
 
         public DocumentPositionEventArgs(DefinitionParams v) : this()
         {
-            this.Position = new ProgrammingLanguage.Core.SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
+            this.Position = new SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
             this.Position.Character++;
             this.Document = new Document(v.TextDocument);
         }
 
         public DocumentPositionEventArgs(HoverParams v) : this()
         {
-            this.Position = new ProgrammingLanguage.Core.SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
+            this.Position = new SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
             this.Position.Character++;
             this.Document = new Document(v.TextDocument);
         }
@@ -434,13 +435,13 @@ namespace ProgrammingLanguage.LanguageServer.Interface
     internal readonly struct FindReferencesEventArgs
     {
         internal readonly bool IncludeDeclaration;
-        internal readonly ProgrammingLanguage.Core.SinglePosition Position;
+        internal readonly SinglePosition Position;
         internal readonly Document Document;
 
         public FindReferencesEventArgs(ReferenceParams e) : this()
         {
             this.IncludeDeclaration = e.Context.IncludeDeclaration;
-            this.Position = new ProgrammingLanguage.Core.SinglePosition(e.Position.Line + 1, e.Position.Character + 1);
+            this.Position = new SinglePosition(e.Position.Line + 1, e.Position.Character + 1);
             this.Position.Character++;
             this.Document = new Document(e.TextDocument);
         }
@@ -448,13 +449,13 @@ namespace ProgrammingLanguage.LanguageServer.Interface
 
     internal readonly struct DocumentPositionContextEventArgs
     {
-        internal readonly ProgrammingLanguage.Core.SinglePosition Position;
+        internal readonly SinglePosition Position;
         internal readonly Document Document;
         internal readonly CompletionContext Context;
 
         public DocumentPositionContextEventArgs(CompletionParams e, string content)
         {
-            this.Position = new ProgrammingLanguage.Core.SinglePosition(e.Position.Line + 1, e.Position.Character + 1);
+            this.Position = new SinglePosition(e.Position.Line + 1, e.Position.Character + 1);
             this.Position.Character++;
             this.Document = new Document(new DocumentItem(e.TextDocument.Uri.ToUri(), content, e.TextDocument.Uri.ToUri().Extension()));
             this.Context = e.Context;
@@ -473,13 +474,13 @@ namespace ProgrammingLanguage.LanguageServer.Interface
 
     internal readonly struct SignatureHelpEventArgs
     {
-        internal readonly ProgrammingLanguage.Core.SinglePosition Position;
+        internal readonly SinglePosition Position;
         internal readonly Document Document;
         internal readonly SignatureHelpContext Context;
 
         public SignatureHelpEventArgs(SignatureHelpParams v)
         {
-            this.Position = new ProgrammingLanguage.Core.SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
+            this.Position = new SinglePosition(v.Position.Line + 1, v.Position.Character + 1);
             this.Document = new Document(v.TextDocument);
             this.Context = v.Context;
         }
@@ -507,6 +508,6 @@ namespace ProgrammingLanguage.LanguageServer.Interface
     {
         public System.Uri Uri;
 
-        public ProgrammingLanguage.Core.Position Range;
+        public LanguageCore.Position Range;
     }
 }

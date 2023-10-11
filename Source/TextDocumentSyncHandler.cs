@@ -1,9 +1,8 @@
-﻿using ProgrammingLanguage.LanguageServer.Interface.SystemExtensions;
-
+﻿using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using MediatR;
-
 using Microsoft.Language.Xml;
-
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -11,11 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace ProgrammingLanguage.LanguageServer
+namespace LanguageServer
 {
     internal static class DocumentSelectorGen
     {
@@ -27,8 +22,10 @@ namespace ProgrammingLanguage.LanguageServer
     }
 }
 
-namespace ProgrammingLanguage.LanguageServer.Managers
+namespace LanguageServer.Managers
 {
+    using Interface.SystemExtensions;
+
     class TextDocumentHandler : TextDocumentSyncHandlerBase
     {
         readonly ILanguageServerFacade Router;

@@ -3,7 +3,7 @@
 using System;
 using System.IO;
 
-namespace ProgrammingLanguage.LanguageServer
+namespace LanguageServer
 {
     public class Logger
     {

@@ -180,9 +180,9 @@ namespace LanguageServer.DocumentManagers
 
                 Tokens = result.TokenizerResult;
 
-                Logger.Log($"Succesfully compiled ({file.Name})");
+                Logger.Log($"Successfully compiled ({file.Name})");
             }
-            catch (Exception exception)
+            catch (LanguageException exception)
             {
                 Position range = exception.Position;
 
@@ -195,7 +195,7 @@ namespace LanguageServer.DocumentManagers
                     message = exception.Message,
                 });
 
-                if (exception.InnerException is Exception innerException)
+                if (exception.InnerException is LanguageException innerException)
                 {
                     range = innerException.Position;
 

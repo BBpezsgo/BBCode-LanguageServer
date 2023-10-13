@@ -114,8 +114,7 @@ namespace LanguageServer.Interface
 
         internal string GetDocumentContent(Uri uri)
         {
-            Microsoft.Language.Xml.Buffer buffer = BufferManager.GetBuffer(uri);
-            if (buffer == null) throw new ServiceException($"Buffer {uri} not found");
+            Microsoft.Language.Xml.Buffer buffer = BufferManager.GetBuffer(uri) ?? throw new ServiceException($"Buffer {uri} not found");
             string text = buffer.GetText(0, buffer.Length);
             if (text != null) return text;
             throw new ServiceException($"Document {uri} is not buffered");

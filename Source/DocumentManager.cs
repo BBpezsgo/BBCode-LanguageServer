@@ -334,6 +334,8 @@ namespace LanguageServer.DocumentManagers
 
         CodeLensInfo[] IDocument.CodeLens(DocumentEventArgs e)
         {
+            if (Functions == null) return Array.Empty<CodeLensInfo>();
+
             List<CodeLensInfo> result = new();
 
             foreach (CompiledFunction function in Functions)

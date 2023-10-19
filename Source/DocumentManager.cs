@@ -88,6 +88,90 @@ namespace LanguageServer.DocumentManagers
             return (errors.ToArray(), warnings.ToArray(), informations.ToArray(), hints.ToArray());
         }
 
+        static DiagnosticInfo[] GetDiagnosticInfos(string currentPath, params Hint[] hints)
+        {
+            List<DiagnosticInfo> diagnostics = new();
+
+            for (int i = 0; i < hints.Length; i++)
+            {
+                Hint hint = hints[i];
+
+                if (hint.File == null || hint.File != currentPath) continue;
+
+                diagnostics.Add(new DiagnosticInfo
+                {
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Hint,
+                    range = hint.Position,
+                    message = hint.Message,
+                });
+            }
+
+            return diagnostics.ToArray();
+        }
+
+        static DiagnosticInfo[] GetDiagnosticInfos(string currentPath, params Information[] informations)
+        {
+            List<DiagnosticInfo> diagnostics = new();
+
+            for (int i = 0; i < informations.Length; i++)
+            {
+                Information information = informations[i];
+
+                if (information.File == null || information.File != currentPath) continue;
+
+                diagnostics.Add(new DiagnosticInfo
+                {
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Information,
+                    range = information.Position,
+                    message = information.Message,
+                });
+            }
+
+            return diagnostics.ToArray();
+        }
+
+        static DiagnosticInfo[] GetDiagnosticInfos(string currentPath, params Warning[] warnings)
+        {
+            List<DiagnosticInfo> diagnostics = new();
+
+            for (int i = 0; i < warnings.Length; i++)
+            {
+                Warning warning = warnings[i];
+
+                if (warning.File == null || warning.File != currentPath) continue;
+
+                diagnostics.Add(new DiagnosticInfo
+                {
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
+                    range = warning.Position,
+                    message = warning.Message,
+                });
+            }
+
+            return diagnostics.ToArray();
+        }
+
+        static DiagnosticInfo[] GetDiagnosticInfos(string currentPath, params Error[] errors)
+        {
+            List<DiagnosticInfo> diagnostics = new();
+
+            for (int i = 0; i < errors.Length; i++)
+            {
+                Error error = errors[i];
+
+                if (error.File == null || error.File != currentPath) continue;
+
+                diagnostics.Add(new DiagnosticInfo
+                {
+                    severity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error,
+                    range = error.Position,
+                    message = error.Message,
+                });
+            }
+
+            return diagnostics.ToArray();
+        }
+
         static DiagnosticInfo[] GetDiagnosticInfos(Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints, string currentPath)
         {
             List<DiagnosticInfo> diagnostics = new();
@@ -155,30 +239,69 @@ namespace LanguageServer.DocumentManagers
         {
             List<DiagnosticInfo> diagnostics = new();
 
+            string basePath = null;
             try
             {
-                EasyCompiler.Result result = EasyCompiler.Compile(
-                    file,
+                string configFile = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(file.FullName), "config.json");
+                if (System.IO.File.Exists(configFile))
+                {
+                    string configRaw = System.IO.File.ReadAllText(configFile);
+                    System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(configRaw, new System.Text.Json.JsonDocumentOptions()
+                    {
+                        AllowTrailingCommas = true,
+                        CommentHandling = System.Text.Json.JsonCommentHandling.Skip,
+                    });
+                    if (doc.RootElement.TryGetProperty("base", out var property))
+                    { basePath = property.GetString(); }
+                }
+            }
+            catch (Exception)
+            { }
+
+            try
+            {
+                List<Warning> tokenizerWarnings = new();
+                Tokenizer tokenizer = new(TokenizerSettings.Default);
+                Tokens = tokenizer.Parse(
+                    System.IO.File.ReadAllText(file.FullName),
+                    tokenizerWarnings,
+                    file.FullName);
+
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, tokenizerWarnings.ToArray()));
+
+                ParserResult ast = Parser.Parse(Tokens);
+
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, ast.Errors));
+
+                Compiler.Result compiled = Compiler.Compile(
+                    ast,
                     new Dictionary<string, ExternalFunctionBase>(),
-                    TokenizerSettings.Default,
+                    file,
                     ParserSettings.Default,
+                    null,
+                    basePath);
+
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, compiled.Warnings));
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, compiled.Errors));
+
+                CodeGenerator.Result generated = CodeGenerator.Generate(
+                    compiled,
                     Compiler.CompilerSettings.Default,
                     null,
-                    null);
+                    Compiler.CompileLevel.All);
 
-                (Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints) = CollectErrors(result);
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, generated.Hints));
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, generated.Informations));
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, generated.Warnings));
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, generated.Errors));
 
-                diagnostics.AddRange(GetDiagnosticInfos(errors, warnings, informations, hints, file.FullName));
+                Functions = compiled.Functions;
+                GeneralFunctions = compiled.GeneralFunctions;
 
-                Functions = result.CodeGeneratorResult.Functions ?? result.CompilerResult.Functions;
-                GeneralFunctions = result.CodeGeneratorResult.GeneralFunctions ?? result.CompilerResult.GeneralFunctions;
+                Enums = compiled.Enums;
 
-                Enums = result.CompilerResult.Enums;
-
-                Classes = result.CodeGeneratorResult.Classes ?? result.CompilerResult.Classes;
-                Structs = result.CodeGeneratorResult.Structs ?? result.CompilerResult.Structs;
-
-                Tokens = result.TokenizerResult;
+                Classes = compiled.Classes;
+                Structs = compiled.Structs;
 
                 Logger.Log($"Successfully compiled ({file.Name})");
             }
@@ -251,7 +374,7 @@ namespace LanguageServer.DocumentManagers
                 result.Add(new CompletionInfo()
                 {
                     Deprecated = false,
-                    Detail = function.ExternalFunctionName ?? null,
+                    Detail = function.ReadableID(),
                     Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.CompletionItemKind.Function,
                     Label = function.Identifier.Content,
                     Preselect = false,
@@ -297,6 +420,7 @@ namespace LanguageServer.DocumentManagers
             SinglePosition position = e.Position;
             foreach (CompiledFunction function in Functions)
             {
+                if (function.Block == null) continue;
                 if (function.Block.GetPosition().Range.Contains(position))
                 {
                     foreach (var parameter in function.Parameters)
@@ -363,7 +487,73 @@ namespace LanguageServer.DocumentManagers
         {
             Logger.Log($"Symbols()");
 
-            return Array.Empty<SymbolInformationInfo>();
+            List<SymbolInformationInfo> result = new();
+
+            foreach (var function in Functions)
+            {
+                if (function.FilePath != null && function.FilePath.Replace('\\', '/') != e.Document.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
+
+                result.Add(new SymbolInformationInfo()
+                {
+                    Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Function,
+                    Name = function.Identifier.Content,
+                    Location = new DocumentLocation()
+                    {
+                        Range = function.GetPosition(),
+                        Uri = function.FilePath is null ? e.Document.Uri : new Uri($"file:///{function.FilePath.Replace('\\', '/')}", UriKind.Absolute),
+                    },
+                });
+            }
+
+            foreach (var @class in Classes)
+            {
+                if (@class.FilePath != null && @class.FilePath.Replace('\\', '/') != e.Document.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
+
+                result.Add(new SymbolInformationInfo()
+                {
+                    Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Class,
+                    Name = @class.Name.Content,
+                    Location = new DocumentLocation()
+                    {
+                        Range = @class.GetPosition(),
+                        Uri = @class.FilePath is null ? e.Document.Uri : new Uri($"file:///{@class.FilePath.Replace('\\', '/')}", UriKind.Absolute),
+                    },
+                });
+            }
+
+            foreach (var @struct in Structs)
+            {
+                if (@struct.FilePath != null && @struct.FilePath.Replace('\\', '/') != e.Document.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
+
+                result.Add(new SymbolInformationInfo()
+                {
+                    Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Struct,
+                    Name = @struct.Name.Content,
+                    Location = new DocumentLocation()
+                    {
+                        Range = @struct.GetPosition(),
+                        Uri = @struct.FilePath is null ? e.Document.Uri : new Uri($"file:///{@struct.FilePath.Replace('\\', '/')}", UriKind.Absolute),
+                    },
+                });
+            }
+
+            foreach (var @enum in Enums)
+            {
+                if (@enum.FilePath != null && @enum.FilePath.Replace('\\', '/') != e.Document.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
+
+                result.Add(new SymbolInformationInfo()
+                {
+                    Kind = OmniSharp.Extensions.LanguageServer.Protocol.Models.SymbolKind.Enum,
+                    Name = @enum.Identifier.Content,
+                    Location = new DocumentLocation()
+                    {
+                        Range = @enum.GetPosition(),
+                        Uri = @enum.FilePath is null ? e.Document.Uri : new Uri($"file:///{@enum.FilePath.Replace('\\', '/')}", UriKind.Absolute),
+                    },
+                });
+            }
+
+            return result.ToArray();
         }
 
         FilePosition[] IDocument.References(FindReferencesEventArgs e)

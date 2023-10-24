@@ -260,14 +260,12 @@ namespace LanguageServer.DocumentManagers
 
             try
             {
-                List<Warning> tokenizerWarnings = new();
-                Tokenizer tokenizer = new(TokenizerSettings.Default);
-                Tokens = tokenizer.Parse(
+                TokenizerResult tokenizerResult = Tokenizer.Tokenize(
                     System.IO.File.ReadAllText(file.FullName),
-                    tokenizerWarnings,
                     file.FullName);
+                Tokens = tokenizerResult.Tokens;
 
-                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, tokenizerWarnings.ToArray()));
+                diagnostics.AddRange(GetDiagnosticInfos(file.FullName, tokenizerResult.Warnings));
 
                 ParserResult ast = Parser.Parse(Tokens);
 
@@ -277,7 +275,6 @@ namespace LanguageServer.DocumentManagers
                     ast,
                     new Dictionary<string, ExternalFunctionBase>(),
                     file,
-                    ParserSettings.Default,
                     null,
                     basePath);
 
@@ -578,65 +575,65 @@ namespace LanguageServer.DocumentManagers
             {
                 switch (token.AnalyzedType)
                 {
-                    case TokenAnalysedType.Attribute:
+                    case TokenAnalyzedType.Attribute:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Type));
                         break;
-                    case TokenAnalysedType.Type:
+                    case TokenAnalyzedType.Type:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Type));
                         break;
-                    case TokenAnalysedType.Struct:
+                    case TokenAnalyzedType.Struct:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Struct));
                         break;
-                    case TokenAnalysedType.Keyword:
+                    case TokenAnalyzedType.Keyword:
                         break;
-                    case TokenAnalysedType.FunctionName:
+                    case TokenAnalyzedType.FunctionName:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Function));
                         break;
-                    case TokenAnalysedType.VariableName:
+                    case TokenAnalyzedType.VariableName:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Variable));
                         break;
-                    case TokenAnalysedType.ParameterName:
+                    case TokenAnalyzedType.ParameterName:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Parameter));
                         break;
-                    case TokenAnalysedType.Namespace:
+                    case TokenAnalyzedType.Namespace:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Namespace));
                         break;
-                    case TokenAnalysedType.Library:
+                    case TokenAnalyzedType.Library:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Namespace));
                         break;
-                    case TokenAnalysedType.Class:
+                    case TokenAnalyzedType.Class:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Class));
                         break;
-                    case TokenAnalysedType.Statement:
+                    case TokenAnalyzedType.Statement:
                         break;
-                    case TokenAnalysedType.BuiltinType:
+                    case TokenAnalyzedType.BuiltinType:
                         break;
-                    case TokenAnalysedType.Enum:
+                    case TokenAnalyzedType.Enum:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.Enum));
                         break;
-                    case TokenAnalysedType.EnumMember:
+                    case TokenAnalyzedType.EnumMember:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.EnumMember));
                         break;
-                    case TokenAnalysedType.TypeParameter:
+                    case TokenAnalyzedType.TypeParameter:
                         result.Add(new SemanticToken(token,
                             OmniSharp.Extensions.LanguageServer.Protocol.Models.SemanticTokenType.TypeParameter));
                         break;
-                    case TokenAnalysedType.Hash:
-                    case TokenAnalysedType.HashParameter:
+                    case TokenAnalyzedType.Hash:
+                    case TokenAnalyzedType.HashParameter:
 
-                    case TokenAnalysedType.None:
-                    case TokenAnalysedType.FieldName:
+                    case TokenAnalyzedType.None:
+                    case TokenAnalyzedType.FieldName:
                     default:
                         break;
                 }

@@ -55,7 +55,7 @@ namespace LanguageServer.DocumentManagers
             if (Tokens.Length == 0) return null;
 
             foreach (var token in Tokens)
-            { if (token.Position.Contains(position)) return token; }
+            { if (token.Position.Range.Contains(position)) return token; }
 
             return null;
         }
@@ -418,7 +418,7 @@ namespace LanguageServer.DocumentManagers
             foreach (CompiledFunction function in Functions)
             {
                 if (function.Block == null) continue;
-                if (function.Block.GetPosition().Range.Contains(position))
+                if (function.Block.Position.Range.Contains(position))
                 {
                     foreach (var parameter in function.Parameters)
                     {
@@ -496,7 +496,7 @@ namespace LanguageServer.DocumentManagers
                     Name = function.Identifier.Content,
                     Location = new DocumentLocation()
                     {
-                        Range = function.GetPosition(),
+                        Range = function.Position,
                         Uri = function.FilePath is null ? e.Document.Uri : new Uri($"file:///{function.FilePath.Replace('\\', '/')}", UriKind.Absolute),
                     },
                 });
@@ -512,7 +512,7 @@ namespace LanguageServer.DocumentManagers
                     Name = @class.Name.Content,
                     Location = new DocumentLocation()
                     {
-                        Range = @class.GetPosition(),
+                        Range = @class.Position,
                         Uri = @class.FilePath is null ? e.Document.Uri : new Uri($"file:///{@class.FilePath.Replace('\\', '/')}", UriKind.Absolute),
                     },
                 });
@@ -528,7 +528,7 @@ namespace LanguageServer.DocumentManagers
                     Name = @struct.Name.Content,
                     Location = new DocumentLocation()
                     {
-                        Range = @struct.GetPosition(),
+                        Range = @struct.Position,
                         Uri = @struct.FilePath is null ? e.Document.Uri : new Uri($"file:///{@struct.FilePath.Replace('\\', '/')}", UriKind.Absolute),
                     },
                 });
@@ -544,7 +544,7 @@ namespace LanguageServer.DocumentManagers
                     Name = @enum.Identifier.Content,
                     Location = new DocumentLocation()
                     {
-                        Range = @enum.GetPosition(),
+                        Range = @enum.Position,
                         Uri = @enum.FilePath is null ? e.Document.Uri : new Uri($"file:///{@enum.FilePath.Replace('\\', '/')}", UriKind.Absolute),
                     },
                 });

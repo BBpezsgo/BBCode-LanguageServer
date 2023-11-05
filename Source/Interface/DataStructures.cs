@@ -72,8 +72,8 @@ namespace LanguageServer.Interface
 
         internal static Range Convert2(this LanguageCore.Position self) => new()
         {
-            Start = self.Start.Convert2(),
-            End = self.End.Convert2(),
+            Start = self.Range.Start.Convert2(),
+            End = self.Range.End.Convert2(),
         };
 
         internal static T[] Convert2<T>(this IConvertable<T>[] self)
@@ -105,13 +105,13 @@ namespace LanguageServer.Interface
         internal CodeLensInfo(string title, BaseToken range)
         {
             Title = title;
-            Range = range.Position;
+            Range = range.Position.Range;
         }
 
         internal CodeLensInfo(string title, BaseToken range, string Command, params string[] CommandArgs)
         {
             this.Title = title;
-            this.Range = range.Position;
+            this.Range = range.Position.Range;
             this.CommandName = Command;
             this.CommandArgs = CommandArgs;
         }
@@ -496,8 +496,8 @@ namespace LanguageServer.Interface
 
         public SemanticToken(Token token, SemanticTokenType type, params SemanticTokenModifier[] modifiers)
         {
-            this.Line = token.Position.Start.Line;
-            this.Col = token.Position.Start.Character;
+            this.Line = token.Position.Range.Start.Line;
+            this.Col = token.Position.Range.Start.Character;
             this.Length = token.Content.Length;
             this.Type = type;
             this.Modifier = modifiers;

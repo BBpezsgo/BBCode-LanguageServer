@@ -306,7 +306,7 @@ namespace LanguageServer.DocumentManagers
             {
                 Position range = exception.Position;
 
-                Logger.Log($"Exception: {exception}\n  at {range.ToMinString()}");
+                Logger.Log($"Exception: {exception}\n  at {range.ToStringRange()}");
 
                 diagnostics.Add(new DiagnosticInfo
                 {
@@ -353,7 +353,7 @@ namespace LanguageServer.DocumentManagers
 
             List<DiagnosticInfo> diagnostics = Compile(file);
 
-            for (int i = diagnostics.Count - 1; i >= 0; i--) if (diagnostics[i].range.ToMinString() == "0:0") diagnostics.RemoveAt(i);
+            for (int i = diagnostics.Count - 1; i >= 0; i--) if (diagnostics[i].range.ToStringRange() == "0:0") diagnostics.RemoveAt(i);
 
             App.Interface.PublishDiagnostics(e.Uri, diagnostics.ToArray());
         }
@@ -441,10 +441,10 @@ namespace LanguageServer.DocumentManagers
 
         HoverInfo IDocument.Hover(DocumentPositionEventArgs e)
         {
-            Logger.Log($"Hover({e.Position.ToMinString()})");
+            Logger.Log($"Hover({e.Position.ToStringMin()})");
 
             List<HoverContent> result = new();
-            Range<SinglePosition> range = new(e.Position, e.Position);
+            Range<SinglePosition> range = new(e.Position);
 
             return new HoverInfo()
             {
@@ -475,7 +475,7 @@ namespace LanguageServer.DocumentManagers
 
         SingleOrArray<FilePosition>? IDocument.GotoDefinition(DocumentPositionEventArgs e)
         {
-            Logger.Log($"GotoDefinition({e.Position.ToMinString()})");
+            Logger.Log($"GotoDefinition({e.Position.ToStringMin()})");
 
             return null;
         }
@@ -555,7 +555,7 @@ namespace LanguageServer.DocumentManagers
 
         FilePosition[] IDocument.References(FindReferencesEventArgs e)
         {
-            Logger.Log($"References({e.Position.ToMinString()})");
+            Logger.Log($"References({e.Position.ToStringMin()})");
 
             return Array.Empty<FilePosition>();
         }

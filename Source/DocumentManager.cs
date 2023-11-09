@@ -281,7 +281,7 @@ namespace LanguageServer.DocumentManagers
                 diagnostics.AddRange(GetDiagnosticInfos(file.FullName, compiled.Warnings));
                 diagnostics.AddRange(GetDiagnosticInfos(file.FullName, compiled.Errors));
 
-                CodeGenerator.Result generated = CodeGenerator.Generate(
+                CodeGeneratorForMain.Result generated = CodeGeneratorForMain.Generate(
                     compiled,
                     Compiler.CompilerSettings.Default,
                     null,

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace LanguageServer.Interface
 {
@@ -8,24 +7,24 @@ namespace LanguageServer.Interface
 
     internal interface IDocument
     {
-        internal Uri Uri { get; }
+        public Uri Uri { get; }
 
-        internal void OnChanged(DocumentItem document);
-        internal void OnSaved(Document document);
+        public void OnChanged(DocumentItem document);
+        public void OnSaved(Document document);
 
-        internal HoverInfo Hover(DocumentPositionEventArgs e);
-        internal CodeLensInfo[] CodeLens(DocumentEventArgs e);
-        internal FilePosition[] References(FindReferencesEventArgs e);
-        internal SignatureHelpInfo SignatureHelp(SignatureHelpEventArgs e);
-        internal SemanticToken[] GetSemanticTokens(DocumentEventArgs e);
-        internal CompletionInfo[] Completion(DocumentPositionContextEventArgs e);
-        internal SingleOrArray<FilePosition>? GotoDefinition(DocumentPositionEventArgs e);
-        internal SymbolInformationInfo[] Symbols(DocumentEventArgs e);
+        public HoverInfo Hover(DocumentPositionEventArgs e);
+        public CodeLensInfo[] CodeLens(DocumentEventArgs e);
+        public FilePosition[] References(FindReferencesEventArgs e);
+        public SignatureHelpInfo SignatureHelp(SignatureHelpEventArgs e);
+        public SemanticToken[] GetSemanticTokens(DocumentEventArgs e);
+        public CompletionInfo[] Completion(DocumentPositionContextEventArgs e);
+        public SingleOrArray<FilePosition>? GotoDefinition(DocumentPositionEventArgs e);
+        public SymbolInformationInfo[] Symbols(DocumentEventArgs e);
     }
 
     internal static class DocumentGenerator
     {
-        internal static IDocument GenerateDocument(DocumentItem document, DocumentInterface documentInterface)
+        public static IDocument GenerateDocument(DocumentItem document, DocumentInterface documentInterface)
         {
             if (document.LanguageID == "bbc") return new DocumentBBCode(document, documentInterface);
             throw new System.Exception($"Unknown language {document.LanguageID}");

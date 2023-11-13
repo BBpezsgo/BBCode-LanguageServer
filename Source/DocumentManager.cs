@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using LanguageCore.BBCode;
 using LanguageCore.BBCode.Compiler;
 using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
 

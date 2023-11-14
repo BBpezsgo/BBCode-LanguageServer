@@ -1,0 +1,15 @@
+﻿global using System;
+global using System.Collections.Generic;
+global using System.Diagnostics.CodeAnalysis;
+global using System.Linq;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using OmniSharp.Extensions.LanguageServer.Protocol;
+global using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
+global using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+global using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+global using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+global using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
+global using OmniSharp.Extensions.LanguageServer.Protocol.Window;
+global using OmniSharp.Extensions.LanguageServer.Server;
+global using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;

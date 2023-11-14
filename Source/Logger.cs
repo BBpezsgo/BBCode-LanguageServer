@@ -1,25 +1,43 @@
-﻿using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-
-using System;
-using System.IO;
+﻿using System.IO;
+using System.Text;
 
 namespace LanguageServer
 {
     public class Logger
     {
-        static ILogger Instance;
+        const string LOG_PATH = @"D:\Program Files\BBCodeProject\LanguageServer\";
 
-        static string _fileName;
+        static string? _fileName;
         static string FileName
         {
             get
             {
-                if (_fileName == null)
-                { _fileName = $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.txt"; }
+                _fileName ??= $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.txt";
                 return _fileName;
             }
         }
-        const string LOG_PATH = @"D:\Program Files\BBCodeProject\LanguageServer\";
+
+        const int MaxKindLength = 5;
+        const int TimePrefixLength = 10;
+        const int PrefixLength = TimePrefixLength + 1 + MaxKindLength + 3;
+
+        static long PrevTime = 0;
+        static readonly string EmptyTimePrefix = new(' ', TimePrefixLength);
+
+        static bool IsNewTime(DateTime time)
+        {
+            long t = (long)time.TimeOfDay.TotalSeconds;
+            if (t == PrevTime) return false;
+            PrevTime = t;
+            return true;
+        }
+        static string GetTimePrefix(DateTime time)
+        {
+            if (IsNewTime(time))
+            { return $"[{time:HH:mm:ss}]"; }
+            else
+            { return EmptyTimePrefix; }
+        }
 
         /*
         Proxy proxy;
@@ -45,17 +63,58 @@ namespace LanguageServer
         }
         */
 
+        static void GetPrefix(StringBuilder builder, string kind)
+        {
+            DateTime time = DateTime.Now;
+            if (IsNewTime(time))
+            {
+                builder.Append('[');
+                builder.Append(time.ToString("HH:mm:ss"));
+                builder.Append(']');
+            }
+            else
+            {
+                builder.Append(' ', 10);
+            }
+
+            builder.Append(' ');
+            builder.Append('[');
+            builder.Append(kind);
+            builder.Append(']');
+
+            if (kind.Length < MaxKindLength)
+            { builder.Append(' ', MaxKindLength - kind.Length); }
+        }
+
+        static string IndentMessage(string message, int indent)
+        {
+            string[] lines = message.Split('\n');
+            for (int i = 1; i < lines.Length; i++)
+            { lines[i] = new string(' ', indent) + lines[i]; }
+            return string.Join('\n', lines).Trim();
+        }
+
+        static string GetMessage(string kind, string message)
+        {
+            StringBuilder builder = new();
+            GetPrefix(builder, kind);
+            builder.Append(' ');
+            builder.Append(IndentMessage(message, PrefixLength));
+            builder.Append(Environment.NewLine);
+            return builder.ToString();
+        }
+
         public static void Error(string message)
         {
             try
             {
                 if (Directory.Exists(LOG_PATH))
-                { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [ERROR] {message}"); }
+                { File.AppendAllText($"{LOG_PATH}{FileName}", GetMessage("ERROR", message)); }
             }
             catch (IOException)
             { }
 
-            Instance?.Send(MessageType.Error, message);
+            OmniSharpService.Instance?.Server?.Window.LogError(message);
         }
 
         public static void Warn(string message)
@@ -63,12 +122,12 @@ namespace LanguageServer
             try
             {
                 if (Directory.Exists(LOG_PATH))
-                { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [WARN] {message}"); }
+                { File.AppendAllText($"{LOG_PATH}{FileName}", GetMessage("WARN", message)); }
             }
             catch (IOException)
             { }
 
-            Instance?.Send(MessageType.Warning, message);
+            OmniSharpService.Instance?.Server?.Window.LogWarning(message);
         }
 
         public static void Info(string message)
@@ -76,12 +135,12 @@ namespace LanguageServer
             try
             {
                 if (Directory.Exists(LOG_PATH))
-                { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [INFO] {message}"); }
+                { File.AppendAllText($"{LOG_PATH}{FileName}", GetMessage("INFO", message)); }
             }
             catch (IOException)
             { }
 
-            Instance?.Send(MessageType.Info, message);
+            OmniSharpService.Instance?.Server?.Window.LogInfo(message);
         }
 
         public static void Log(string message)
@@ -89,22 +148,12 @@ namespace LanguageServer
             try
             {
                 if (Directory.Exists(LOG_PATH))
-                { File.AppendAllText($"{LOG_PATH}{FileName}", $"[{DateTime.Now:HH:mm:ss}] [LOG] {message}"); }
+                { File.AppendAllText($"{LOG_PATH}{FileName}", GetMessage("LOG", message)); }
             }
             catch (IOException)
             { }
 
-            Instance?.Send(MessageType.Log, message);
+            OmniSharpService.Instance?.Server?.Window.Log(message);
         }
-
-        internal static void Setup(ILogger logger)
-        {
-            Instance = logger;
-        }
-    }
-
-    internal interface ILogger
-    {
-        void Send(MessageType type, string message);
     }
 }

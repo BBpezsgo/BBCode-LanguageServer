@@ -3,8 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <BaseOutputPath>C:\Users\bazsi\Documents\GitHub\InterpreterVSCodeExtension\server</BaseOutputPath>
+    <BaseOutputPath>C:\Users\bazsi\Documents\GitHub\InterpreterVSCodeExtension\language-server</BaseOutputPath>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <ApplicationIcon>ls.ico</ApplicationIcon>

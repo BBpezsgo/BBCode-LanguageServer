@@ -112,12 +112,122 @@
             return diagnostics.ToArray();
         }
 
-        public static AnalysisResult Analyze(FileInfo file)
+        static void HandleCatchedExceptions(Dictionary<string, List<Diagnostic>> diagnostics, LanguageException exception, string source, FileInfo file)
         {
-            Dictionary<string, List<Diagnostic>> diagnostics = new();
+            if (exception.File == file.FullName)
+            {
+                diagnostics.GetOrAdd(exception.File, new List<Diagnostic>())
+                    .Add(new Diagnostic
+                    {
+                        Severity = DiagnosticSeverity.Error,
+                        Range = exception.Position.ToOmniSharp(),
+                        Message = exception.Message,
+                    });
+            }
 
+            if (exception.InnerException is LanguageException innerException)
+            {
+                if (exception.File == file.FullName)
+                {
+                    diagnostics.GetOrAdd(exception.File, new List<Diagnostic>())
+                        .Add(new Diagnostic
+                        {
+                            Severity = DiagnosticSeverity.Error,
+                            Range = innerException.Position.ToOmniSharp(),
+                            Message = innerException.Message,
+                        });
+                }
+            }
+        }
+
+        static Token[]? Tokenize(Dictionary<string, List<Diagnostic>> diagnostics, FileInfo file)
+        {
+            try
+            {
+                TokenizerResult tokenizerResult = Tokenizer.Tokenize(
+                    File.ReadAllText(file.FullName),
+                    file.FullName);
+
+                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
+                    .AddRange(GetDiagnosticInfos(file.FullName, "Tokenizer", tokenizerResult.Warnings));
+
+                return tokenizerResult.Tokens;
+            }
+            catch (LanguageException exception)
+            {
+                Logger.Log($"{exception.GetType()}: {exception}");
+                HandleCatchedExceptions(diagnostics, exception, "Tokenizer", file);
+            }
+            catch (Exception exception)
+            {
+                Logger.Log($"{exception.GetType()}: {exception}");
+            }
+
+            return null;
+        }
+
+        static ParserResult? Parse(Dictionary<string, List<Diagnostic>> diagnostics, Token[] tokens, FileInfo file)
+        {
+            try
+            {
+                ParserResult ast = Parser.Parse(tokens);
+                ast.SetFile(file.FullName);
+
+                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
+                    .AddRange(GetDiagnosticInfos(file.FullName, "Parser", ast.Errors));
+
+                return ast;
+            }
+            catch (LanguageException exception)
+            {
+                Logger.Log($"{exception.GetType()}: {exception}");
+                HandleCatchedExceptions(diagnostics, exception, "Parser", file);
+            }
+            catch (Exception exception)
+            {
+                Logger.Log($"{exception.GetType()}: {exception}");
+            }
+
+            return null;
+        }
+
+        static Compiler.Result? Compile(Dictionary<string, List<Diagnostic>> diagnostics, ParserResult ast, FileInfo file, string? basePath)
+        {
+            try
+            {
+                Compiler.Result compiled = Compiler.Compile(
+                    ast,
+                    new Dictionary<string, ExternalFunctionBase>(),
+                    file,
+                    null,
+                    basePath);
+
+                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
+                    .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", compiled.Warnings));
+
+                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
+                    .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", compiled.Errors));
+
+                return compiled;
+            }
+            catch (LanguageException exception)
+            {
+                Logger.Log($"{exception.GetType()}: {exception}");
+                HandleCatchedExceptions(diagnostics, exception, "Compiler", file);
+            }
+            catch (Exception exception)
+            {
+                Logger.Log($"{exception.GetType()}: {exception}");
+            }
+
+            return null;
+        }
+
+        static string? GetBasePath(FileInfo file)
+        {
             string? basePath = null;
             string? configFile = file.DirectoryName != null ? Path.Combine(file.DirectoryName, "config.json") : null;
+         
             try
             {
                 if (configFile != null && File.Exists(configFile))
@@ -140,132 +250,94 @@
                 basePath = Path.GetFullPath(basePath, file.DirectoryName);
             }
 
+            return basePath;
+        }
+
+        public static AnalysisResult Analyze(FileInfo file)
+        {
+            Dictionary<string, List<Diagnostic>> diagnostics = new();
+
+            string? basePath = GetBasePath(file);
+
             Logger.Log($"Base path: \"{basePath ?? "null"}\"");
 
-            Token[] tokens = Array.Empty<Token>();
+            CompiledFunction[]? functions = null;
+            CompiledGeneralFunction[]? generalFunctions = null;
+            CompiledEnum[]? enums = null;
+            CompiledClass[]? classes = null;
+            CompiledStruct[]? structs = null;
 
-            CompiledFunction[] functions = Array.Empty<CompiledFunction>();
-            CompiledGeneralFunction[] generalFunctions = Array.Empty<CompiledGeneralFunction>();
+            Token[]? tokens = Tokenize(diagnostics, file);
 
-            CompiledEnum[] enums = Array.Empty<CompiledEnum>();
+            ParserResult? ast = tokens is null ? null : Parse(diagnostics, tokens, file);
 
-            CompiledClass[] classes = Array.Empty<CompiledClass>();
-            CompiledStruct[] structs = Array.Empty<CompiledStruct>();
-            ParserResult ast = ParserResult.Empty;
+            Compiler.Result? compilerResult = !ast.HasValue ? null : Compile(diagnostics, ast.Value, file, basePath);
 
-            try
+            if (compilerResult.HasValue)
             {
-                TokenizerResult tokenizerResult = Tokenizer.Tokenize(
-                    File.ReadAllText(file.FullName),
-                    file.FullName);
-                tokens = tokenizerResult.Tokens;
+                functions = compilerResult.Value.Functions;
+                generalFunctions = compilerResult.Value.GeneralFunctions;
 
-                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "Tokenizer", tokenizerResult.Warnings));
+                enums = compilerResult.Value.Enums;
 
-                ast = Parser.Parse(tokens);
-                ast.SetFile(file.FullName);
+                classes = compilerResult.Value.Classes;
+                structs = compilerResult.Value.Structs;
 
-                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "Parser", ast.Errors));
-
-                Compiler.Result compiled = Compiler.Compile(
-                    ast,
-                    new Dictionary<string, ExternalFunctionBase>(),
-                    file,
-                    null,
-                    basePath);
-
-                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", compiled.Warnings));
-
-                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", compiled.Errors));
-
-                CodeGeneratorForMain.Result generated = CodeGeneratorForMain.Generate(
-                    compiled,
-                    new Compiler.CompilerSettings()
-                    {
-                        CheckNullPointers = false,
-                        DontOptimize = true,
-                        ExternalFunctionsCache = false,
-                        GenerateComments = false,
-                        GenerateDebugInstructions = false,
-                        PrintInstructions = false,
-                        RemoveUnusedFunctionsMaxIterations = 0,
-                    },
-                    null,
-                    Compiler.CompileLevel.All);
-
-                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Hints));
-
-                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Informations));
-
-                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Warnings));
-
-                diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Errors));
-
-                functions = compiled.Functions;
-                generalFunctions = compiled.GeneralFunctions;
-
-                enums = compiled.Enums;
-
-                classes = compiled.Classes;
-                structs = compiled.Structs;
-
-                Logger.Log($"Successfully compiled ({file.Name})");
-            }
-            catch (LanguageException exception)
-            {
-                Logger.Log($"{exception.GetType()}: {exception}");
-
-                if (exception.File == file.FullName)
+                try
                 {
-                    diagnostics.GetOrAdd(exception.File, new List<Diagnostic>())
-                        .Add(new Diagnostic
+                    CodeGeneratorForMain.Result generated = CodeGeneratorForMain.Generate(
+                        compilerResult.Value,
+                        new Compiler.CompilerSettings()
                         {
-                            Severity = DiagnosticSeverity.Error,
-                            Range = exception.Position.ToOmniSharp(),
-                            Message = exception.Message,
-                        });
-                }
+                            CheckNullPointers = false,
+                            DontOptimize = true,
+                            ExternalFunctionsCache = false,
+                            GenerateComments = false,
+                            GenerateDebugInstructions = false,
+                            PrintInstructions = false,
+                            RemoveUnusedFunctionsMaxIterations = 0,
+                        },
+                        null,
+                        Compiler.CompileLevel.All);
 
-                if (exception.InnerException is LanguageException innerException)
-                {
-                    if (exception.File == file.FullName)
-                    {
-                        diagnostics.GetOrAdd(exception.File, new List<Diagnostic>())
-                            .Add(new Diagnostic
-                            {
-                                Severity = DiagnosticSeverity.Error,
-                                Range = innerException.Position.ToOmniSharp(),
-                                Message = innerException.Message,
-                            });
-                    }
+                    diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
+                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Hints));
+
+                    diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
+                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Informations));
+
+                    diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
+                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Warnings));
+
+                    diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
+                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Errors));
+
+                    Logger.Log($"Successfully compiled ({file.Name})");
                 }
-            }
-            catch (Exception exception)
-            {
-                Logger.Error($"{exception.GetType()}: {exception}");
+                catch (LanguageException exception)
+                {
+                    Logger.Log($"{exception.GetType()}: {exception}");
+                    HandleCatchedExceptions(diagnostics, exception, "CodeGenerator", file);
+                }
+                catch (Exception exception)
+                {
+                    Logger.Error($"{exception.GetType()}: {exception}");
+                }
             }
 
             return new AnalysisResult()
             {
                 Diagnostics = diagnostics,
 
-                Tokens = tokens,
+                Tokens = tokens ?? Array.Empty<Token>(),
 
-                AST = ast,
+                AST = ast ?? ParserResult.Empty,
 
-                Functions = functions,
-                GeneralFunctions = generalFunctions,
-                Enums = enums,
-                Classes = classes,
-                Structs = structs,
+                Functions = functions ?? Array.Empty<CompiledFunction>(),
+                GeneralFunctions = generalFunctions ?? Array.Empty<CompiledGeneralFunction>(),
+                Enums = enums ?? Array.Empty<CompiledEnum>(),
+                Classes = classes ?? Array.Empty<CompiledClass>(),
+                Structs = structs ?? Array.Empty<CompiledStruct>(),
             };
         }
     }

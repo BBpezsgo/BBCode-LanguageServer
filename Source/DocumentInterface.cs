@@ -63,10 +63,11 @@
             Interface = @interface;
         }
 
+        /// <exception cref="ServiceException"/>
         public static SingleDocumentHandler GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface)
         {
             if (languageId == "bbc") return new DocumentBBCode(uri, content, languageId, documentInterface);
-            throw new Exception($"Unknown language {languageId}");
+            throw new ServiceException($"Unknown language {languageId}");
         }
 
         public void Initialize()

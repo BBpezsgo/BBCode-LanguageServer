@@ -21,6 +21,7 @@ namespace LanguageServer
             Documents = new Documents(this);
         }
 
+        /// <exception cref="ServiceException"/>
         public string GetDocumentContent(DocumentUri uri)
         {
             string? text = Buffers?.GetText(uri);

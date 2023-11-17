@@ -144,9 +144,7 @@
         {
             try
             {
-                TokenizerResult tokenizerResult = Tokenizer.Tokenize(
-                    File.ReadAllText(file.FullName),
-                    file.FullName);
+                TokenizerResult tokenizerResult = StringTokenizer.Tokenize(File.ReadAllText(file.FullName));
 
                 diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
                     .AddRange(GetDiagnosticInfos(file.FullName, "Tokenizer", tokenizerResult.Warnings));
@@ -227,7 +225,7 @@
         {
             string? basePath = null;
             string? configFile = file.DirectoryName != null ? Path.Combine(file.DirectoryName, "config.json") : null;
-         
+
             try
             {
                 if (configFile != null && File.Exists(configFile))

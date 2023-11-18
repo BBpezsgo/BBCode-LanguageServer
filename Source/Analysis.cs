@@ -2,10 +2,9 @@
 {
     using System.IO;
     using LanguageCore;
-    using LanguageCore.BBCode.Compiler;
+    using LanguageCore.BBCode.Generator;
+    using LanguageCore.Compiler;
     using LanguageCore.Parser;
-    using LanguageCore.Parser.Statement;
-    using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
 
     public struct AnalysisResult
@@ -117,11 +116,12 @@
             if (exception.File == file.FullName)
             {
                 diagnostics.GetOrAdd(exception.File, new List<Diagnostic>())
-                    .Add(new Diagnostic
+                    .Add(new Diagnostic()
                     {
                         Severity = DiagnosticSeverity.Error,
                         Range = exception.Position.ToOmniSharp(),
                         Message = exception.Message,
+                        Source = source,
                     });
             }
 
@@ -130,11 +130,12 @@
                 if (exception.File == file.FullName)
                 {
                     diagnostics.GetOrAdd(exception.File, new List<Diagnostic>())
-                        .Add(new Diagnostic
+                        .Add(new Diagnostic()
                         {
                             Severity = DiagnosticSeverity.Error,
                             Range = innerException.Position.ToOmniSharp(),
                             Message = innerException.Message,
+                            Source = source,
                         });
                 }
             }
@@ -189,16 +190,11 @@
             return null;
         }
 
-        static Compiler.Result? Compile(Dictionary<string, List<Diagnostic>> diagnostics, ParserResult ast, FileInfo file, string? basePath)
+        static CompilerResult? Compile(Dictionary<string, List<Diagnostic>> diagnostics, ParserResult ast, FileInfo file, string? basePath)
         {
             try
             {
-                Compiler.Result compiled = Compiler.Compile(
-                    ast,
-                    new Dictionary<string, ExternalFunctionBase>(),
-                    file,
-                    null,
-                    basePath);
+                CompilerResult compiled = Compiler.Compile(ast, null, file, basePath, null);
 
                 diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
                     .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", compiled.Warnings));
@@ -269,7 +265,7 @@
 
             ParserResult? ast = tokens is null ? null : Parse(diagnostics, tokens, file);
 
-            Compiler.Result? compilerResult = !ast.HasValue ? null : Compile(diagnostics, ast.Value, file, basePath);
+            CompilerResult? compilerResult = !ast.HasValue ? null : Compile(diagnostics, ast.Value, file, basePath);
 
             if (compilerResult.HasValue)
             {
@@ -283,9 +279,9 @@
 
                 try
                 {
-                    CodeGeneratorForMain.Result generated = CodeGeneratorForMain.Generate(
+                    BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(
                         compilerResult.Value,
-                        new Compiler.CompilerSettings()
+                        new CompilerSettings()
                         {
                             CheckNullPointers = false,
                             DontOptimize = true,
@@ -296,7 +292,7 @@
                             RemoveUnusedFunctionsMaxIterations = 0,
                         },
                         null,
-                        Compiler.CompileLevel.All);
+                        CompileLevel.All);
 
                     diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
                         .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Hints));

@@ -1,7 +1,7 @@
 ﻿namespace LanguageServer.DocumentManagers
 {
     using LanguageCore;
-    using LanguageCore.BBCode.Compiler;
+    using LanguageCore.Compiler;
     using LanguageCore.Parser;
     using LanguageCore.Parser.Statement;
     using LanguageCore.Tokenizing;

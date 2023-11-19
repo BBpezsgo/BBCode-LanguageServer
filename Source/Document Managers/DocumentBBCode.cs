@@ -230,18 +230,6 @@
                 if (function.FilePath != Path)
                 { continue; }
 
-                if (function.CompiledAttributes.ContainsKey("CodeEntry"))
-                {
-                    result.Add(new CodeLens()
-                    {
-                        Range = function.Identifier.Position.Range.ToOmniSharp(),
-                        Command = new Command()
-                        {
-                            Title = "This is the code entry"
-                        },
-                    });
-                }
-
                 result.Add(new CodeLens()
                 {
                     Range = function.Identifier.Position.Range.ToOmniSharp(),

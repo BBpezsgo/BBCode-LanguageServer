@@ -38,8 +38,8 @@
 
         public static OmniSharp.Extensions.LanguageServer.Protocol.Models.Position ToOmniSharp(this SinglePosition self) => new()
         {
-            Line = Math.Max(self.Line, 0),
-            Character = Math.Max(self.Character, 0),
+            Line = self.Line,
+            Character = self.Character,
         };
 
         public static Range ToOmniSharp(this Position self) => new()
@@ -56,8 +56,8 @@
 
         public static SinglePosition ToCool(this OmniSharp.Extensions.LanguageServer.Protocol.Models.Position self) => new()
         {
-            Line = Math.Max(self.Line, 0),
-            Character = Math.Max(self.Character, 0),
+            Line = self.Line,
+            Character = self.Character,
         };
     }
 }

@@ -111,11 +111,15 @@
             return diagnostics.ToArray();
         }
 
-        static void HandleCatchedExceptions(Dictionary<string, List<Diagnostic>> diagnostics, LanguageException exception, string source, FileInfo file)
+        static void HandleCatchedExceptions(Dictionary<string, List<Diagnostic>> diagnostics, LanguageException exception, string source, FileInfo file, string? exceptionFile = null)
         {
-            if (exception.File == file.FullName)
+            exceptionFile ??= exception.File;
+
+            Logger.Log(exceptionFile ?? "null");
+
+            if (exceptionFile == file.FullName)
             {
-                diagnostics.GetOrAdd(exception.File, new List<Diagnostic>())
+                diagnostics.GetOrAdd(exceptionFile, new List<Diagnostic>())
                     .Add(new Diagnostic()
                     {
                         Severity = DiagnosticSeverity.Error,
@@ -127,9 +131,9 @@
 
             if (exception.InnerException is LanguageException innerException)
             {
-                if (exception.File == file.FullName)
+                if (exceptionFile == file.FullName)
                 {
-                    diagnostics.GetOrAdd(exception.File, new List<Diagnostic>())
+                    diagnostics.GetOrAdd(exceptionFile, new List<Diagnostic>())
                         .Add(new Diagnostic()
                         {
                             Severity = DiagnosticSeverity.Error,
@@ -155,7 +159,7 @@
             catch (LanguageException exception)
             {
                 Logger.Log($"{exception.GetType()}: {exception}");
-                HandleCatchedExceptions(diagnostics, exception, "Tokenizer", file);
+                HandleCatchedExceptions(diagnostics, exception, "Tokenizer", file, file.FullName);
             }
             catch (Exception exception)
             {
@@ -180,7 +184,7 @@
             catch (LanguageException exception)
             {
                 Logger.Log($"{exception.GetType()}: {exception}");
-                HandleCatchedExceptions(diagnostics, exception, "Parser", file);
+                HandleCatchedExceptions(diagnostics, exception, "Parser", file, file.FullName);
             }
             catch (Exception exception)
             {

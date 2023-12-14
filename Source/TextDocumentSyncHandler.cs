@@ -10,7 +10,7 @@ namespace LanguageServer.Handlers
         readonly Buffers Buffers;
 
         readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter[] {
-            new TextDocumentFilter() { Pattern = "**/*.bbc" }
+            new() { Pattern = "**/*.bbc" }
         });
 
         public TextDocumentSyncHandler(ILanguageServerFacade router, Buffers bufferManager)
@@ -54,7 +54,7 @@ namespace LanguageServer.Handlers
         {
             Logger.Log($"OnDocumentSave({request.TextDocument.Uri})");
 
-            Microsoft.Language.Xml.StringBuffer? buffer = Buffers.Update(request);
+            // Microsoft.Language.Xml.StringBuffer? buffer = Buffers.Update(request);
 
             OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument).OnSaved(request);
 

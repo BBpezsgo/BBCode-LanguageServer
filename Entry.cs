@@ -2,20 +2,19 @@
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task<int> Main(string[] args)
         {
             OmniSharpService service = new();
             Console.OutputEncoding = new System.Text.UTF8Encoding(); // UTF8N for non-Windows platform
             try
             {
-#pragma warning disable VSTHRD002
-                service.CreateAsync().Wait();
-#pragma warning restore VSTHRD002
+                await service.CreateAsync();
+                return 0;
             }
             catch (AggregateException ex)
             {
-                Console.Error.WriteLine(ex.InnerExceptions[0]);
-                Environment.Exit(-1);
+                await Console.Error.WriteLineAsync(ex.InnerExceptions[0].ToString());
+                return -1;
             }
         }
     }

@@ -1,4 +1,7 @@
-﻿namespace LanguageServer.DocumentManagers
+﻿#pragma warning disable IDE0052 // Remove unread private members
+#pragma warning disable IDE0051 // Remove unused private members
+
+namespace LanguageServer.DocumentManagers
 {
     using LanguageCore;
     using LanguageCore.Compiler;

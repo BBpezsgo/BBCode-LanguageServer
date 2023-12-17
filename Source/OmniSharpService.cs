@@ -114,7 +114,11 @@ namespace LanguageServer
             });
         }
 
+#pragma warning disable CA1822 // Mark members as static
+#pragma warning disable IDE0060 // Remove unused parameter
         public void OnConfigChanged(DidChangeConfigurationParams e)
+#pragma warning restore IDE0060 
+#pragma warning restore CA1822 
         {
 
         }

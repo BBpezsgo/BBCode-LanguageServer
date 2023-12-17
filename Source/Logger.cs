@@ -1,6 +1,8 @@
 ﻿using System.IO;
 using System.Text;
 
+#pragma warning disable IDE0051 // Remove unused private members
+
 namespace LanguageServer
 {
     public class Logger

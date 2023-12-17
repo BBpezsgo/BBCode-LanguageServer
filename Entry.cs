@@ -2,7 +2,7 @@
 {
     class Program
     {
-        static async Task<int> Main(string[] args)
+        static async Task<int> Main()
         {
             OmniSharpService service = new();
             Console.OutputEncoding = new System.Text.UTF8Encoding(); // UTF8N for non-Windows platform

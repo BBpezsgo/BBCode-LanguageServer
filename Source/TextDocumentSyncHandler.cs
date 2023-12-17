@@ -6,7 +6,9 @@ namespace LanguageServer.Handlers
 
     class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     {
+#pragma warning disable IDE0052 // Remove unread private members
         readonly ILanguageServerFacade Router;
+#pragma warning restore IDE0052
         readonly Buffers Buffers;
 
         readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter[] {
@@ -25,7 +27,7 @@ namespace LanguageServer.Handlers
             SyncKind = TextDocumentSyncKind.Full,
         };
 
-        public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri document) 
+        public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri document)
             => new(document, document.Extension());
 
         public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)

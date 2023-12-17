@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="GuiLabs.Language.Xml" Version="1.2.67" />
+    <PackageReference Include="GuiLabs.Language.Xml" Version="1.2.74" />
     <PackageReference Include="OmniSharp.Extensions.LanguageProtocol" Version="0.19.9" />
     <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
   </ItemGroup>

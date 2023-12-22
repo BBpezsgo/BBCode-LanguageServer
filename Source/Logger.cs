@@ -23,7 +23,7 @@ namespace LanguageServer
         const int TimePrefixLength = 10;
         const int PrefixLength = TimePrefixLength + 1 + MaxKindLength + 3;
 
-        static long PrevTime = 0;
+        static long PrevTime;
         static readonly string EmptyTimePrefix = new(' ', TimePrefixLength);
 
         static bool IsNewTime(DateTime time)

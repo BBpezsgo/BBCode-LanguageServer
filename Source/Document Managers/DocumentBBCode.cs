@@ -47,33 +47,6 @@ namespace LanguageServer.DocumentManagers
             Validate();
         }
 
-        Token? GetTokenAt(SinglePosition position)
-        {
-            if (Tokens == null) return null;
-            if (Tokens.Length == 0) return null;
-
-            foreach (var token in Tokens)
-            { if (token.Position.Range.Contains(position)) return token; }
-
-            return null;
-        }
-
-        T? GetStatementAt<T>(SinglePosition position) where T : Statement
-        {
-            T? result = null;
-            StatementFinder.GetAllStatement(AST, statement =>
-            {
-                if (!statement.Position.Range.Contains(position)) return false;
-                if (statement is not T _statement)
-                {
-                    return false;
-                }
-                result = _statement;
-                return true;
-            });
-            return result;
-        }
-
         CompiledFunction? GetFunctionAt(SinglePosition position)
         {
             for (int i = 0; i < Functions.Length; i++)
@@ -191,7 +164,7 @@ namespace LanguageServer.DocumentManagers
                 if (function.Block == null) continue;
                 if (function.Block.Position.Range.Contains(position))
                 {
-                    foreach (var parameter in function.Parameters)
+                    foreach (ParameterDefinition parameter in function.Parameters)
                     {
                         result.Add(new CompletionItem()
                         {
@@ -259,7 +232,7 @@ namespace LanguageServer.DocumentManagers
 
             List<SymbolInformationOrDocumentSymbol> result = new();
 
-            foreach (var function in Functions)
+            foreach (CompiledFunction function in Functions)
             {
                 if (function.FilePath != null && function.FilePath.Replace('\\', '/') != e.TextDocument.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
 
@@ -275,7 +248,7 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (var @class in Classes)
+            foreach (CompiledClass @class in Classes)
             {
                 if (@class.FilePath != null && @class.FilePath.Replace('\\', '/') != e.TextDocument.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
 
@@ -291,7 +264,7 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (var @struct in Structs)
+            foreach (CompiledStruct @struct in Structs)
             {
                 if (@struct.FilePath != null && @struct.FilePath.Replace('\\', '/') != e.TextDocument.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
 
@@ -307,7 +280,7 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (var @enum in Enums)
+            foreach (CompiledEnum @enum in Enums)
             {
                 if (@enum.FilePath != null && @enum.FilePath.Replace('\\', '/') != e.TextDocument.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
 
@@ -359,7 +332,7 @@ namespace LanguageServer.DocumentManagers
         {
             if (Tokens == null) return;
 
-            foreach (var token in Tokens)
+            foreach (Token token in Tokens)
             {
                 switch (token.AnalyzedType)
                 {

@@ -237,5 +237,4 @@ namespace LanguageServer.Handlers
             Range = true,
         };
     }
-
 }

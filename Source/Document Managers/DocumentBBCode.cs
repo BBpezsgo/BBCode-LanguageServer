@@ -115,7 +115,7 @@ namespace LanguageServer.DocumentManagers
                 result.Add(new CompletionItem()
                 {
                     Deprecated = false,
-                    Detail = function.ReadableID(),
+                    Detail = function.ToReadable(),
                     Kind = CompletionItemKind.Function,
                     Label = function.Identifier.Content,
                     Preselect = false,
@@ -310,12 +310,12 @@ namespace LanguageServer.DocumentManagers
             {
                 for (int i = 0; i < function.References.Count; i++)
                 {
-                    (Statement Statement, string? File) reference = function.References[i];
-                    if (reference.File == null) continue;
+                    Reference<Statement> reference = function.References[i];
+                    if (reference.SourceFile == null) continue;
                     result.Add(new Location()
                     {
-                        Range = reference.Statement.Position.ToOmniSharp(),
-                        Uri = reference.File,
+                        Range = reference.Source.Position.ToOmniSharp(),
+                        Uri = reference.SourceFile,
                     });
                 }
             }

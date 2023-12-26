@@ -26,7 +26,7 @@
         public static string Extension(this TextDocumentIdentifier uri)
             => System.IO.Path.GetExtension(uri.Uri.ToUri().AbsolutePath).TrimStart('.').ToLowerInvariant();
 
-        public static Range ToOmniSharp(this Range<SinglePosition> self) => new()
+        public static OmniSharp.Extensions.LanguageServer.Protocol.Models.Range ToOmniSharp(this Range<SinglePosition> self) => new()
         {
             Start = self.Start.ToOmniSharp(),
             End = self.End.ToOmniSharp(),
@@ -38,13 +38,13 @@
             Character = self.Character,
         };
 
-        public static Range ToOmniSharp(this Position self) => new()
+        public static OmniSharp.Extensions.LanguageServer.Protocol.Models.Range ToOmniSharp(this Position self) => new()
         {
             Start = self.Range.Start.ToOmniSharp(),
             End = self.Range.End.ToOmniSharp(),
         };
 
-        public static Range<SinglePosition> ToCool(this Range self) => new()
+        public static Range<SinglePosition> ToCool(this OmniSharp.Extensions.LanguageServer.Protocol.Models.Range self) => new()
         {
             Start = self.Start.ToCool(),
             End = self.End.ToCool(),

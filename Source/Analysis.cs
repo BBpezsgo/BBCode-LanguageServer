@@ -236,7 +236,7 @@
                         AllowTrailingCommas = true,
                         CommentHandling = System.Text.Json.JsonCommentHandling.Skip,
                     });
-                    if (doc.RootElement.TryGetProperty("base", out var property))
+                    if (doc.RootElement.TryGetProperty("base", out System.Text.Json.JsonElement property))
                     { basePath = property.GetString(); }
                 }
             }

@@ -194,17 +194,19 @@
             return null;
         }
 
-        static CompilerResult? Compile(Dictionary<string, List<Diagnostic>> diagnostics, ParserResult ast, FileInfo file, string? basePath)
+        static CompilerResult? Compile(Dictionary<string, List<Diagnostic>> diagnostics, ParserResult ast, FileInfo file, CompilerSettings settings)
         {
             try
             {
-                CompilerResult compiled = Compiler.Compile(ast, null, file, basePath, null);
+                AnalysisCollection analysisCollection = new();
+
+                CompilerResult compiled = Compiler.Compile(ast, null, file, settings, null, analysisCollection);
 
                 diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", compiled.Warnings));
+                    .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", analysisCollection.Warnings.ToArray()));
 
                 diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", compiled.Errors));
+                    .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", analysisCollection.Errors.ToArray()));
 
                 return compiled;
             }
@@ -269,7 +271,10 @@
 
             ParserResult? ast = tokens is null ? null : Parse(diagnostics, tokens, file);
 
-            CompilerResult? compilerResult = !ast.HasValue ? null : Compile(diagnostics, ast.Value, file, basePath);
+            CompilerResult? compilerResult = !ast.HasValue ? null : Compile(diagnostics, ast.Value, file, new CompilerSettings()
+            {
+                BasePath = basePath,
+            });
 
             if (compilerResult.HasValue)
             {
@@ -283,9 +288,11 @@
 
                 try
                 {
+                    AnalysisCollection analysisCollection = new();
+
                     BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(
                         compilerResult.Value,
-                        new CompilerSettings()
+                        new GeneratorSettings()
                         {
                             CheckNullPointers = false,
                             DontOptimize = true,
@@ -294,21 +301,22 @@
                             GenerateDebugInstructions = false,
                             PrintInstructions = false,
                             RemoveUnusedFunctionsMaxIterations = 0,
+                            CompileLevel = CompileLevel.All,
                         },
                         null,
-                        CompileLevel.All);
+                        analysisCollection);
 
                     diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Hints));
+                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", analysisCollection.Hints.ToArray()));
 
                     diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Informations));
+                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", analysisCollection.Informations.ToArray()));
 
                     diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Warnings));
+                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", analysisCollection.Warnings.ToArray()));
 
                     diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
-                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", generated.Errors));
+                        .AddRange(GetDiagnosticInfos(file.FullName, "CodeGenerator", analysisCollection.Errors.ToArray()));
 
                     Logger.Log($"Successfully compiled ({file.Name})");
                 }

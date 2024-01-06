@@ -300,7 +300,6 @@
                             GenerateComments = false,
                             GenerateDebugInstructions = false,
                             PrintInstructions = false,
-                            RemoveUnusedFunctionsMaxIterations = 0,
                             CompileLevel = CompileLevel.All,
                         },
                         null,

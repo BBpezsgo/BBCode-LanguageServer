@@ -31,7 +31,7 @@ namespace LanguageServer.Handlers
         }
 
         public StringBuffer? Get(DocumentUri uri)
-            => buffers.TryGetValue(uri, out var buffer) ? buffer : null;
+            => buffers.TryGetValue(uri, out StringBuffer? buffer) ? buffer : null;
 
         public string? GetText(DocumentUri uri)
         {

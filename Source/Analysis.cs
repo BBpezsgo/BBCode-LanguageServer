@@ -5,6 +5,7 @@
     using LanguageCore.BBCode.Generator;
     using LanguageCore.Compiler;
     using LanguageCore.Parser;
+    using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
 
     public struct AnalysisResult
@@ -200,7 +201,10 @@
             {
                 AnalysisCollection analysisCollection = new();
 
-                CompilerResult compiled = Compiler.Compile(ast, null, file, settings, null, analysisCollection);
+                Dictionary<string, ExternalFunctionBase> externalFunctions = new();
+                new Interpreter().GenerateExternalFunctions(externalFunctions);
+
+                CompilerResult compiled = Compiler.Compile(ast, externalFunctions, file, settings, null, analysisCollection);
 
                 diagnostics.GetOrAdd(file.FullName, new List<Diagnostic>())
                     .AddRange(GetDiagnosticInfos(file.FullName, "Compiler", analysisCollection.Warnings.ToArray()));

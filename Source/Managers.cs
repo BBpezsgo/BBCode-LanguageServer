@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using LanguageServer.DocumentManagers;
+using MediatR;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 
 namespace LanguageServer.Handlers
@@ -28,7 +29,7 @@ namespace LanguageServer.Handlers
             capability.HierarchicalDocumentSymbolSupport = true;
             return new DocumentSymbolRegistrationOptions()
             {
-                DocumentSelector = TextDocumentSelector.ForLanguage("bbc"),
+                DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
             };
         }
     }
@@ -58,7 +59,7 @@ namespace LanguageServer.Handlers
             capability.ContextSupport = false;
             return new CompletionRegistrationOptions()
             {
-                DocumentSelector = TextDocumentSelector.ForLanguage("bbc"),
+                DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
                 ResolveProvider = false,
             };
         }
@@ -86,7 +87,7 @@ namespace LanguageServer.Handlers
 
         public CodeLensRegistrationOptions GetRegistrationOptions(CodeLensCapability capability, ClientCapabilities clientCapabilities) => new()
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("bbc"),
+            DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
             ResolveProvider = false,
         };
     }
@@ -112,7 +113,7 @@ namespace LanguageServer.Handlers
 
         public DefinitionRegistrationOptions GetRegistrationOptions(DefinitionCapability capability, ClientCapabilities clientCapabilities) => new()
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("bbc"),
+            DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
         };
     }
 
@@ -137,7 +138,7 @@ namespace LanguageServer.Handlers
 
         public HoverRegistrationOptions GetRegistrationOptions(HoverCapability capability, ClientCapabilities clientCapabilities) => new()
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("bbc"),
+            DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
         };
     }
 
@@ -164,7 +165,7 @@ namespace LanguageServer.Handlers
 
         public ReferenceRegistrationOptions GetRegistrationOptions(ReferenceCapability capability, ClientCapabilities clientCapabilities) => new()
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("bbc"),
+            DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
         };
     }
 
@@ -189,7 +190,7 @@ namespace LanguageServer.Handlers
 
         public SignatureHelpRegistrationOptions GetRegistrationOptions(SignatureHelpCapability capability, ClientCapabilities clientCapabilities) => new()
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("bbc"),
+            DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
             TriggerCharacters = new Container<string>("(", ","),
         };
     }
@@ -224,7 +225,7 @@ namespace LanguageServer.Handlers
 
         protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities) => new()
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("bbc"),
+            DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
             Legend = new SemanticTokensLegend
             {
                 TokenModifiers = capability.TokenModifiers,

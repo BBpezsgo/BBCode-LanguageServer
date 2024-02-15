@@ -4,11 +4,9 @@
 
     public abstract class SingleDocumentHandler
     {
-        public DocumentUri Uri;
-        public string Text;
-        public string LanguageId;
-
-        protected readonly Documents App;
+        public DocumentUri Uri => _uri;
+        public string Text => _text;
+        public string LanguageId => _languageId;
 
         public string Path
         {
@@ -20,27 +18,41 @@
                 return result;
             }
         }
+
+        string _languageId;
+        string _text;
+        DocumentUri _uri;
+
+        protected readonly Documents App;
+
         public SingleDocumentHandler(DocumentUri uri, string content, string languageId, Documents app)
         {
-            Uri = uri;
-            Text = content;
-            LanguageId = languageId;
+            _uri = uri;
+            _text = content;
+            _languageId = languageId;
             App = app;
         }
 
         public virtual void OnOpened(DidOpenTextDocumentParams e)
         {
-            Uri = e.TextDocument.Uri;
-            Text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
-            LanguageId = e.TextDocument.Extension();
+            _uri = e.TextDocument.Uri;
+            _text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
+            _languageId = e.TextDocument.Extension();
         }
+
         public virtual void OnChanged(DidChangeTextDocumentParams e)
         {
-            Uri = e.TextDocument.Uri;
-            Text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
-            LanguageId = e.TextDocument.Extension();
+            _uri = e.TextDocument.Uri;
+            _text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
+            _languageId = e.TextDocument.Extension();
         }
-        public abstract void OnSaved(DidSaveTextDocumentParams e);
+
+        public virtual void OnSaved(DidSaveTextDocumentParams e)
+        {
+            _uri = e.TextDocument.Uri;
+            _text = e.Text ?? string.Empty;
+            _languageId = e.TextDocument.Extension();
+        }
 
         public abstract Hover? Hover(HoverParams e);
         public abstract CodeLens[] CodeLens(CodeLensParams e);
@@ -54,7 +66,7 @@
 
     public class Documents
     {
-        public readonly OmniSharpService Interface;
+        readonly OmniSharpService Interface;
         readonly List<SingleDocumentHandler> documents;
 
         public Documents(OmniSharpService @interface)
@@ -64,11 +76,11 @@
         }
 
         /// <exception cref="ServiceException"/>
-        public static SingleDocumentHandler GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface)
+        public static SingleDocumentHandler GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface) => languageId switch
         {
-            if (languageId == "bbc") return new DocumentBBCode(uri, content, languageId, documentInterface);
-            throw new ServiceException($"Unknown language {languageId}");
-        }
+            DocumentBBCode.LanguageIdentifier => new DocumentBBCode(uri, content, languageId, documentInterface),
+            _ => throw new ServiceException($"Unknown language \"{languageId}\"")
+        };
 
         public void Initialize()
         {

@@ -1,16 +1,18 @@
-﻿#pragma warning disable IDE0052 // Remove unread private members
-#pragma warning disable IDE0051 // Remove unused private members
+﻿using LanguageCore;
+using LanguageCore.Compiler;
+using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Tokenizing;
+using Position = LanguageCore.Position;
+
+#pragma warning disable IDE0052 // Remove unread private members
 
 namespace LanguageServer.DocumentManagers
 {
-    using LanguageCore;
-    using LanguageCore.Compiler;
-    using LanguageCore.Parser;
-    using LanguageCore.Parser.Statement;
-    using LanguageCore.Tokenizing;
-
     internal class DocumentBBCode : SingleDocumentHandler
     {
+        public const string LanguageIdentifier = "bbc";
+
         Token[] Tokens;
 
         CompiledClass[] Classes;
@@ -22,8 +24,6 @@ namespace LanguageServer.DocumentManagers
 
         public DocumentBBCode(DocumentUri uri, string content, string languageId, Documents app) : base(uri, content, languageId, app)
         {
-            Validate();
-
             Tokens = Array.Empty<Token>();
 
             Classes = Array.Empty<CompiledClass>();
@@ -44,6 +44,15 @@ namespace LanguageServer.DocumentManagers
 
         public override void OnSaved(DidSaveTextDocumentParams e)
         {
+            base.OnSaved(e);
+
+            Validate();
+        }
+
+        public override void OnOpened(DidOpenTextDocumentParams e)
+        {
+            base.OnOpened(e);
+
             Validate();
         }
 
@@ -187,12 +196,105 @@ namespace LanguageServer.DocumentManagers
         {
             Logger.Log($"Hover({e.Position.ToCool().ToStringMin()})");
 
-            List<MarkedString> result = new();
-            Range<SinglePosition> range = new(e.Position.ToCool());
+            SinglePosition position = e.Position.ToCool();
+
+            Token? token = Tokens.GetTokenAt(position);
+
+            Range<SinglePosition> range = new(position);
+
+            List<MarkedString> contents = new();
+
+            if (token == null)
+            {
+                return new Hover()
+                {
+                    Contents = new MarkedStringsOrMarkupContent(),
+                    Range = range.ToOmniSharp(),
+                };
+            }
+
+            range = token.Position.Range;
+
+            CompiledFunction? function = GetFunctionAt(position);
+
+            if (function != null)
+            {
+                contents.Add(new MarkedString("csharp", $"{function.Type} {function.ToReadable()}"));
+            }
+
+            Statement? statement = AST.GetStatementAt(position);
+            if (statement is not null)
+            {
+                MarkedString? typeHover = null;
+                MarkedString? referenceHover = null;
+
+                static void HandleTypeHovering(Statement statement, ref MarkedString? typeHover, ref Range<SinglePosition> range)
+                {
+                    if (statement is not StatementWithValue statementWithValue ||
+                        statementWithValue.CompiledType is null)
+                    { return; }
+
+                    typeHover = new MarkedString("csharp", $"{statementWithValue.CompiledType}");
+                    range = statement.Position.Range;
+                }
+
+                static void HandleReferenceHovering(Statement statement, ref MarkedString? referenceHover, ref Range<SinglePosition> range)
+                {
+                    if (statement is IReferenceableTo _ref1)
+                    {
+                        if (_ref1.Reference is CompiledFunction compiledFunction &&
+                            compiledFunction.FilePath is not null)
+                        {
+                            referenceHover = new MarkedString("csharp", $"{compiledFunction.Type} {compiledFunction.ToReadable()}");
+                        }
+                        else if (_ref1.Reference is MacroDefinition macroDefinition &&
+                            macroDefinition.FilePath is not null)
+                        {
+                            referenceHover = new MarkedString("csharp", $"{macroDefinition.ToReadable()}");
+                        }
+                        else if (_ref1.Reference is CompiledGeneralFunction generalFunction &&
+                            generalFunction.FilePath is not null)
+                        {
+                            referenceHover = new MarkedString("csharp", $"{generalFunction.Type} {generalFunction.ToReadable()}");
+                        }
+                        else if (_ref1.Reference is CompiledVariable compiledVariable &&
+                                 compiledVariable.FilePath is not null)
+                        {
+                            referenceHover = new MarkedString("csharp", $"(variable) {compiledVariable.Type} {compiledVariable.VariableName}");
+                        }
+                        else if (_ref1.Reference is LanguageCore.BBCode.Generator.CompiledParameter compiledParameter &&
+                                 !compiledParameter.IsAnonymous)
+                        {
+                            referenceHover = new MarkedString("csharp", $"(parameter) {compiledParameter.Type} {compiledParameter.Identifier}");
+                        }
+                        else if (_ref1.Reference is CompiledField compiledField &&
+                                 compiledField.Class is not null &&
+                                 compiledField.Class.FilePath is not null)
+                        {
+                            referenceHover = new MarkedString("csharp", $"(field) {compiledField.Type} {compiledField.Identifier}");
+                        }
+                    }
+                }
+
+                HandleTypeHovering(statement, ref typeHover, ref range);
+                HandleReferenceHovering(statement, ref referenceHover, ref range);
+
+                foreach (Statement item in statement)
+                {
+                    if (!item.Position.Range.Contains(e.Position.ToCool()))
+                    { continue; }
+
+                    HandleTypeHovering(item, ref typeHover, ref range);
+                    HandleReferenceHovering(item, ref referenceHover, ref range);
+                }
+
+                if (typeHover is not null) contents.Add(typeHover);
+                if (referenceHover is not null) contents.Add(referenceHover);
+            }
 
             return new Hover()
             {
-                Contents = new MarkedStringsOrMarkupContent(result),
+                Contents = new MarkedStringsOrMarkupContent(contents),
                 Range = range.ToOmniSharp(),
             };
         }
@@ -223,7 +325,159 @@ namespace LanguageServer.DocumentManagers
         {
             Logger.Log($"GotoDefinition({e.Position.ToCool().ToStringMin()})");
 
-            return null;
+            List<LocationOrLocationLink> links = new();
+
+            foreach (UsingDefinition @using in AST.Usings)
+            {
+                if (!@using.Position.Range.Contains(e.Position.ToCool()))
+                { continue; }
+                if (@using.CompiledUri is null)
+                { break; }
+
+                links.Add(new LocationOrLocationLink(new LocationLink()
+                {
+                    TargetUri = DocumentUri.From(@using.CompiledUri),
+                    OriginSelectionRange = new Position(@using.Path).ToOmniSharp(),
+                    TargetRange = Position.Zero.ToOmniSharp(),
+                    TargetSelectionRange = Position.Zero.ToOmniSharp(),
+                }));
+                break;
+            }
+
+            Statement? statement = AST.GetStatementAt(e.Position.ToCool());
+            if (statement is not null)
+            {
+                foreach (Statement item in statement)
+                {
+                    if (!item.Position.Range.Contains(e.Position.ToCool()))
+                    { continue; }
+
+                    Position from = item.Position;
+
+                    if (item is AnyCall anyCall &&
+                        anyCall.PrevStatement is Field field)
+                    {
+                        from = field.FieldName.Position;
+                    }
+
+                    if (item is OperatorCall operatorCall)
+                    {
+                        from = operatorCall.Operator.Position;
+                    }
+
+                    if (item is IReferenceableTo _ref1)
+                    {
+                        if (_ref1.Reference is CompiledFunction compiledFunction &&
+                            compiledFunction.FilePath is not null)
+                        {
+                            links.Add(new LocationOrLocationLink(new LocationLink()
+                            {
+                                OriginSelectionRange = from.ToOmniSharp(),
+                                TargetRange = compiledFunction.Identifier.Position.ToOmniSharp(),
+                                TargetSelectionRange = compiledFunction.Identifier.Position.ToOmniSharp(),
+                                TargetUri = DocumentUri.From(compiledFunction.FilePath),
+                            }));
+                        }
+                        else if (_ref1.Reference is MacroDefinition macroDefinition &&
+                            macroDefinition.FilePath is not null)
+                        {
+                            links.Add(new LocationOrLocationLink(new LocationLink()
+                            {
+                                OriginSelectionRange = from.ToOmniSharp(),
+                                TargetRange = macroDefinition.Identifier.Position.ToOmniSharp(),
+                                TargetSelectionRange = macroDefinition.Identifier.Position.ToOmniSharp(),
+                                TargetUri = DocumentUri.From(macroDefinition.FilePath),
+                            }));
+                        }
+                        else if (_ref1.Reference is CompiledGeneralFunction generalFunction &&
+                            generalFunction.FilePath is not null)
+                        {
+                            links.Add(new LocationOrLocationLink(new LocationLink()
+                            {
+                                OriginSelectionRange = from.ToOmniSharp(),
+                                TargetRange = generalFunction.Identifier.Position.ToOmniSharp(),
+                                TargetSelectionRange = generalFunction.Identifier.Position.ToOmniSharp(),
+                                TargetUri = DocumentUri.From(generalFunction.FilePath),
+                            }));
+                        }
+                        else if (_ref1.Reference is CompiledVariable compiledVariable &&
+                                 compiledVariable.FilePath is not null)
+                        {
+                            links.Add(new LocationOrLocationLink(new LocationLink()
+                            {
+                                OriginSelectionRange = from.ToOmniSharp(),
+                                TargetRange = compiledVariable.VariableName.Position.ToOmniSharp(),
+                                TargetSelectionRange = compiledVariable.VariableName.Position.ToOmniSharp(),
+                                TargetUri = DocumentUri.From(compiledVariable.FilePath),
+                            }));
+                        }
+                        else if (_ref1.Reference is LanguageCore.BBCode.Generator.CompiledParameter compiledParameter &&
+                                 !compiledParameter.IsAnonymous)
+                        {
+                            links.Add(new LocationOrLocationLink(new LocationLink()
+                            {
+                                OriginSelectionRange = from.ToOmniSharp(),
+                                TargetRange = compiledParameter.Identifier.Position.ToOmniSharp(),
+                                TargetSelectionRange = compiledParameter.Identifier.Position.ToOmniSharp(),
+                                TargetUri = e.TextDocument.Uri,
+                            }));
+                        }
+                        else if (_ref1.Reference is CompiledField compiledField &&
+                                 compiledField.Class is not null &&
+                                 compiledField.Class.FilePath is not null)
+                        {
+                            links.Add(new LocationOrLocationLink(new LocationLink()
+                            {
+                                OriginSelectionRange = from.ToOmniSharp(),
+                                TargetRange = compiledField.Identifier.Position.ToOmniSharp(),
+                                TargetSelectionRange = compiledField.Identifier.Position.ToOmniSharp(),
+                                TargetUri = DocumentUri.From(compiledField.Class.FilePath),
+                            }));
+                        }
+                    }
+
+                    if (item is IReferenceableTo<CompiledFunction> _ref2 &&
+                        _ref2.Reference is not null &&
+                        _ref2.Reference.FilePath is not null)
+                    {
+                        links.Add(new LocationOrLocationLink(new LocationLink()
+                        {
+                            OriginSelectionRange = from.ToOmniSharp(),
+                            TargetRange = _ref2.Reference.Identifier.Position.ToOmniSharp(),
+                            TargetSelectionRange = _ref2.Reference.Identifier.Position.ToOmniSharp(),
+                            TargetUri = DocumentUri.From(_ref2.Reference.FilePath),
+                        }));
+                    }
+
+                    if (item is IReferenceableTo<CompiledOperator> _ref3 &&
+                        _ref3.Reference is not null &&
+                        _ref3.Reference.FilePath is not null)
+                    {
+                        links.Add(new LocationOrLocationLink(new LocationLink()
+                        {
+                            OriginSelectionRange = from.ToOmniSharp(),
+                            TargetRange = _ref3.Reference.Identifier.Position.ToOmniSharp(),
+                            TargetSelectionRange = _ref3.Reference.Identifier.Position.ToOmniSharp(),
+                            TargetUri = DocumentUri.From(_ref3.Reference.FilePath),
+                        }));
+                    }
+
+                    if (item is IReferenceableTo<CompiledGeneralFunction> _ref4 &&
+                        _ref4.Reference is not null &&
+                        _ref4.Reference.FilePath is not null)
+                    {
+                        links.Add(new LocationOrLocationLink(new LocationLink()
+                        {
+                            OriginSelectionRange = from.ToOmniSharp(),
+                            TargetRange = _ref4.Reference.Identifier.Position.ToOmniSharp(),
+                            TargetSelectionRange = _ref4.Reference.Identifier.Position.ToOmniSharp(),
+                            TargetUri = DocumentUri.From(_ref4.Reference.FilePath),
+                        }));
+                    }
+                }
+            }
+
+            return new LocationOrLocationLinks(links);
         }
 
         public override SymbolInformationOrDocumentSymbol[] Symbols(DocumentSymbolParams e)
@@ -381,9 +635,33 @@ namespace LanguageServer.DocumentManagers
                     case TokenAnalyzedType.Hash:
                     case TokenAnalyzedType.HashParameter:
                         break;
-                    case TokenAnalyzedType.None:
                     case TokenAnalyzedType.FieldName:
+                        break;
+                    case TokenAnalyzedType.None:
                     default:
+                        switch (token.TokenType)
+                        {
+                            case TokenType.Identifier:
+                                break;
+                            case TokenType.LiteralString:
+                            case TokenType.LiteralCharacter:
+                                builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.String, SemanticTokenModifier.Defaults);
+                                break;
+                            case TokenType.LiteralNumber:
+                            case TokenType.LiteralHex:
+                            case TokenType.LiteralBinary:
+                            case TokenType.LiteralFloat:
+                                builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Number, SemanticTokenModifier.Defaults);
+                                break;
+                            case TokenType.Operator:
+                                break;
+                            case TokenType.Comment:
+                            case TokenType.CommentMultiline:
+                                builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Comment, SemanticTokenModifier.Defaults);
+                                break;
+                            default:
+                                break;
+                        }
                         break;
                 }
             }

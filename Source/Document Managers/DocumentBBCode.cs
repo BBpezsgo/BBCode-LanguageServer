@@ -71,6 +71,89 @@ namespace LanguageServer.DocumentManagers
             return null;
         }
 
+        (TypeInstance, CompiledType)? GetTypeInstanceAt(SinglePosition position)
+        {
+            bool Handle1(CompiledType? type, out (TypeInstance, CompiledType) result)
+            {
+                result = default;
+                if (type is null) return false;
+                if (type.Origin is null) return false;
+                if (!type.Origin.Position.Range.Contains(position)) return false;
+
+                result = (type.Origin, type);
+                return true;
+            }
+
+            bool Handle2(Statement? statement, out (TypeInstance, CompiledType) result)
+            {
+                result = default;
+                if (statement is null) return false;
+
+                if (statement is TypeCast typeCast)
+                { return Handle3(typeCast.Type, typeCast.CompiledType, out result); }
+
+                if (statement is VariableDeclaration variableDeclaration)
+                { return Handle3(variableDeclaration.Type, variableDeclaration.CompiledType, out result); }
+
+                return false;
+            }
+
+            bool Handle3(TypeInstance? type1, CompiledType? type2, out (TypeInstance, CompiledType) result)
+            {
+                result = default;
+                if (type1 is null || type2 is null) return false;
+                if (!type1.Position.Range.Contains(position)) return false;
+
+                result = (type1, type2);
+                return true;
+            }
+
+            foreach (CompiledFunction function in Functions)
+            {
+                if (function.FilePath != Path)
+                { continue; }
+
+                if (Handle1(function.Type, out (TypeInstance, CompiledType) result1))
+                { return result1; }
+
+                foreach (CompiledType parameter in function.ParameterTypes)
+                {
+                    if (Handle1(parameter, out (TypeInstance, CompiledType) result2))
+                    { return result2; }
+                }
+            }
+
+            foreach (CompiledGeneralFunction function in GeneralFunctions)
+            {
+                if (function.FilePath != Path)
+                { continue; }
+
+                if (Handle1(function.Type, out (TypeInstance, CompiledType) result1))
+                { return result1; }
+
+                foreach (CompiledType parameter in function.ParameterTypes)
+                {
+                    if (Handle1(parameter, out (TypeInstance, CompiledType) result2))
+                    { return result2; }
+                }
+            }
+
+            Statement? statement = AST.GetStatementAt(position);
+            if (statement is not null)
+            {
+                if (Handle2(statement, out (TypeInstance, CompiledType) result1))
+                { return result1; }
+
+                foreach (Statement item in statement)
+                {
+                    if (Handle2(item, out (TypeInstance, CompiledType) result2))
+                    { return result2; }
+                }
+            }
+
+            return null;
+        }
+
         void Validate()
         {
             string path = Path;
@@ -215,11 +298,27 @@ namespace LanguageServer.DocumentManagers
 
             range = token.Position.Range;
 
-            CompiledFunction? function = GetFunctionAt(position);
-
-            if (function != null)
             {
-                contents.Add(new MarkedString("csharp", $"{function.Type} {function.ToReadable()}"));
+                CompiledFunction? function = GetFunctionAt(position);
+
+                if (function != null)
+                {
+                    contents.Add(new MarkedString("csharp", $"{function.Type} {function.ToReadable()}"));
+                }
+            }
+
+            static MarkedString GetTypeHover(CompiledType type)
+            {
+                if (type.IsClass)
+                { return new MarkedString("csharp", $"class {type.Name}"); }
+
+                if (type.IsStruct)
+                { return new MarkedString("csharp", $"struct {type.Name}"); }
+
+                if (type.IsEnum)
+                { return new MarkedString("csharp", $"enum {type.Name}"); }
+
+                return new MarkedString("csharp", type.ToString());
             }
 
             Statement? statement = AST.GetStatementAt(position);
@@ -234,7 +333,7 @@ namespace LanguageServer.DocumentManagers
                         statementWithValue.CompiledType is null)
                     { return; }
 
-                    typeHover = new MarkedString("csharp", $"{statementWithValue.CompiledType}");
+                    typeHover = GetTypeHover(statementWithValue.CompiledType);
                     range = statement.Position.Range;
                 }
 
@@ -290,6 +389,19 @@ namespace LanguageServer.DocumentManagers
 
                 if (typeHover is not null) contents.Add(typeHover);
                 if (referenceHover is not null) contents.Add(referenceHover);
+            }
+
+            {
+                (TypeInstance, CompiledType)? _type = GetTypeInstanceAt(e.Position.ToCool());
+
+                if (_type.HasValue)
+                {
+                    CompiledType type = _type.Value.Item2;
+                    TypeInstance origin = _type.Value.Item1;
+
+                    range = origin.Position.Range;
+                    contents.Add(GetTypeHover(type));
+                }
             }
 
             return new Hover()
@@ -349,21 +461,26 @@ namespace LanguageServer.DocumentManagers
             {
                 foreach (Statement item in statement)
                 {
-                    if (!item.Position.Range.Contains(e.Position.ToCool()))
-                    { continue; }
-
                     Position from = item.Position;
 
                     if (item is AnyCall anyCall &&
-                        anyCall.PrevStatement is Field field)
-                    {
-                        from = field.FieldName.Position;
-                    }
+                        anyCall.PrevStatement is Field field1)
+                    { from = field1.FieldName.Position; }
 
                     if (item is OperatorCall operatorCall)
-                    {
-                        from = operatorCall.Operator.Position;
-                    }
+                    { from = operatorCall.Operator.Position; }
+
+                    if (item is Field field2)
+                    { from = field2.FieldName.Position; }
+
+                    if (item is ConstructorCall constructorCall)
+                    { from = new Position(constructorCall.Keyword, constructorCall.TypeName); }
+
+                    if (item is NewInstance newInstance)
+                    { from = new Position(newInstance.Keyword, newInstance.TypeName); }
+
+                    if (!from.Range.Contains(e.Position.ToCool()))
+                    { continue; }
 
                     if (item is IReferenceableTo _ref1)
                     {
@@ -477,6 +594,49 @@ namespace LanguageServer.DocumentManagers
                 }
             }
 
+            {
+                (TypeInstance, CompiledType)? _type = GetTypeInstanceAt(e.Position.ToCool());
+
+                if (_type.HasValue)
+                {
+                    CompiledType type = _type.Value.Item2;
+                    TypeInstance origin = _type.Value.Item1;
+
+                    if (type.IsClass && type.Class.FilePath != null)
+                    {
+                        links.Add(new LocationOrLocationLink(new LocationLink()
+                        {
+                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            TargetRange = type.Class.Name.Position.ToOmniSharp(),
+                            TargetSelectionRange = type.Class.Name.Position.ToOmniSharp(),
+                            TargetUri = DocumentUri.From(type.Class.FilePath),
+                        }));
+                    }
+
+                    if (type.IsStruct && type.Struct.FilePath != null)
+                    {
+                        links.Add(new LocationOrLocationLink(new LocationLink()
+                        {
+                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            TargetRange = type.Struct.Name.Position.ToOmniSharp(),
+                            TargetSelectionRange = type.Struct.Name.Position.ToOmniSharp(),
+                            TargetUri = DocumentUri.From(type.Struct.FilePath),
+                        }));
+                    }
+
+                    if (type.IsEnum && type.Enum.FilePath != null)
+                    {
+                        links.Add(new LocationOrLocationLink(new LocationLink()
+                        {
+                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            TargetRange = type.Enum.Identifier.Position.ToOmniSharp(),
+                            TargetSelectionRange = type.Enum.Identifier.Position.ToOmniSharp(),
+                            TargetUri = DocumentUri.From(type.Enum.FilePath),
+                        }));
+                    }
+                }
+            }
+
             return new LocationOrLocationLinks(links);
         }
 
@@ -488,7 +648,8 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledFunction function in Functions)
             {
-                if (function.FilePath != null && function.FilePath.Replace('\\', '/') != e.TextDocument.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
+                DocumentUri? uri = function.FilePath is null ? null : DocumentUri.File(function.FilePath);
+                if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
                 result.Add(new SymbolInformation()
                 {
@@ -497,14 +658,32 @@ namespace LanguageServer.DocumentManagers
                     Location = new Location()
                     {
                         Range = function.Position.Range.ToOmniSharp(),
-                        Uri = function.FilePath is null ? e.TextDocument.Uri : new Uri($"file:///{function.FilePath.Replace('\\', '/')}", UriKind.Absolute),
+                        Uri = uri ?? e.TextDocument.Uri,
+                    },
+                });
+            }
+
+            foreach (CompiledGeneralFunction function in GeneralFunctions)
+            {
+                DocumentUri? uri = function.FilePath is null ? null : DocumentUri.File(function.FilePath);
+                if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
+
+                result.Add(new SymbolInformation()
+                {
+                    Kind = SymbolKind.Function,
+                    Name = function.Identifier.Content,
+                    Location = new Location()
+                    {
+                        Range = function.Position.Range.ToOmniSharp(),
+                        Uri = uri ?? e.TextDocument.Uri,
                     },
                 });
             }
 
             foreach (CompiledClass @class in Classes)
             {
-                if (@class.FilePath != null && @class.FilePath.Replace('\\', '/') != e.TextDocument.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
+                DocumentUri? uri = @class.FilePath is null ? null : DocumentUri.File(@class.FilePath);
+                if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
                 result.Add(new SymbolInformation()
                 {
@@ -513,14 +692,15 @@ namespace LanguageServer.DocumentManagers
                     Location = new Location()
                     {
                         Range = @class.Position.ToOmniSharp(),
-                        Uri = @class.FilePath is null ? e.TextDocument.Uri : new Uri($"file:///{@class.FilePath.Replace('\\', '/')}", UriKind.Absolute),
+                        Uri = uri ?? e.TextDocument.Uri,
                     },
                 });
             }
 
             foreach (CompiledStruct @struct in Structs)
             {
-                if (@struct.FilePath != null && @struct.FilePath.Replace('\\', '/') != e.TextDocument.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
+                DocumentUri? uri = @struct.FilePath is null ? null : DocumentUri.File(@struct.FilePath);
+                if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
                 result.Add(new SymbolInformation()
                 {
@@ -529,14 +709,15 @@ namespace LanguageServer.DocumentManagers
                     Location = new Location()
                     {
                         Range = @struct.Position.ToOmniSharp(),
-                        Uri = @struct.FilePath is null ? e.TextDocument.Uri : new Uri($"file:///{@struct.FilePath.Replace('\\', '/')}", UriKind.Absolute),
+                        Uri = uri ?? e.TextDocument.Uri,
                     },
                 });
             }
 
             foreach (CompiledEnum @enum in Enums)
             {
-                if (@enum.FilePath != null && @enum.FilePath.Replace('\\', '/') != e.TextDocument.Uri.ToString().Replace("file:///", string.Empty).Replace('\\', '/')) continue;
+                DocumentUri? uri = @enum.FilePath is null ? null : DocumentUri.File(@enum.FilePath);
+                if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
                 result.Add(new SymbolInformation()
                 {
@@ -545,7 +726,7 @@ namespace LanguageServer.DocumentManagers
                     Location = new Location()
                     {
                         Range = @enum.Position.ToOmniSharp(),
-                        Uri = @enum.FilePath is null ? e.TextDocument.Uri : new Uri($"file:///{@enum.FilePath.Replace('\\', '/')}", UriKind.Absolute),
+                        Uri = uri ?? e.TextDocument.Uri,
                     },
                 });
             }

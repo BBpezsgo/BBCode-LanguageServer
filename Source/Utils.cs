@@ -1,6 +1,7 @@
 ﻿namespace LanguageServer
 {
     using LanguageCore;
+    using LanguageCore.Parser;
 
     public class ServiceException : Exception
     {
@@ -10,6 +11,9 @@
 
     public static class Extensions
     {
+        public static DocumentUri? Uri(this FunctionThingDefinition function)
+            => function.FilePath is null ? null : DocumentUri.File(function.FilePath);
+
         public static TValue GetOrAdd<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key, TValue value) where TKey : notnull
         {
             if (self.TryGetValue(key, out TValue? _value))

@@ -16,6 +16,11 @@
                 await Console.Error.WriteLineAsync(ex.InnerExceptions[0].ToString());
                 return -1;
             }
+            catch (Exception ex)
+            {
+                await Console.Error.WriteLineAsync(ex.ToString());
+                return -1;
+            }
         }
     }
 }

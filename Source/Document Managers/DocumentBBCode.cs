@@ -5,8 +5,6 @@ using LanguageCore.Parser.Statement;
 using LanguageCore.Tokenizing;
 using Position = LanguageCore.Position;
 
-#pragma warning disable IDE0052 // Remove unread private members
-
 namespace LanguageServer.DocumentManagers
 {
     internal class DocumentBBCode : SingleDocumentHandler
@@ -14,25 +12,14 @@ namespace LanguageServer.DocumentManagers
         public const string LanguageIdentifier = "bbc";
 
         Token[] Tokens;
-
-        CompiledClass[] Classes;
-        CompiledStruct[] Structs;
-        CompiledEnum[] Enums;
-        CompiledFunction[] Functions;
-        CompiledGeneralFunction[] GeneralFunctions;
         ParserResult AST;
+        CompilerResult CompilerResult;
 
         public DocumentBBCode(DocumentUri uri, string content, string languageId, Documents app) : base(uri, content, languageId, app)
         {
             Tokens = Array.Empty<Token>();
-
-            Classes = Array.Empty<CompiledClass>();
-            Structs = Array.Empty<CompiledStruct>();
-            Enums = Array.Empty<CompiledEnum>();
-            Functions = Array.Empty<CompiledFunction>();
-            GeneralFunctions = Array.Empty<CompiledGeneralFunction>();
-
             AST = ParserResult.Empty;
+            CompilerResult = CompilerResult.Empty;
         }
 
         public override void OnChanged(DidChangeTextDocumentParams e)
@@ -54,21 +41,6 @@ namespace LanguageServer.DocumentManagers
             base.OnOpened(e);
 
             Validate();
-        }
-
-        CompiledFunction? GetFunctionAt(SinglePosition position)
-        {
-            for (int i = 0; i < Functions.Length; i++)
-            {
-                if (Functions[i].FilePath != Path)
-                { continue; }
-
-                if (!Functions[i].Identifier.Position.Range.Contains(position))
-                { continue; }
-
-                return Functions[i];
-            }
-            return null;
         }
 
         (TypeInstance, CompiledType)? GetTypeInstanceAt(SinglePosition position)
@@ -108,7 +80,7 @@ namespace LanguageServer.DocumentManagers
                 return true;
             }
 
-            foreach (CompiledFunction function in Functions)
+            foreach (CompiledFunction function in CompilerResult.Functions)
             {
                 if (function.FilePath != Path)
                 { continue; }
@@ -123,7 +95,7 @@ namespace LanguageServer.DocumentManagers
                 }
             }
 
-            foreach (CompiledGeneralFunction function in GeneralFunctions)
+            foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
             {
                 if (function.FilePath != Path)
                 { continue; }
@@ -173,14 +145,8 @@ namespace LanguageServer.DocumentManagers
             AnalysisResult analysisResult = Analysis.Analyze(file);
 
             Tokens = analysisResult.Tokens;
-
             AST = analysisResult.AST;
-
-            Structs = analysisResult.Structs;
-            Classes = analysisResult.Classes;
-            Enums = analysisResult.Enums;
-            Functions = analysisResult.Functions;
-            GeneralFunctions = analysisResult.GeneralFunctions;
+            CompilerResult = analysisResult.CompilerResult ?? CompilerResult.Empty;
 
             foreach (KeyValuePair<string, List<Diagnostic>> diagnostics in analysisResult.Diagnostics)
             {
@@ -200,7 +166,7 @@ namespace LanguageServer.DocumentManagers
 
             List<CompletionItem> result = new();
 
-            foreach (CompiledFunction function in Functions)
+            foreach (CompiledFunction function in CompilerResult.Functions)
             {
                 if (function.Context != null) continue;
 
@@ -214,7 +180,7 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (CompiledEnum @enum in Enums)
+            foreach (CompiledEnum @enum in CompilerResult.Enums)
             {
                 result.Add(new CompletionItem()
                 {
@@ -226,32 +192,32 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (CompiledClass @class in Classes)
+            foreach (CompiledClass @class in CompilerResult.Classes)
             {
                 result.Add(new CompletionItem()
                 {
                     Deprecated = false,
                     Detail = null,
                     Kind = CompletionItemKind.Class,
-                    Label = @class.Name.Content,
+                    Label = @class.Identifier.Content,
                     Preselect = false,
                 });
             }
 
-            foreach (CompiledStruct @struct in Structs)
+            foreach (CompiledStruct @struct in CompilerResult.Structs)
             {
                 result.Add(new CompletionItem()
                 {
                     Deprecated = false,
                     Detail = null,
                     Kind = CompletionItemKind.Struct,
-                    Label = @struct.Name.Content,
+                    Label = @struct.Identifier.Content,
                     Preselect = false,
                 });
             }
 
             SinglePosition position = e.Position.ToCool();
-            foreach (CompiledFunction function in Functions)
+            foreach (CompiledFunction function in CompilerResult.Functions)
             {
                 if (function.Block == null) continue;
                 if (function.Block.Position.Range.Contains(position))
@@ -275,50 +241,68 @@ namespace LanguageServer.DocumentManagers
             return result.ToArray();
         }
 
-        public override Hover Hover(HoverParams e)
+        public override Hover? Hover(HoverParams e)
         {
             Logger.Log($"Hover({e.Position.ToCool().ToStringMin()})");
 
             SinglePosition position = e.Position.ToCool();
 
             Token? token = Tokens.GetTokenAt(position);
-
-            Range<SinglePosition> range = new(position);
-
             List<MarkedString> contents = new();
 
             if (token == null)
+            { return null; }
+
+            Range<SinglePosition> range = token.Position.Range;
+
             {
-                return new Hover()
-                {
-                    Contents = new MarkedStringsOrMarkupContent(),
-                    Range = range.ToOmniSharp(),
-                };
+                CompiledFunction? function = CompilerResult.GetFunctionAt(Path, position);
+                if (function != null)
+                { contents.Add(new MarkedString("bbcode", $"{function.Type} {function.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
             }
 
-            range = token.Position.Range;
+            {
+                CompiledGeneralFunction? function = CompilerResult.GetGeneralFunctionAt(Path, position);
+                if (function != null)
+                { contents.Add(new MarkedString("bbcode", $"{function.Type} {function.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
+            }
 
             {
-                CompiledFunction? function = GetFunctionAt(position);
+                CompiledOperator? @operator = CompilerResult.GetOperatorAt(Path, position);
+                if (@operator != null)
+                { contents.Add(new MarkedString("bbcode", $"{@operator.Type} {@operator.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
+            }
 
-                if (function != null)
-                {
-                    contents.Add(new MarkedString("csharp", $"{function.Type} {function.ToReadable()}"));
-                }
+            {
+                CompiledClass? @class = CompilerResult.GetClassAt(Path, position);
+                if (@class != null)
+                { contents.Add(new MarkedString("bbcode", @class.ToString())); }
+            }
+
+            {
+                CompiledStruct? @struct = CompilerResult.GetStructAt(Path, position);
+                if (@struct != null)
+                { contents.Add(new MarkedString("bbcode", @struct.ToString())); }
+            }
+
+            {
+                CompiledEnum? @enum = CompilerResult.GetEnumAt(Path, position);
+                if (@enum != null)
+                { contents.Add(new MarkedString("bbcode", @enum.ToString())); }
             }
 
             static MarkedString GetTypeHover(CompiledType type)
             {
                 if (type.IsClass)
-                { return new MarkedString("csharp", $"class {type.Name}"); }
+                { return new MarkedString("bbcode", $"class {type.Name}"); }
 
                 if (type.IsStruct)
-                { return new MarkedString("csharp", $"struct {type.Name}"); }
+                { return new MarkedString("bbcode", $"struct {type.Name}"); }
 
                 if (type.IsEnum)
-                { return new MarkedString("csharp", $"enum {type.Name}"); }
+                { return new MarkedString("bbcode", $"enum {type.Name}"); }
 
-                return new MarkedString("csharp", type.ToString());
+                return new MarkedString("bbcode", type.ToString());
             }
 
             Statement? statement = AST.GetStatementAt(position);
@@ -341,36 +325,41 @@ namespace LanguageServer.DocumentManagers
                 {
                     if (statement is IReferenceableTo _ref1)
                     {
-                        if (_ref1.Reference is CompiledFunction compiledFunction &&
+                        if (_ref1.Reference is CompiledOperator compiledOperator &&
+                            compiledOperator.FilePath is not null)
+                        {
+                            referenceHover = new MarkedString("bbcode", $"{compiledOperator.Type} {compiledOperator.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}");
+                        }
+                        else if (_ref1.Reference is CompiledFunction compiledFunction &&
                             compiledFunction.FilePath is not null)
                         {
-                            referenceHover = new MarkedString("csharp", $"{compiledFunction.Type} {compiledFunction.ToReadable()}");
+                            referenceHover = new MarkedString("bbcode", $"{compiledFunction.Type} {compiledFunction.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}");
                         }
                         else if (_ref1.Reference is MacroDefinition macroDefinition &&
                             macroDefinition.FilePath is not null)
                         {
-                            referenceHover = new MarkedString("csharp", $"{macroDefinition.ToReadable()}");
+                            referenceHover = new MarkedString("bbcode", $"{macroDefinition.ToReadable()}");
                         }
                         else if (_ref1.Reference is CompiledGeneralFunction generalFunction &&
                             generalFunction.FilePath is not null)
                         {
-                            referenceHover = new MarkedString("csharp", $"{generalFunction.Type} {generalFunction.ToReadable()}");
+                            referenceHover = new MarkedString("bbcode", $"{generalFunction.Type} {generalFunction.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}");
                         }
                         else if (_ref1.Reference is CompiledVariable compiledVariable &&
                                  compiledVariable.FilePath is not null)
                         {
-                            referenceHover = new MarkedString("csharp", $"(variable) {compiledVariable.Type} {compiledVariable.VariableName}");
+                            referenceHover = new MarkedString("bbcode", $"(variable) {compiledVariable.Type} {compiledVariable.VariableName}");
                         }
                         else if (_ref1.Reference is LanguageCore.BBCode.Generator.CompiledParameter compiledParameter &&
                                  !compiledParameter.IsAnonymous)
                         {
-                            referenceHover = new MarkedString("csharp", $"(parameter) {compiledParameter.Type} {compiledParameter.Identifier}");
+                            referenceHover = new MarkedString("bbcode", $"(parameter) {compiledParameter.Type} {compiledParameter.Identifier}");
                         }
                         else if (_ref1.Reference is CompiledField compiledField &&
                                  compiledField.Class is not null &&
                                  compiledField.Class.FilePath is not null)
                         {
-                            referenceHover = new MarkedString("csharp", $"(field) {compiledField.Type} {compiledField.Identifier}");
+                            referenceHover = new MarkedString("bbcode", $"(field) {compiledField.Type} {compiledField.Identifier}");
                         }
                     }
                 }
@@ -415,7 +404,67 @@ namespace LanguageServer.DocumentManagers
         {
             List<CodeLens> result = new();
 
-            foreach (CompiledFunction function in Functions)
+            foreach (CompiledFunction function in CompilerResult.Functions)
+            {
+                if (function.FilePath != Path)
+                { continue; }
+
+                result.Add(new CodeLens()
+                {
+                    Range = function.Identifier.Position.Range.ToOmniSharp(),
+                    Command = new Command()
+                    {
+                        Title = $"{function.References.Count} reference",
+                    },
+                });
+            }
+
+            foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
+            {
+                if (function.FilePath != Path)
+                { continue; }
+
+                result.Add(new CodeLens()
+                {
+                    Range = function.Identifier.Position.Range.ToOmniSharp(),
+                    Command = new Command()
+                    {
+                        Title = $"{function.References.Count} reference",
+                    },
+                });
+            }
+
+            foreach (CompiledOperator function in CompilerResult.Operators)
+            {
+                if (function.FilePath != Path)
+                { continue; }
+
+                result.Add(new CodeLens()
+                {
+                    Range = function.Identifier.Position.Range.ToOmniSharp(),
+                    Command = new Command()
+                    {
+                        Title = $"{function.ReferencesOperator.Count} reference",
+                    },
+                });
+            }
+
+            foreach (CompiledClass function in CompilerResult.Classes)
+            {
+                if (function.FilePath != Path)
+                { continue; }
+
+                result.Add(new CodeLens()
+                {
+                    Range = function.Identifier.Position.Range.ToOmniSharp(),
+                    Command = new Command()
+                    {
+                        Title = $"{function.References.Count} reference",
+                    },
+                });
+            }
+
+            foreach (CompiledStruct function in CompilerResult.Structs)
             {
                 if (function.FilePath != Path)
                 { continue; }
@@ -607,8 +656,8 @@ namespace LanguageServer.DocumentManagers
                         links.Add(new LocationOrLocationLink(new LocationLink()
                         {
                             OriginSelectionRange = origin.Position.ToOmniSharp(),
-                            TargetRange = type.Class.Name.Position.ToOmniSharp(),
-                            TargetSelectionRange = type.Class.Name.Position.ToOmniSharp(),
+                            TargetRange = type.Class.Identifier.Position.ToOmniSharp(),
+                            TargetSelectionRange = type.Class.Identifier.Position.ToOmniSharp(),
                             TargetUri = DocumentUri.From(type.Class.FilePath),
                         }));
                     }
@@ -618,8 +667,8 @@ namespace LanguageServer.DocumentManagers
                         links.Add(new LocationOrLocationLink(new LocationLink()
                         {
                             OriginSelectionRange = origin.Position.ToOmniSharp(),
-                            TargetRange = type.Struct.Name.Position.ToOmniSharp(),
-                            TargetSelectionRange = type.Struct.Name.Position.ToOmniSharp(),
+                            TargetRange = type.Struct.Identifier.Position.ToOmniSharp(),
+                            TargetSelectionRange = type.Struct.Identifier.Position.ToOmniSharp(),
                             TargetUri = DocumentUri.From(type.Struct.FilePath),
                         }));
                     }
@@ -646,7 +695,7 @@ namespace LanguageServer.DocumentManagers
 
             List<SymbolInformationOrDocumentSymbol> result = new();
 
-            foreach (CompiledFunction function in Functions)
+            foreach (CompiledFunction function in CompilerResult.Functions)
             {
                 DocumentUri? uri = function.FilePath is null ? null : DocumentUri.File(function.FilePath);
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -663,7 +712,7 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (CompiledGeneralFunction function in GeneralFunctions)
+            foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
             {
                 DocumentUri? uri = function.FilePath is null ? null : DocumentUri.File(function.FilePath);
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -680,7 +729,7 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (CompiledClass @class in Classes)
+            foreach (CompiledClass @class in CompilerResult.Classes)
             {
                 DocumentUri? uri = @class.FilePath is null ? null : DocumentUri.File(@class.FilePath);
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -688,7 +737,7 @@ namespace LanguageServer.DocumentManagers
                 result.Add(new SymbolInformation()
                 {
                     Kind = SymbolKind.Class,
-                    Name = @class.Name.Content,
+                    Name = @class.Identifier.Content,
                     Location = new Location()
                     {
                         Range = @class.Position.ToOmniSharp(),
@@ -697,7 +746,7 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (CompiledStruct @struct in Structs)
+            foreach (CompiledStruct @struct in CompilerResult.Structs)
             {
                 DocumentUri? uri = @struct.FilePath is null ? null : DocumentUri.File(@struct.FilePath);
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -705,7 +754,7 @@ namespace LanguageServer.DocumentManagers
                 result.Add(new SymbolInformation()
                 {
                     Kind = SymbolKind.Struct,
-                    Name = @struct.Name.Content,
+                    Name = @struct.Identifier.Content,
                     Location = new Location()
                     {
                         Range = @struct.Position.ToOmniSharp(),
@@ -714,7 +763,7 @@ namespace LanguageServer.DocumentManagers
                 });
             }
 
-            foreach (CompiledEnum @enum in Enums)
+            foreach (CompiledEnum @enum in CompilerResult.Enums)
             {
                 DocumentUri? uri = @enum.FilePath is null ? null : DocumentUri.File(@enum.FilePath);
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -740,18 +789,88 @@ namespace LanguageServer.DocumentManagers
 
             List<Location> result = new();
 
-            CompiledFunction? function = GetFunctionAt(e.Position.ToCool());
-            if (function is not null)
             {
-                for (int i = 0; i < function.References.Count; i++)
+                CompiledFunction? function = CompilerResult.GetFunctionAt(Path, e.Position.ToCool());
+                if (function is not null)
                 {
-                    Reference<Statement> reference = function.References[i];
-                    if (reference.SourceFile == null) continue;
-                    result.Add(new Location()
+                    for (int i = 0; i < function.References.Count; i++)
                     {
-                        Range = reference.Source.Position.ToOmniSharp(),
-                        Uri = reference.SourceFile,
-                    });
+                        Reference<Statement> reference = function.References[i];
+                        if (reference.SourceFile == null) continue;
+                        result.Add(new Location()
+                        {
+                            Range = reference.Source.Position.ToOmniSharp(),
+                            Uri = reference.SourceFile,
+                        });
+                    }
+                }
+            }
+
+            {
+                CompiledGeneralFunction? generalFunction = CompilerResult.GetGeneralFunctionAt(Path, e.Position.ToCool());
+                if (generalFunction is not null)
+                {
+                    for (int i = 0; i < generalFunction.References.Count; i++)
+                    {
+                        Reference<Statement> reference = generalFunction.References[i];
+                        if (reference.SourceFile == null) continue;
+                        result.Add(new Location()
+                        {
+                            Range = reference.Source.Position.ToOmniSharp(),
+                            Uri = reference.SourceFile,
+                        });
+                    }
+                }
+            }
+
+            {
+                CompiledOperator? @operator = CompilerResult.GetOperatorAt(Path, e.Position.ToCool());
+                if (@operator is not null)
+                {
+                    for (int i = 0; i < @operator.ReferencesOperator.Count; i++)
+                    {
+                        Reference<OperatorCall> reference = @operator.ReferencesOperator[i];
+                        if (reference.SourceFile == null) continue;
+                        result.Add(new Location()
+                        {
+                            Range = reference.Source.Position.ToOmniSharp(),
+                            Uri = reference.SourceFile,
+                        });
+                    }
+                }
+            }
+
+            {
+                CompiledClass? @class = CompilerResult.GetClassAt(Path, e.Position.ToCool());
+                if (@class is not null)
+                {
+                    for (int i = 0; i < @class.References.Count; i++)
+                    {
+                        Reference<TypeInstance> reference = @class.References[i];
+                        if (reference.SourceFile == null) continue;
+                        result.Add(new Location()
+                        {
+                            Range = reference.Source.Position.ToOmniSharp(),
+                            Uri = reference.SourceFile,
+                        });
+                    }
+                }
+            }
+
+            {
+                CompiledStruct? @struct = CompilerResult.GetStructAt(Path, e.Position.ToCool());
+                if (@struct is not null)
+                {
+                    for (int i = 0; i < @struct.References.Count; i++)
+                    {
+                        Reference<TypeInstance> reference = @struct.References[i];
+                        if (reference.SourceFile == null) continue;
+                        result.Add(new Location()
+                        {
+                            Range = reference.Source.Position.ToOmniSharp(),
+                            Uri = reference.SourceFile,
+                        });
+                    }
                 }
             }
 

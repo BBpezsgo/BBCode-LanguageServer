@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <BaseOutputPath>C:\Users\bazsi\Documents\GitHub\InterpreterVSCodeExtension\language-server</BaseOutputPath>
+    <BaseOutputPath>C:\Users\bazsi\Documents\GitHub\InterpreterVSCodeExtension\out\language-server</BaseOutputPath>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <ApplicationIcon>ls.ico</ApplicationIcon>

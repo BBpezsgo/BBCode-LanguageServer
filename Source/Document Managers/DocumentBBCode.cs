@@ -113,10 +113,7 @@ namespace LanguageServer.DocumentManagers
             Statement? statement = AST.GetStatementAt(position);
             if (statement is not null)
             {
-                if (Handle2(statement, out (TypeInstance, CompiledType) result1))
-                { return result1; }
-
-                foreach (Statement item in statement)
+                foreach (Statement item in statement.GetStatementsRecursively(true))
                 {
                     if (Handle2(item, out (TypeInstance, CompiledType) result2))
                     { return result2; }
@@ -364,10 +361,7 @@ namespace LanguageServer.DocumentManagers
                     }
                 }
 
-                HandleTypeHovering(statement, ref typeHover, ref range);
-                HandleReferenceHovering(statement, ref referenceHover, ref range);
-
-                foreach (Statement item in statement)
+                foreach (Statement item in statement.GetStatementsRecursively(true))
                 {
                     if (!item.Position.Range.Contains(e.Position.ToCool()))
                     { continue; }
@@ -508,7 +502,7 @@ namespace LanguageServer.DocumentManagers
             Statement? statement = AST.GetStatementAt(e.Position.ToCool());
             if (statement is not null)
             {
-                foreach (Statement item in statement)
+                foreach (Statement item in statement.GetStatementsRecursively(true))
                 {
                     Position from = item.Position;
 

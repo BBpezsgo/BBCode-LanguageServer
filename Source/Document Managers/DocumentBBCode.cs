@@ -165,8 +165,6 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledFunction function in CompilerResult.Functions)
             {
-                if (function.Context != null) continue;
-
                 result.Add(new CompletionItem()
                 {
                     Deprecated = false,
@@ -185,18 +183,6 @@ namespace LanguageServer.DocumentManagers
                     Detail = null,
                     Kind = CompletionItemKind.Enum,
                     Label = @enum.Identifier.Content,
-                    Preselect = false,
-                });
-            }
-
-            foreach (CompiledClass @class in CompilerResult.Classes)
-            {
-                result.Add(new CompletionItem()
-                {
-                    Deprecated = false,
-                    Detail = null,
-                    Kind = CompletionItemKind.Class,
-                    Label = @class.Identifier.Content,
                     Preselect = false,
                 });
             }
@@ -271,12 +257,6 @@ namespace LanguageServer.DocumentManagers
             }
 
             {
-                CompiledClass? @class = CompilerResult.GetClassAt(Path, position);
-                if (@class != null)
-                { contents.Add(new MarkedString("bbcode", @class.ToString())); }
-            }
-
-            {
                 CompiledStruct? @struct = CompilerResult.GetStructAt(Path, position);
                 if (@struct != null)
                 { contents.Add(new MarkedString("bbcode", @struct.ToString())); }
@@ -290,9 +270,6 @@ namespace LanguageServer.DocumentManagers
 
             static MarkedString GetTypeHover(CompiledType type)
             {
-                if (type.IsClass)
-                { return new MarkedString("bbcode", $"class {type.Name}"); }
-
                 if (type.IsStruct)
                 { return new MarkedString("bbcode", $"struct {type.Name}"); }
 
@@ -439,21 +416,6 @@ namespace LanguageServer.DocumentManagers
                     Command = new Command()
                     {
                         Title = $"{function.ReferencesOperator.Count} reference",
-                    },
-                });
-            }
-
-            foreach (CompiledClass function in CompilerResult.Classes)
-            {
-                if (function.FilePath != Path)
-                { continue; }
-
-                result.Add(new CodeLens()
-                {
-                    Range = function.Identifier.Position.Range.ToOmniSharp(),
-                    Command = new Command()
-                    {
-                        Title = $"{function.References.Count} reference",
                     },
                 });
             }
@@ -645,17 +607,6 @@ namespace LanguageServer.DocumentManagers
                     CompiledType type = _type.Value.Item2;
                     TypeInstance origin = _type.Value.Item1;
 
-                    if (type.IsClass && type.Class.FilePath != null)
-                    {
-                        links.Add(new LocationOrLocationLink(new LocationLink()
-                        {
-                            OriginSelectionRange = origin.Position.ToOmniSharp(),
-                            TargetRange = type.Class.Identifier.Position.ToOmniSharp(),
-                            TargetSelectionRange = type.Class.Identifier.Position.ToOmniSharp(),
-                            TargetUri = DocumentUri.From(type.Class.FilePath),
-                        }));
-                    }
-
                     if (type.IsStruct && type.Struct.FilePath != null)
                     {
                         links.Add(new LocationOrLocationLink(new LocationLink()
@@ -718,23 +669,6 @@ namespace LanguageServer.DocumentManagers
                     Location = new Location()
                     {
                         Range = function.Position.Range.ToOmniSharp(),
-                        Uri = uri ?? e.TextDocument.Uri,
-                    },
-                });
-            }
-
-            foreach (CompiledClass @class in CompilerResult.Classes)
-            {
-                DocumentUri? uri = @class.FilePath is null ? null : DocumentUri.File(@class.FilePath);
-                if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
-
-                result.Add(new SymbolInformation()
-                {
-                    Kind = SymbolKind.Class,
-                    Name = @class.Identifier.Content,
-                    Location = new Location()
-                    {
-                        Range = @class.Position.ToOmniSharp(),
                         Uri = uri ?? e.TextDocument.Uri,
                     },
                 });
@@ -824,23 +758,6 @@ namespace LanguageServer.DocumentManagers
                     for (int i = 0; i < @operator.ReferencesOperator.Count; i++)
                     {
                         Reference<OperatorCall> reference = @operator.ReferencesOperator[i];
-                        if (reference.SourceFile == null) continue;
-                        result.Add(new Location()
-                        {
-                            Range = reference.Source.Position.ToOmniSharp(),
-                            Uri = reference.SourceFile,
-                        });
-                    }
-                }
-            }
-
-            {
-                CompiledClass? @class = CompilerResult.GetClassAt(Path, e.Position.ToCool());
-                if (@class is not null)
-                {
-                    for (int i = 0; i < @class.References.Count; i++)
-                    {
-                        Reference<TypeInstance> reference = @class.References[i];
                         if (reference.SourceFile == null) continue;
                         result.Add(new Location()
                         {

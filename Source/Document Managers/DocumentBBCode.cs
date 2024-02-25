@@ -82,7 +82,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledFunction function in CompilerResult.Functions)
             {
-                if (function.FilePath != Path)
+                if (function.FilePath != Uri)
                 { continue; }
 
                 if (Handle1(function.Type, out (TypeInstance, CompiledType) result1))
@@ -97,7 +97,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
             {
-                if (function.FilePath != Path)
+                if (function.FilePath != Uri)
                 { continue; }
 
                 if (Handle1(function.Type, out (TypeInstance, CompiledType) result1))
@@ -125,33 +125,21 @@ namespace LanguageServer.DocumentManagers
 
         void Validate()
         {
-            string path = Path;
+            Logger.Log($"Validating \"{Uri}\" ...");
 
-            Logger.Log($"Validating \"{path}\" ...");
-
-            if (Uri.Scheme != "file") return;
-
-            if (!System.IO.File.Exists(path))
-            {
-                Logger.Warn($"File \"{path}\" not found");
-                return;
-            }
-
-            System.IO.FileInfo file = new(path);
-
-            AnalysisResult analysisResult = Analysis.Analyze(file);
+            AnalysisResult analysisResult = Analysis.Analyze(Uri);
 
             Tokens = analysisResult.Tokens;
             AST = analysisResult.AST;
             CompilerResult = analysisResult.CompilerResult ?? CompilerResult.Empty;
 
-            foreach (KeyValuePair<string, List<Diagnostic>> diagnostics in analysisResult.Diagnostics)
+            foreach (KeyValuePair<Uri, List<Diagnostic>> diagnostics in analysisResult.Diagnostics)
             {
                 IEnumerable<Diagnostic> filteredDiagnostics = diagnostics.Value.Where(item => !item.Range.IsEmpty());
 
                 OmniSharpService.Instance?.Server?.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams()
                 {
-                    Uri = DocumentUri.File(diagnostics.Key),
+                    Uri = diagnostics.Key,
                     Diagnostics = new Container<Diagnostic>(filteredDiagnostics),
                 });
             }
@@ -239,31 +227,31 @@ namespace LanguageServer.DocumentManagers
             Range<SinglePosition> range = token.Position.Range;
 
             {
-                CompiledFunction? function = CompilerResult.GetFunctionAt(Path, position);
+                CompiledFunction? function = CompilerResult.GetFunctionAt(Uri, position);
                 if (function != null)
                 { contents.Add(new MarkedString("bbcode", $"{function.Type} {function.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
             }
 
             {
-                CompiledGeneralFunction? function = CompilerResult.GetGeneralFunctionAt(Path, position);
+                CompiledGeneralFunction? function = CompilerResult.GetGeneralFunctionAt(Uri, position);
                 if (function != null)
                 { contents.Add(new MarkedString("bbcode", $"{function.Type} {function.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
             }
 
             {
-                CompiledOperator? @operator = CompilerResult.GetOperatorAt(Path, position);
+                CompiledOperator? @operator = CompilerResult.GetOperatorAt(Uri, position);
                 if (@operator != null)
                 { contents.Add(new MarkedString("bbcode", $"{@operator.Type} {@operator.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
             }
 
             {
-                CompiledStruct? @struct = CompilerResult.GetStructAt(Path, position);
+                CompiledStruct? @struct = CompilerResult.GetStructAt(Uri, position);
                 if (@struct != null)
                 { contents.Add(new MarkedString("bbcode", @struct.ToString())); }
             }
 
             {
-                CompiledEnum? @enum = CompilerResult.GetEnumAt(Path, position);
+                CompiledEnum? @enum = CompilerResult.GetEnumAt(Uri, position);
                 if (@enum != null)
                 { contents.Add(new MarkedString("bbcode", @enum.ToString())); }
             }
@@ -377,7 +365,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledFunction function in CompilerResult.Functions)
             {
-                if (function.FilePath != Path)
+                if (function.FilePath != Uri)
                 { continue; }
 
                 result.Add(new CodeLens()
@@ -392,7 +380,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
             {
-                if (function.FilePath != Path)
+                if (function.FilePath != Uri)
                 { continue; }
 
                 result.Add(new CodeLens()
@@ -407,7 +395,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledOperator function in CompilerResult.Operators)
             {
-                if (function.FilePath != Path)
+                if (function.FilePath != Uri)
                 { continue; }
 
                 result.Add(new CodeLens()
@@ -422,7 +410,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledStruct function in CompilerResult.Structs)
             {
-                if (function.FilePath != Path)
+                if (function.FilePath != Uri)
                 { continue; }
 
                 result.Add(new CodeLens()
@@ -642,7 +630,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledFunction function in CompilerResult.Functions)
             {
-                DocumentUri? uri = function.FilePath is null ? null : DocumentUri.File(function.FilePath);
+                DocumentUri? uri = function.FilePath is null ? null : (DocumentUri)function.FilePath;
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
                 result.Add(new SymbolInformation()
@@ -659,7 +647,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
             {
-                DocumentUri? uri = function.FilePath is null ? null : DocumentUri.File(function.FilePath);
+                DocumentUri? uri = function.FilePath is null ? null : (DocumentUri)function.FilePath;
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
                 result.Add(new SymbolInformation()
@@ -676,7 +664,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledStruct @struct in CompilerResult.Structs)
             {
-                DocumentUri? uri = @struct.FilePath is null ? null : DocumentUri.File(@struct.FilePath);
+                DocumentUri? uri = @struct.FilePath is null ? null : (DocumentUri)@struct.FilePath;
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
                 result.Add(new SymbolInformation()
@@ -693,7 +681,7 @@ namespace LanguageServer.DocumentManagers
 
             foreach (CompiledEnum @enum in CompilerResult.Enums)
             {
-                DocumentUri? uri = @enum.FilePath is null ? null : DocumentUri.File(@enum.FilePath);
+                DocumentUri? uri = @enum.FilePath is null ? null : (DocumentUri)@enum.FilePath;
                 if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
                 result.Add(new SymbolInformation()
@@ -718,7 +706,7 @@ namespace LanguageServer.DocumentManagers
             List<Location> result = new();
 
             {
-                CompiledFunction? function = CompilerResult.GetFunctionAt(Path, e.Position.ToCool());
+                CompiledFunction? function = CompilerResult.GetFunctionAt(Uri, e.Position.ToCool());
                 if (function is not null)
                 {
                     for (int i = 0; i < function.References.Count; i++)
@@ -735,7 +723,7 @@ namespace LanguageServer.DocumentManagers
             }
 
             {
-                CompiledGeneralFunction? generalFunction = CompilerResult.GetGeneralFunctionAt(Path, e.Position.ToCool());
+                CompiledGeneralFunction? generalFunction = CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool());
                 if (generalFunction is not null)
                 {
                     for (int i = 0; i < generalFunction.References.Count; i++)
@@ -752,7 +740,7 @@ namespace LanguageServer.DocumentManagers
             }
 
             {
-                CompiledOperator? @operator = CompilerResult.GetOperatorAt(Path, e.Position.ToCool());
+                CompiledOperator? @operator = CompilerResult.GetOperatorAt(Uri, e.Position.ToCool());
                 if (@operator is not null)
                 {
                     for (int i = 0; i < @operator.ReferencesOperator.Count; i++)
@@ -769,7 +757,7 @@ namespace LanguageServer.DocumentManagers
             }
 
             {
-                CompiledStruct? @struct = CompilerResult.GetStructAt(Path, e.Position.ToCool());
+                CompiledStruct? @struct = CompilerResult.GetStructAt(Uri, e.Position.ToCool());
                 if (@struct is not null)
                 {
                     for (int i = 0; i < @struct.References.Count; i++)

@@ -4,7 +4,7 @@ using DocumentManagers;
 
 public abstract class SingleDocumentHandler
 {
-    public DocumentUri Uri => _uri;
+    public Uri Uri => _uri.ToUri();
     public string Text => _text;
     public string LanguageId => _languageId;
 
@@ -12,7 +12,7 @@ public abstract class SingleDocumentHandler
     {
         get
         {
-            string result = Uri.ToUri().AbsolutePath;
+            string result = Uri.AbsolutePath;
             result = System.Net.WebUtility.UrlDecode(result);
             result = System.IO.Path.GetFullPath(result);
             return result;

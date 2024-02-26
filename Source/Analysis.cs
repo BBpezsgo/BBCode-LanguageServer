@@ -286,7 +286,7 @@ public static class Analysis
                     new GeneratorSettings()
                     {
                         CheckNullPointers = false,
-                        DontOptimize = true,
+                        DontOptimize = false,
                         ExternalFunctionsCache = false,
                         GenerateComments = false,
                         GenerateDebugInstructions = false,

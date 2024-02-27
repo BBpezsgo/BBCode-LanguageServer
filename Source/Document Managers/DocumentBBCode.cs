@@ -342,8 +342,8 @@ internal class DocumentBBCode : SingleDocumentHandler
                         referenceHover = new MarkedString("bbcode", $"(parameter) {compiledParameter.Type} {compiledParameter.Identifier}");
                     }
                     else if (_ref1.Reference is CompiledField compiledField &&
-                             compiledField.Class is not null &&
-                             compiledField.Class.FilePath is not null)
+                             compiledField.Context is not null &&
+                             compiledField.Context.FilePath is not null)
                     {
                         referenceHover = new MarkedString("bbcode", $"(field) {compiledField.Type} {compiledField.Identifier}");
                     }
@@ -571,15 +571,15 @@ internal class DocumentBBCode : SingleDocumentHandler
                         }));
                     }
                     else if (_ref1.Reference is CompiledField compiledField &&
-                             compiledField.Class is not null &&
-                             compiledField.Class.FilePath is not null)
+                             compiledField.Context is not null &&
+                             compiledField.Context.FilePath is not null)
                     {
                         links.Add(new LocationOrLocationLink(new LocationLink()
                         {
                             OriginSelectionRange = from.ToOmniSharp(),
                             TargetRange = compiledField.Identifier.Position.ToOmniSharp(),
                             TargetSelectionRange = compiledField.Identifier.Position.ToOmniSharp(),
-                            TargetUri = DocumentUri.From(compiledField.Class.FilePath),
+                            TargetUri = DocumentUri.From(compiledField.Context.FilePath),
                         }));
                     }
                 }

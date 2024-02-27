@@ -34,6 +34,12 @@ public static class Extensions
     public static string Extension(this TextDocumentIdentifier uri)
         => Path.GetExtension(uri.Uri.ToUri().AbsolutePath).TrimStart('.').ToLowerInvariant();
 
+    public static OmniSharpRange ToOmniSharp(this MutableRange<SinglePosition> self) => new()
+    {
+        Start = self.Start.ToOmniSharp(),
+        End = self.End.ToOmniSharp(),
+    };
+
     public static OmniSharpRange ToOmniSharp(this Range<SinglePosition> self) => new()
     {
         Start = self.Start.ToOmniSharp(),
@@ -52,7 +58,7 @@ public static class Extensions
         End = self.Range.End.ToOmniSharp(),
     };
 
-    public static Range<SinglePosition> ToCool(this OmniSharpRange self) => new()
+    public static MutableRange<SinglePosition> ToCool(this OmniSharpRange self) => new()
     {
         Start = self.Start.ToCool(),
         End = self.End.ToCool(),

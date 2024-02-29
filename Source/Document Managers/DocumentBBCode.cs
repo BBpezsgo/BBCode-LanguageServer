@@ -44,20 +44,21 @@ internal class DocumentBBCode : SingleDocumentHandler
         Validate();
     }
 
-    (TypeInstance, CompiledType)? GetTypeInstanceAt(SinglePosition position)
+    (TypeInstance, GeneralType)? GetTypeInstanceAt(SinglePosition position)
     {
-        bool Handle1(CompiledType? type, out (TypeInstance, CompiledType) result)
+        bool Handle1(GeneralType? type, out (TypeInstance, GeneralType) result)
         {
             result = default;
             if (type is null) return false;
-            if (type.Origin is null) return false;
-            if (!type.Origin.Position.Range.Contains(position)) return false;
-
-            result = (type.Origin, type);
-            return true;
+            return false;
+            // if (type.Origin is null) return false;
+            // if (!type.Origin.Position.Range.Contains(position)) return false;
+            // 
+            // result = (type.Origin, type);
+            // return true;
         }
 
-        bool Handle2(Statement? statement, out (TypeInstance, CompiledType) result)
+        bool Handle2(Statement? statement, out (TypeInstance, GeneralType) result)
         {
             result = default;
             if (statement is null) return false;
@@ -71,7 +72,7 @@ internal class DocumentBBCode : SingleDocumentHandler
             return false;
         }
 
-        bool Handle3(TypeInstance? type1, CompiledType? type2, out (TypeInstance, CompiledType) result)
+        bool Handle3(TypeInstance? type1, GeneralType? type2, out (TypeInstance, GeneralType) result)
         {
             result = default;
             if (type1 is null || type2 is null) return false;
@@ -86,12 +87,12 @@ internal class DocumentBBCode : SingleDocumentHandler
             if (function.FilePath != Uri)
             { continue; }
 
-            if (Handle1(function.Type, out (TypeInstance, CompiledType) result1))
+            if (Handle1(function.Type, out (TypeInstance, GeneralType) result1))
             { return result1; }
 
-            foreach (CompiledType parameter in function.ParameterTypes)
+            foreach (GeneralType parameter in function.ParameterTypes)
             {
-                if (Handle1(parameter, out (TypeInstance, CompiledType) result2))
+                if (Handle1(parameter, out (TypeInstance, GeneralType) result2))
                 { return result2; }
             }
         }
@@ -101,12 +102,12 @@ internal class DocumentBBCode : SingleDocumentHandler
             if (function.FilePath != Uri)
             { continue; }
 
-            if (Handle1(function.Type, out (TypeInstance, CompiledType) result1))
+            if (Handle1(function.Type, out (TypeInstance, GeneralType) result1))
             { return result1; }
 
-            foreach (CompiledType parameter in function.ParameterTypes)
+            foreach (GeneralType parameter in function.ParameterTypes)
             {
-                if (Handle1(parameter, out (TypeInstance, CompiledType) result2))
+                if (Handle1(parameter, out (TypeInstance, GeneralType) result2))
                 { return result2; }
             }
         }
@@ -116,7 +117,7 @@ internal class DocumentBBCode : SingleDocumentHandler
         {
             foreach (Statement item in statement.GetStatementsRecursively(true))
             {
-                if (Handle2(item, out (TypeInstance, CompiledType) result2))
+                if (Handle2(item, out (TypeInstance, GeneralType) result2))
                 { return result2; }
             }
         }
@@ -257,17 +258,16 @@ internal class DocumentBBCode : SingleDocumentHandler
             { contents.Add(new MarkedString("bbcode", @enum.ToString())); }
         }
 
-        static MarkedString GetTypeHover(CompiledType type)
+        static MarkedString GetTypeHover(GeneralType type)
         {
-            if (type.IsStruct)
-            { return new MarkedString("bbcode", $"struct {type.Name}"); }
+            if (type is StructType structType)
+            { return new MarkedString("bbcode", $"struct {structType.Struct.Identifier.Content}"); }
 
-            if (type.IsEnum)
-            { return new MarkedString("bbcode", $"enum {type.Name}"); }
+            if (type is EnumType enumType)
+            { return new MarkedString("bbcode", $"enum {enumType.Enum.Identifier.Content}"); }
 
             return new MarkedString("bbcode", type.ToString());
         }
-
 
         static MarkedString GetValueHover(DataItem value)
         {
@@ -378,11 +378,11 @@ internal class DocumentBBCode : SingleDocumentHandler
         }
 
         {
-            (TypeInstance, CompiledType)? _type = GetTypeInstanceAt(e.Position.ToCool());
+            (TypeInstance, GeneralType)? _type = GetTypeInstanceAt(e.Position.ToCool());
 
             if (_type.HasValue)
             {
-                CompiledType type = _type.Value.Item2;
+                GeneralType type = _type.Value.Item2;
                 TypeInstance origin = _type.Value.Item1;
 
                 range = origin.Position.Range;
@@ -441,7 +441,7 @@ internal class DocumentBBCode : SingleDocumentHandler
                 Range = function.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.ReferencesOperator.Count} reference",
+                    Title = $"{function.References.Count} reference",
                 },
             });
         }
@@ -626,32 +626,32 @@ internal class DocumentBBCode : SingleDocumentHandler
         }
 
         {
-            (TypeInstance, CompiledType)? _type = GetTypeInstanceAt(e.Position.ToCool());
+            (TypeInstance, GeneralType)? _type = GetTypeInstanceAt(e.Position.ToCool());
 
             if (_type.HasValue)
             {
-                CompiledType type = _type.Value.Item2;
+                GeneralType type = _type.Value.Item2;
                 TypeInstance origin = _type.Value.Item1;
 
-                if (type.IsStruct && type.Struct.FilePath != null)
+                if (type is StructType structType && structType.Struct.FilePath != null)
                 {
                     links.Add(new LocationOrLocationLink(new LocationLink()
                     {
                         OriginSelectionRange = origin.Position.ToOmniSharp(),
-                        TargetRange = type.Struct.Identifier.Position.ToOmniSharp(),
-                        TargetSelectionRange = type.Struct.Identifier.Position.ToOmniSharp(),
-                        TargetUri = DocumentUri.From(type.Struct.FilePath),
+                        TargetRange = structType.Struct.Identifier.Position.ToOmniSharp(),
+                        TargetSelectionRange = structType.Struct.Identifier.Position.ToOmniSharp(),
+                        TargetUri = DocumentUri.From(structType.Struct.FilePath),
                     }));
                 }
 
-                if (type.IsEnum && type.Enum.FilePath != null)
+                if (type is EnumType enumType && enumType.Enum.FilePath != null)
                 {
                     links.Add(new LocationOrLocationLink(new LocationLink()
                     {
                         OriginSelectionRange = origin.Position.ToOmniSharp(),
-                        TargetRange = type.Enum.Identifier.Position.ToOmniSharp(),
-                        TargetSelectionRange = type.Enum.Identifier.Position.ToOmniSharp(),
-                        TargetUri = DocumentUri.From(type.Enum.FilePath),
+                        TargetRange = enumType.Enum.Identifier.Position.ToOmniSharp(),
+                        TargetSelectionRange = enumType.Enum.Identifier.Position.ToOmniSharp(),
+                        TargetUri = DocumentUri.From(enumType.Enum.FilePath),
                     }));
                 }
             }
@@ -749,7 +749,7 @@ internal class DocumentBBCode : SingleDocumentHandler
             {
                 for (int i = 0; i < function.References.Count; i++)
                 {
-                    Reference<Statement> reference = function.References[i];
+                    Reference<StatementWithValue> reference = function.References[i];
                     if (reference.SourceFile == null) continue;
                     result.Add(new Location()
                     {
@@ -781,9 +781,9 @@ internal class DocumentBBCode : SingleDocumentHandler
             CompiledOperator? @operator = CompilerResult.GetOperatorAt(Uri, e.Position.ToCool());
             if (@operator is not null)
             {
-                for (int i = 0; i < @operator.ReferencesOperator.Count; i++)
+                for (int i = 0; i < @operator.References.Count; i++)
                 {
-                    Reference<OperatorCall> reference = @operator.ReferencesOperator[i];
+                    Reference<OperatorCall> reference = @operator.References[i];
                     if (reference.SourceFile == null) continue;
                     result.Add(new Location()
                     {

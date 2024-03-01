@@ -5,7 +5,7 @@ using System.Text;
 
 namespace LanguageServer;
 
-public class Logger
+public static class Logger
 {
     const string LOG_PATH = @"D:\Program Files\BBCodeProject\LanguageServer\";
 

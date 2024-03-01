@@ -1,6 +1,6 @@
 ﻿namespace LanguageServer;
 
-class Program
+static class Program
 {
     static async Task<int> Main()
     {

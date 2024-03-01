@@ -274,10 +274,10 @@ internal class DocumentBBCode : SingleDocumentHandler
             return value.Type switch
             {
                 RuntimeType.Null => new MarkedString("bbcode", $"{null}"),
-                RuntimeType.UInt8 => new MarkedString("bbcode", $"{value}"),
-                RuntimeType.SInt32 => new MarkedString("bbcode", $"{value}"),
+                RuntimeType.Byte => new MarkedString("bbcode", $"{value}"),
+                RuntimeType.Integer => new MarkedString("bbcode", $"{value}"),
                 RuntimeType.Single => new MarkedString("bbcode", $"{value}"),
-                RuntimeType.UInt16 => new MarkedString("bbcode", $"\'{value}\'"),
+                RuntimeType.Char => new MarkedString("bbcode", $"\'{value}\'"),
                 _ => new MarkedString(value.ToString()),
             };
         }
@@ -334,7 +334,7 @@ internal class DocumentBBCode : SingleDocumentHandler
                     else if (_ref1.Reference is CompiledVariable compiledVariable &&
                              compiledVariable.FilePath is not null)
                     {
-                        referenceHover = new MarkedString("bbcode", $"(variable) {compiledVariable.Type} {compiledVariable.VariableName}");
+                        referenceHover = new MarkedString("bbcode", $"(variable) {compiledVariable.Type} {compiledVariable.Identifier}");
                     }
                     else if (_ref1.Reference is LanguageCore.BBCode.Generator.CompiledParameter compiledParameter &&
                              !compiledParameter.IsAnonymous)
@@ -496,19 +496,19 @@ internal class DocumentBBCode : SingleDocumentHandler
 
                 if (item is AnyCall anyCall &&
                     anyCall.PrevStatement is Field field1)
-                { from = field1.FieldName.Position; }
+                { from = field1.Identifier.Position; }
 
                 if (item is OperatorCall operatorCall)
                 { from = operatorCall.Operator.Position; }
 
                 if (item is Field field2)
-                { from = field2.FieldName.Position; }
+                { from = field2.Identifier.Position; }
 
                 if (item is ConstructorCall constructorCall)
-                { from = new Position(constructorCall.Keyword, constructorCall.TypeName); }
+                { from = new Position(constructorCall.Keyword, constructorCall.Type); }
 
                 if (item is NewInstance newInstance)
-                { from = new Position(newInstance.Keyword, newInstance.TypeName); }
+                { from = new Position(newInstance.Keyword, newInstance.Type); }
 
                 if (!from.Range.Contains(e.Position.ToCool()))
                 { continue; }
@@ -554,8 +554,8 @@ internal class DocumentBBCode : SingleDocumentHandler
                         links.Add(new LocationOrLocationLink(new LocationLink()
                         {
                             OriginSelectionRange = from.ToOmniSharp(),
-                            TargetRange = compiledVariable.VariableName.Position.ToOmniSharp(),
-                            TargetSelectionRange = compiledVariable.VariableName.Position.ToOmniSharp(),
+                            TargetRange = compiledVariable.Identifier.Position.ToOmniSharp(),
+                            TargetSelectionRange = compiledVariable.Identifier.Position.ToOmniSharp(),
                             TargetUri = DocumentUri.From(compiledVariable.FilePath),
                         }));
                     }
@@ -869,8 +869,8 @@ internal class DocumentBBCode : SingleDocumentHandler
                 case TokenAnalyzedType.TypeParameter:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.TypeParameter, SemanticTokenModifier.Defaults);
                     break;
-                case TokenAnalyzedType.Hash:
-                case TokenAnalyzedType.HashParameter:
+                case TokenAnalyzedType.CompileTag:
+                case TokenAnalyzedType.CompileTagParameter:
                     break;
                 case TokenAnalyzedType.FieldName:
                     break;

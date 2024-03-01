@@ -26,7 +26,7 @@ public static class Analysis
         {
             Hint hint = hints[i];
 
-            if (hint.File == null || hint.File != currentPath) continue;
+            if (hint.Uri == null || hint.Uri != currentPath) continue;
 
             diagnostics.Add(new Diagnostic
             {
@@ -48,7 +48,7 @@ public static class Analysis
         {
             Information information = informations[i];
 
-            if (information.File == null || information.File != currentPath) continue;
+            if (information.Uri == null || information.Uri != currentPath) continue;
 
             diagnostics.Add(new Diagnostic
             {
@@ -70,7 +70,7 @@ public static class Analysis
         {
             Warning warning = warnings[i];
 
-            if (warning.File == null || warning.File != currentPath) continue;
+            if (warning.Uri == null || warning.Uri != currentPath) continue;
 
             diagnostics.Add(new Diagnostic
             {
@@ -92,7 +92,7 @@ public static class Analysis
         {
             Error error = errors[i];
 
-            if (error.File == null || error.File != currentPath) continue;
+            if (error.Uri == null || error.Uri != currentPath) continue;
 
             diagnostics.Add(new Diagnostic
             {
@@ -168,7 +168,7 @@ public static class Analysis
     {
         try
         {
-            ParserResult ast = Parser.Parse(tokens);
+            ParserResult ast = Parser.Parse(tokens, file);
             ast.SetFile(file);
 
             diagnostics.GetOrAdd(file, new List<Diagnostic>())

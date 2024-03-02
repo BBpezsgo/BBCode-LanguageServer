@@ -25,7 +25,7 @@ public abstract class SingleDocumentHandler
 
     protected readonly Documents App;
 
-    public SingleDocumentHandler(DocumentUri uri, string content, string languageId, Documents app)
+    protected SingleDocumentHandler(DocumentUri uri, string content, string languageId, Documents app)
     {
         _uri = uri;
         _text = content;

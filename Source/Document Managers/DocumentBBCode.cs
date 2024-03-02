@@ -261,10 +261,10 @@ internal class DocumentBBCode : SingleDocumentHandler
         static MarkedString GetTypeHover(GeneralType type)
         {
             if (type is StructType structType)
-            { return new MarkedString("bbcode", $"struct {structType.Struct.Identifier.Content}"); }
+            { return new MarkedString("bbcode", $"{DeclarationKeywords.Struct} {structType.Struct.Identifier.Content}"); }
 
             if (type is EnumType enumType)
-            { return new MarkedString("bbcode", $"enum {enumType.Enum.Identifier.Content}"); }
+            { return new MarkedString("bbcode", $"{DeclarationKeywords.Enum} {enumType.Enum.Identifier.Content}"); }
 
             return new MarkedString("bbcode", type.ToString());
         }

@@ -403,8 +403,7 @@ internal class DocumentBBCode : SingleDocumentHandler
 
         foreach (CompiledFunction function in CompilerResult.Functions)
         {
-            if (function.FilePath != Uri)
-            { continue; }
+            if (function.FilePath != Uri) continue;
 
             result.Add(new CodeLens()
             {
@@ -412,14 +411,13 @@ internal class DocumentBBCode : SingleDocumentHandler
                 Command = new Command()
                 {
                     Title = $"{function.References.Count} reference",
-                },
+                }
             });
         }
 
         foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
         {
-            if (function.FilePath != Uri)
-            { continue; }
+            if (function.FilePath != Uri) continue;
 
             result.Add(new CodeLens()
             {
@@ -433,8 +431,21 @@ internal class DocumentBBCode : SingleDocumentHandler
 
         foreach (CompiledOperator function in CompilerResult.Operators)
         {
-            if (function.FilePath != Uri)
-            { continue; }
+            if (function.FilePath != Uri) continue;
+
+            result.Add(new CodeLens()
+            {
+                Range = function.Identifier.Position.Range.ToOmniSharp(),
+                Command = new Command()
+                {
+                    Title = $"{function.References.Count} reference",
+                },
+            });
+        }
+
+        foreach (CompiledConstructor function in CompilerResult.Constructors)
+        {
+            if (function.FilePath != Uri) continue;
 
             result.Add(new CodeLens()
             {
@@ -448,8 +459,7 @@ internal class DocumentBBCode : SingleDocumentHandler
 
         foreach (CompiledStruct function in CompilerResult.Structs)
         {
-            if (function.FilePath != Uri)
-            { continue; }
+            if (function.FilePath != Uri) continue;
 
             result.Add(new CodeLens()
             {

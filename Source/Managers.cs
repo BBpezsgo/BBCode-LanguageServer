@@ -234,8 +234,8 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
         },
         Full = new SemanticTokensCapabilityRequestFull
         {
-            Delta = true,
+            Delta = false,
         },
-        Range = true,
+        Range = false,
     };
 }

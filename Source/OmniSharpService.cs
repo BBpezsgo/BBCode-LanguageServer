@@ -7,18 +7,17 @@ using Handlers;
 
 public class OmniSharpService
 {
-    public ILanguageServer? Server;
-    public IServiceProvider? ServiceProvider;
-    Buffers? Buffers;
-
     public static OmniSharpService? Instance { get; private set; }
 
-    public readonly Documents Documents;
+    public ILanguageServer? Server { get; private set; }
+    public IServiceProvider? ServiceProvider { get; private set; }
+    public Documents Documents { get; }
+    Buffers? Buffers;
 
     public OmniSharpService()
     {
         Instance = this;
-        Documents = new Documents(this);
+        Documents = new Documents();
     }
 
     /// <exception cref="ServiceException"/>
@@ -101,7 +100,6 @@ public class OmniSharpService
         options.OnInitialized((server, e, result, cancellationToken) =>
         {
             server.Window.Log($"Initialized");
-            Documents.Initialize();
             return Task.CompletedTask;
         });
 
@@ -114,7 +112,5 @@ public class OmniSharpService
 
     [SuppressMessage("Performance", "CA1822")]
     public void OnConfigChanged(DidChangeConfigurationParams _)
-    {
-
-    }
+    { }
 }

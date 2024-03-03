@@ -208,9 +208,7 @@ public class DidChangeConfigurationHandler : IDidChangeConfigurationHandler
     });
 
     public void SetCapability(DidChangeConfigurationCapability capability, ClientCapabilities clientCapabilities)
-    {
-
-    }
+    { }
 }
 
 public class SemanticTokensHandler : SemanticTokensHandlerBase

@@ -4,10 +4,10 @@ using DocumentManagers;
 
 public abstract class SingleDocumentHandler
 {
-    public Uri Uri => _uri.ToUri();
-    public string Text => _text;
-    public string LanguageId => _languageId;
-
+    public Uri Uri => DocumentUri.ToUri();
+    public DocumentUri DocumentUri { get; private set; }
+    public string Text { get; private set; }
+    public string LanguageId { get; private set; }
     public string Path
     {
         get
@@ -18,40 +18,35 @@ public abstract class SingleDocumentHandler
             return result;
         }
     }
-
-    string _languageId;
-    string _text;
-    DocumentUri _uri;
-
-    protected readonly Documents App;
+    protected Documents App { get; }
 
     protected SingleDocumentHandler(DocumentUri uri, string content, string languageId, Documents app)
     {
-        _uri = uri;
-        _text = content;
-        _languageId = languageId;
+        DocumentUri = uri;
+        Text = content;
+        LanguageId = languageId;
         App = app;
     }
 
     public virtual void OnOpened(DidOpenTextDocumentParams e)
     {
-        _uri = e.TextDocument.Uri;
-        _text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
-        _languageId = e.TextDocument.Extension();
+        DocumentUri = e.TextDocument.Uri;
+        Text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
+        LanguageId = e.TextDocument.Extension();
     }
 
     public virtual void OnChanged(DidChangeTextDocumentParams e)
     {
-        _uri = e.TextDocument.Uri;
-        _text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
-        _languageId = e.TextDocument.Extension();
+        DocumentUri = e.TextDocument.Uri;
+        Text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
+        LanguageId = e.TextDocument.Extension();
     }
 
     public virtual void OnSaved(DidSaveTextDocumentParams e)
     {
-        _uri = e.TextDocument.Uri;
-        _text = e.Text ?? string.Empty;
-        _languageId = e.TextDocument.Extension();
+        DocumentUri = e.TextDocument.Uri;
+        Text = e.Text ?? string.Empty;
+        LanguageId = e.TextDocument.Extension();
     }
 
     public abstract Hover? Hover(HoverParams e);
@@ -66,13 +61,11 @@ public abstract class SingleDocumentHandler
 
 public class Documents
 {
-    readonly OmniSharpService Interface;
-    readonly List<SingleDocumentHandler> documents;
+    readonly List<SingleDocumentHandler> _documents;
 
-    public Documents(OmniSharpService @interface)
+    public Documents()
     {
-        documents = new List<SingleDocumentHandler>();
-        Interface = @interface;
+        _documents = new List<SingleDocumentHandler>();
     }
 
     /// <exception cref="ServiceException"/>
@@ -82,18 +75,13 @@ public class Documents
         _ => throw new ServiceException($"Unknown language \"{languageId}\"")
     };
 
-    public void Initialize()
-    {
-
-    }
-
     public bool TryGet(DocumentUri uri, [NotNullWhen(true)] out SingleDocumentHandler? document)
     {
-        for (int i = 0; i < documents.Count; i++)
+        for (int i = 0; i < _documents.Count; i++)
         {
-            if (documents[i].Uri == uri)
+            if (_documents[i].Uri == uri)
             {
-                document = documents[i];
+                document = _documents[i];
                 return true;
             }
         }
@@ -104,26 +92,26 @@ public class Documents
     public void Remove(TextDocumentIdentifier documentId)
     {
         Logger.Log($"Unregister document \"{documentId.Uri}\" ...");
-        for (int i = documents.Count - 1; i >= 0; i--)
+        for (int i = _documents.Count - 1; i >= 0; i--)
         {
-            if (documents[i].Uri == documentId.Uri)
+            if (_documents[i].Uri == documentId.Uri)
             {
                 Logger.Log($"Document \"{documentId.Uri}\" unregistered");
-                documents.RemoveAt(i);
+                _documents.RemoveAt(i);
             }
         }
     }
 
     public void RemoveDuplicates()
     {
-        for (int i = documents.Count - 1; i >= 0; i--)
+        for (int i = _documents.Count - 1; i >= 0; i--)
         {
-            for (int j = documents.Count - 1; j >= i + 1; j--)
+            for (int j = _documents.Count - 1; j >= i + 1; j--)
             {
-                if (documents[i].Uri == documents[j].Uri)
+                if (_documents[i].Uri == _documents[j].Uri)
                 {
-                    Logger.Log($"Unregister duplicated document \"{documents[i].Uri}\"");
-                    documents.RemoveAt(i);
+                    Logger.Log($"Unregister duplicated document \"{_documents[i].Uri}\"");
+                    _documents.RemoveAt(i);
                 }
             }
         }
@@ -153,7 +141,7 @@ public class Documents
 
             Logger.Log($"Document \"{documentId.Uri}\" registered");
             document = GenerateDocument(documentId.Uri, content, extension, this);
-            documents.Add(document);
+            _documents.Add(document);
 
             return document;
         }
@@ -178,7 +166,7 @@ public class Documents
 
             Logger.Log($"Document \"{documentId.Uri}\" registered");
             document = GenerateDocument(documentId.Uri, content, extension, this);
-            documents.Add(document);
+            _documents.Add(document);
 
             return document;
         }

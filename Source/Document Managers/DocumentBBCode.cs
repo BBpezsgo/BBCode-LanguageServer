@@ -358,7 +358,8 @@ internal class DocumentBBCode : SingleDocumentHandler
                 Position checkPosition = item switch
                 {
                     AnyCall functionCall => functionCall.PrevStatement.Position,
-                    OperatorCall operatorCall => operatorCall.Operator.Position,
+                    BinaryOperatorCall binaryOperatorCall => binaryOperatorCall.Operator.Position,
+                    UnaryOperatorCall unaryOperatorCall => unaryOperatorCall.Operator.Position,
                     _ => item.Position,
                 };
 
@@ -508,8 +509,11 @@ internal class DocumentBBCode : SingleDocumentHandler
                     anyCall.PrevStatement is Field field1)
                 { from = field1.Identifier.Position; }
 
-                if (item is OperatorCall operatorCall)
-                { from = operatorCall.Operator.Position; }
+                if (item is BinaryOperatorCall binaryOperatorCall)
+                { from = binaryOperatorCall.Operator.Position; }
+
+                if (item is UnaryOperatorCall unaryOperatorCall)
+                { from = unaryOperatorCall.Operator.Position; }
 
                 if (item is Field field2)
                 { from = field2.Identifier.Position; }
@@ -793,7 +797,7 @@ internal class DocumentBBCode : SingleDocumentHandler
             {
                 for (int i = 0; i < @operator.References.Count; i++)
                 {
-                    Reference<OperatorCall> reference = @operator.References[i];
+                    Reference<StatementWithValue> reference = @operator.References[i];
                     if (reference.SourceFile == null) continue;
                     result.Add(new Location()
                     {

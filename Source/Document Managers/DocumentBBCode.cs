@@ -336,7 +336,7 @@ internal class DocumentBBCode : SingleDocumentHandler
                     {
                         referenceHover = new MarkedString("bbcode", $"(variable) {compiledVariable.Type} {compiledVariable.Identifier}");
                     }
-                    else if (_ref1.Reference is LanguageCore.BBCode.Generator.CompiledParameter compiledParameter &&
+                    else if (_ref1.Reference is CompiledParameter compiledParameter &&
                              !compiledParameter.IsAnonymous)
                     {
                         referenceHover = new MarkedString("bbcode", $"(parameter) {compiledParameter.Type} {compiledParameter.Identifier}");
@@ -573,7 +573,7 @@ internal class DocumentBBCode : SingleDocumentHandler
                             TargetUri = DocumentUri.From(compiledVariable.FilePath),
                         }));
                     }
-                    else if (_ref1.Reference is LanguageCore.BBCode.Generator.CompiledParameter compiledParameter &&
+                    else if (_ref1.Reference is CompiledParameter compiledParameter &&
                              !compiledParameter.IsAnonymous)
                     {
                         links.Add(new LocationOrLocationLink(new LocationLink()

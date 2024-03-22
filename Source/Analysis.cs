@@ -12,130 +12,109 @@ public struct AnalysisResult
 {
     public Dictionary<Uri, List<Diagnostic>> Diagnostics;
     public Token[] Tokens;
-    public ParserResult AST;
+    public ParserResult? AST;
     public CompilerResult? CompilerResult;
 }
 
 public static class Analysis
 {
-    static Diagnostic[] GetDiagnosticInfos(Uri currentPath, string source, params Hint[] hints)
+    [return: NotNullIfNotNull(nameof(warning))]
+    public static Diagnostic? ToOmniSharp(this Warning? warning, string? source = null) => warning is null ? null : new Diagnostic()
     {
-        List<Diagnostic> diagnostics = new();
+        Severity = DiagnosticSeverity.Warning,
+        Range = warning.Position.ToOmniSharp(),
+        Message = warning.Message,
+        Source = source,
+    };
 
-        for (int i = 0; i < hints.Length; i++)
+    [return: NotNullIfNotNull(nameof(information))]
+    public static Diagnostic? ToOmniSharp(this Information? information, string? source = null) => information is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Information,
+        Range = information.Position.ToOmniSharp(),
+        Message = information.Message,
+        Source = source,
+    };
+
+    [return: NotNullIfNotNull(nameof(hint))]
+    public static Diagnostic? ToOmniSharp(this Hint? hint, string? source = null) => hint is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Hint,
+        Range = hint.Position.ToOmniSharp(),
+        Message = hint.Message,
+        Source = source,
+    };
+
+    [return: NotNullIfNotNull(nameof(error))]
+    public static Diagnostic? ToOmniSharp(this Error? error, string? source = null) => error is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Error,
+        Range = error.Position.ToOmniSharp(),
+        Message = error.Message,
+        Source = source,
+    };
+
+    [return: NotNullIfNotNull(nameof(error))]
+    public static Diagnostic? ToOmniSharp(this LanguageException? error, string? source = null) => error is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Error,
+        Range = error.Position.ToOmniSharp(),
+        Message = error.Message,
+        Source = source,
+    };
+
+    static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Hint> hints, Uri currentPath, string? source = null)
+    {
+        foreach (Hint hint in hints)
         {
-            Hint hint = hints[i];
-
-            if (hint.Uri == null || hint.Uri != currentPath) continue;
-
-            diagnostics.Add(new Diagnostic
-            {
-                Severity = DiagnosticSeverity.Hint,
-                Range = hint.Position.ToOmniSharp(),
-                Message = hint.Message,
-                Source = source,
-            });
+            if (hint.Uri is null || hint.Uri != currentPath) continue;
+            yield return hint.ToOmniSharp(source);
         }
-
-        return diagnostics.ToArray();
     }
 
-    static Diagnostic[] GetDiagnosticInfos(Uri currentPath, string source, params Information[] informations)
+    static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Information> informations, Uri currentPath, string? source = null)
     {
-        List<Diagnostic> diagnostics = new();
-
-        for (int i = 0; i < informations.Length; i++)
+        foreach (Information information in informations)
         {
-            Information information = informations[i];
-
-            if (information.Uri == null || information.Uri != currentPath) continue;
-
-            diagnostics.Add(new Diagnostic
-            {
-                Severity = DiagnosticSeverity.Information,
-                Range = information.Position.ToOmniSharp(),
-                Message = information.Message,
-                Source = source,
-            });
+            if (information.Uri is null || information.Uri != currentPath) continue;
+            yield return information.ToOmniSharp(source);
         }
-
-        return diagnostics.ToArray();
     }
 
-    static Diagnostic[] GetDiagnosticInfos(Uri currentPath, string source, params Warning[] warnings)
+    static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Warning> warnings, Uri currentPath, string? source = null)
     {
-        List<Diagnostic> diagnostics = new();
-
-        for (int i = 0; i < warnings.Length; i++)
+        foreach (Warning warning in warnings)
         {
-            Warning warning = warnings[i];
-
-            if (warning.Uri == null || warning.Uri != currentPath) continue;
-
-            diagnostics.Add(new Diagnostic
-            {
-                Severity = DiagnosticSeverity.Warning,
-                Range = warning.Position.ToOmniSharp(),
-                Message = warning.Message,
-                Source = source,
-            });
+            if (warning.Uri is null || warning.Uri != currentPath) continue;
+            yield return warning.ToOmniSharp(source);
         }
-
-        return diagnostics.ToArray();
     }
 
-    static Diagnostic[] GetDiagnosticInfos(Uri currentPath, string source, params Error[] errors)
+    static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Error> errors, Uri currentPath, string? source = null)
     {
-        List<Diagnostic> diagnostics = new();
-
-        for (int i = 0; i < errors.Length; i++)
+        foreach (Error error in errors)
         {
-            Error error = errors[i];
-
-            if (error.Uri == null || error.Uri != currentPath) continue;
-
-            diagnostics.Add(new Diagnostic
-            {
-                Severity = DiagnosticSeverity.Error,
-                Range = error.Position.ToOmniSharp(),
-                Message = error.Message,
-                Source = source,
-            });
+            if (error.Uri is null || error.Uri != currentPath) continue;
+            yield return error.ToOmniSharp(source);
         }
-
-        return diagnostics.ToArray();
     }
 
-    static void HandleCatchedExceptions(Dictionary<Uri, List<Diagnostic>> diagnostics, LanguageException exception, string source, Uri file, Uri? exceptionFile = null)
+    static void HandleCatchedExceptions(Dictionary<Uri, List<Diagnostic>> diagnostics, LanguageException exception, string? source, Uri file, Uri? exceptionFile = null)
     {
         exceptionFile ??= exception.Uri;
 
-        Logger.Log(exceptionFile?.ToString() ?? "null");
-
         if (exceptionFile == file)
         {
-            diagnostics.GetOrAdd(exceptionFile, new List<Diagnostic>())
-                .Add(new Diagnostic()
-                {
-                    Severity = DiagnosticSeverity.Error,
-                    Range = exception.Position.ToOmniSharp(),
-                    Message = exception.Message,
-                    Source = source,
-                });
+            diagnostics.EnsureExistence(exceptionFile, new List<Diagnostic>())
+                .Add(exception.ToOmniSharp(source));
         }
 
         if (exception.InnerException is LanguageException innerException)
         {
             if (exceptionFile == file)
             {
-                diagnostics.GetOrAdd(exceptionFile, new List<Diagnostic>())
-                    .Add(new Diagnostic()
-                    {
-                        Severity = DiagnosticSeverity.Error,
-                        Range = innerException.Position.ToOmniSharp(),
-                        Message = innerException.Message,
-                        Source = source,
-                    });
+                diagnostics.EnsureExistence(exceptionFile, new List<Diagnostic>())
+                    .Add(innerException.ToOmniSharp(source));
             }
         }
     }
@@ -146,8 +125,8 @@ public static class Analysis
         {
             TokenizerResult tokenizerResult = AnyTokenizer.Tokenize(file);
 
-            diagnostics.GetOrAdd(file, new List<Diagnostic>())
-                .AddRange(GetDiagnosticInfos(file, "Tokenizer", tokenizerResult.Warnings));
+            diagnostics.EnsureExistence(file, new List<Diagnostic>())
+                .AddRange(tokenizerResult.Warnings.ToOmniSharp(file, "Tokenizer"));
 
             return tokenizerResult.Tokens;
         }
@@ -171,8 +150,8 @@ public static class Analysis
             ParserResult ast = Parser.Parse(tokens, file);
             ast.SetFile(file);
 
-            diagnostics.GetOrAdd(file, new List<Diagnostic>())
-                .AddRange(GetDiagnosticInfos(file, "Parser", ast.Errors));
+            diagnostics.EnsureExistence(file, new List<Diagnostic>())
+                .AddRange(ast.Errors.ToOmniSharp(file, "Parser"));
 
             return ast;
         }
@@ -200,11 +179,11 @@ public static class Analysis
 
             CompilerResult compiled = Compiler.Compile(ast, externalFunctions, file, settings, null, analysisCollection);
 
-            diagnostics.GetOrAdd(file, new List<Diagnostic>())
-                .AddRange(GetDiagnosticInfos(file, "Compiler", analysisCollection.Warnings.ToArray()));
+            diagnostics.EnsureExistence(file, new List<Diagnostic>())
+                .AddRange(analysisCollection.Warnings.ToOmniSharp(file, "Compiler"));
 
-            diagnostics.GetOrAdd(file, new List<Diagnostic>())
-                .AddRange(GetDiagnosticInfos(file, "Compiler", analysisCollection.Errors.ToArray()));
+            diagnostics.EnsureExistence(file, new List<Diagnostic>())
+                .AddRange(analysisCollection.Errors.ToOmniSharp(file, "Compiler"));
 
             return compiled;
         }
@@ -286,7 +265,7 @@ public static class Analysis
                     new GeneratorSettings()
                     {
                         CheckNullPointers = false,
-                        DontOptimize = false,
+                        DontOptimize = true,
                         ExternalFunctionsCache = false,
                         GenerateComments = false,
                         GenerateDebugInstructions = false,
@@ -296,17 +275,17 @@ public static class Analysis
                     null,
                     analysisCollection);
 
-                diagnostics.GetOrAdd(file, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file, "CodeGenerator", analysisCollection.Hints.ToArray()));
+                diagnostics.EnsureExistence(file, new List<Diagnostic>())
+                    .AddRange(analysisCollection.Hints.ToOmniSharp(file, "CodeGenerator"));
 
-                diagnostics.GetOrAdd(file, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file, "CodeGenerator", analysisCollection.Informations.ToArray()));
+                diagnostics.EnsureExistence(file, new List<Diagnostic>())
+                    .AddRange(analysisCollection.Informations.ToOmniSharp(file, "CodeGenerator"));
 
-                diagnostics.GetOrAdd(file, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file, "CodeGenerator", analysisCollection.Warnings.ToArray()));
+                diagnostics.EnsureExistence(file, new List<Diagnostic>())
+                    .AddRange(analysisCollection.Warnings.ToOmniSharp(file, "CodeGenerator"));
 
-                diagnostics.GetOrAdd(file, new List<Diagnostic>())
-                    .AddRange(GetDiagnosticInfos(file, "CodeGenerator", analysisCollection.Errors.ToArray()));
+                diagnostics.EnsureExistence(file, new List<Diagnostic>())
+                    .AddRange(analysisCollection.Errors.ToOmniSharp(file, "CodeGenerator"));
 
                 Logger.Log($"Successfully compiled ({file})");
             }
@@ -325,7 +304,7 @@ public static class Analysis
         {
             Diagnostics = diagnostics,
             Tokens = tokens ?? Array.Empty<Token>(),
-            AST = ast ?? ParserResult.Empty,
+            AST = ast,
             CompilerResult = compilerResult,
         };
     }

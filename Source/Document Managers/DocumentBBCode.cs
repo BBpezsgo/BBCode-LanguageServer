@@ -132,8 +132,8 @@ internal class DocumentBBCode : SingleDocumentHandler
         AnalysisResult analysisResult = Analysis.Analyze(Uri);
 
         Tokens = analysisResult.Tokens;
-        AST = analysisResult.AST;
-        CompilerResult = analysisResult.CompilerResult ?? CompilerResult.Empty;
+        AST = analysisResult.AST ?? ParserResult.Empty;
+        CompilerResult = analysisResult.CompilerResult ?? CompilerResult;
 
         foreach (KeyValuePair<Uri, List<Diagnostic>> diagnostics in analysisResult.Diagnostics)
         {
@@ -149,7 +149,7 @@ internal class DocumentBBCode : SingleDocumentHandler
 
     public override CompletionItem[] Completion(CompletionParams e)
     {
-        Logger.Log($"Completion()");
+        Logger.Log($"Completion({e})");
 
         List<CompletionItem> result = new();
 
@@ -450,7 +450,7 @@ internal class DocumentBBCode : SingleDocumentHandler
 
             result.Add(new CodeLens()
             {
-                Range = function.Identifier.Position.Range.ToOmniSharp(),
+                Range = (function as ConstructorDefinition).Type.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
                     Title = $"{function.References.Count} reference",

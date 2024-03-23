@@ -174,8 +174,7 @@ public static class Analysis
         {
             AnalysisCollection analysisCollection = new();
 
-            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-            new Interpreter().GenerateExternalFunctions(externalFunctions);
+            Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
             CompilerResult compiled = Compiler.Compile(ast, externalFunctions, file, settings, null, analysisCollection);
 

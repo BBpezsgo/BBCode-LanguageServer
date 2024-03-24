@@ -842,8 +842,6 @@ internal class DocumentBBCode : SingleDocumentHandler
             switch (token.AnalyzedType)
             {
                 case TokenAnalyzedType.Attribute:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Type, SemanticTokenModifier.Defaults);
-                    break;
                 case TokenAnalyzedType.Type:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Type, SemanticTokenModifier.Defaults);
                     break;
@@ -862,8 +860,6 @@ internal class DocumentBBCode : SingleDocumentHandler
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Parameter, SemanticTokenModifier.Defaults);
                     break;
                 case TokenAnalyzedType.Namespace:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Namespace, SemanticTokenModifier.Defaults);
-                    break;
                 case TokenAnalyzedType.Library:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Namespace, SemanticTokenModifier.Defaults);
                     break;
@@ -888,7 +884,6 @@ internal class DocumentBBCode : SingleDocumentHandler
                     break;
                 case TokenAnalyzedType.FieldName:
                     break;
-                case TokenAnalyzedType.None:
                 default:
                     switch (token.TokenType)
                     {
@@ -908,6 +903,17 @@ internal class DocumentBBCode : SingleDocumentHandler
                             break;
                         case TokenType.Comment:
                         case TokenType.CommentMultiline:
+                            builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Comment, SemanticTokenModifier.Defaults);
+                            break;
+                        case TokenType.Whitespace:
+                            break;
+                        case TokenType.LineBreak:
+                            break;
+                        case TokenType.PreprocessIdentifier:
+                            break;
+                        case TokenType.PreprocessArgument:
+                            break;
+                        case TokenType.PreprocessSkipped:
                             builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Comment, SemanticTokenModifier.Defaults);
                             break;
                         default:

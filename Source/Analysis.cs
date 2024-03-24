@@ -123,7 +123,7 @@ public static class Analysis
     {
         try
         {
-            TokenizerResult tokenizerResult = AnyTokenizer.Tokenize(file);
+            TokenizerResult tokenizerResult = AnyTokenizer.Tokenize(file, PreprocessorVariables.Normal);
 
             diagnostics.EnsureExistence(file, new List<Diagnostic>())
                 .AddRange(tokenizerResult.Warnings.ToOmniSharp(file, "Tokenizer"));
@@ -176,7 +176,7 @@ public static class Analysis
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
-            CompilerResult compiled = Compiler.Compile(ast, externalFunctions, file, settings, null, analysisCollection);
+            CompilerResult compiled = Compiler.Compile(ast, externalFunctions, file, settings, PreprocessorVariables.Normal, null, analysisCollection);
 
             diagnostics.EnsureExistence(file, new List<Diagnostic>())
                 .AddRange(analysisCollection.Warnings.ToOmniSharp(file, "Compiler"));

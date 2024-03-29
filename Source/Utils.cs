@@ -16,6 +16,87 @@ public class ServiceException : Exception
 
 public static class Extensions
 {
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Hint> hints, Uri currentPath, string? source = null)
+    {
+        foreach (Hint hint in hints)
+        {
+            if (hint.Uri is null || hint.Uri != currentPath) continue;
+            yield return hint.ToOmniSharp(source);
+        }
+    }
+
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Information> informations, Uri currentPath, string? source = null)
+    {
+        foreach (Information information in informations)
+        {
+            if (information.Uri is null || information.Uri != currentPath) continue;
+            yield return information.ToOmniSharp(source);
+        }
+    }
+
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Warning> warnings, Uri currentPath, string? source = null)
+    {
+        foreach (Warning warning in warnings)
+        {
+            if (warning.Uri is null || warning.Uri != currentPath) continue;
+            yield return warning.ToOmniSharp(source);
+        }
+    }
+
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Error> errors, Uri currentPath, string? source = null)
+    {
+        foreach (Error error in errors)
+        {
+            if (error.Uri is null || error.Uri != currentPath) continue;
+            yield return error.ToOmniSharp(source);
+        }
+    }
+
+    [return: NotNullIfNotNull(nameof(warning))]
+    public static Diagnostic? ToOmniSharp(this Warning? warning, string? source = null) => warning is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Warning,
+        Range = warning.Position.ToOmniSharp(),
+        Message = warning.Message,
+        Source = source,
+    };
+
+    [return: NotNullIfNotNull(nameof(information))]
+    public static Diagnostic? ToOmniSharp(this Information? information, string? source = null) => information is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Information,
+        Range = information.Position.ToOmniSharp(),
+        Message = information.Message,
+        Source = source,
+    };
+
+    [return: NotNullIfNotNull(nameof(hint))]
+    public static Diagnostic? ToOmniSharp(this Hint? hint, string? source = null) => hint is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Hint,
+        Range = hint.Position.ToOmniSharp(),
+        Message = hint.Message,
+        Source = source,
+    };
+
+    [return: NotNullIfNotNull(nameof(error))]
+    public static Diagnostic? ToOmniSharp(this Error? error, string? source = null) => error is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Error,
+        Range = error.Position.ToOmniSharp(),
+        Message = error.Message,
+        Source = source,
+    };
+
+    [return: NotNullIfNotNull(nameof(error))]
+    public static Diagnostic? ToOmniSharp(this LanguageException? error, string? source = null) => error is null ? null : new Diagnostic()
+    {
+        Severity = DiagnosticSeverity.Error,
+        Range = error.Position.ToOmniSharp(),
+        Message = error.Message,
+        Source = source,
+    };
+
     public static DocumentUri? Uri(this FunctionThingDefinition function)
         => function.FilePath is null ? null : (DocumentUri)function.FilePath;
 

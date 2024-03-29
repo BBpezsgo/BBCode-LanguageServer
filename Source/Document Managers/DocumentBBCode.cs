@@ -1,4 +1,6 @@
-﻿using LanguageCore;
+﻿using System.Collections.Immutable;
+using System.Text;
+using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
@@ -12,13 +14,12 @@ internal class DocumentBBCode : SingleDocumentHandler
 {
     public const string LanguageIdentifier = "bbc";
 
-    Token[] Tokens;
+    ImmutableDictionary<Uri, ImmutableArray<Token>> Tokens = ImmutableDictionary.Create<Uri, ImmutableArray<Token>>();
     ParserResult AST;
     CompilerResult CompilerResult;
 
     public DocumentBBCode(DocumentUri uri, string content, string languageId, Documents app) : base(uri, content, languageId, app)
     {
-        Tokens = Array.Empty<Token>();
         AST = ParserResult.Empty;
         CompilerResult = CompilerResult.Empty;
     }
@@ -44,85 +45,49 @@ internal class DocumentBBCode : SingleDocumentHandler
         Validate();
     }
 
-    (TypeInstance, GeneralType)? GetTypeInstanceAt(SinglePosition position)
+    bool GetCommentDocumentation(IPositioned position, Uri? file, [NotNullWhen(true)] out string? result)
+        => GetCommentDocumentation(position.Position.Range.Start, file, out result);
+
+    bool GetCommentDocumentation<TDefinition>(TDefinition definition, [NotNullWhen(true)] out string? result)
+        where TDefinition : IPositioned, IInFile
+        => GetCommentDocumentation(definition.Position.Range.Start, definition.FilePath, out result);
+
+    bool GetCommentDocumentation(SinglePosition position, Uri? file, [NotNullWhen(true)] out string? result)
     {
-        bool Handle1(GeneralType? type, out (TypeInstance, GeneralType) result)
+        result = null;
+
+        if (file is null)
+        { return false; }
+
+        if (!Tokens.TryGetValue(file, out ImmutableArray<Token> tokens))
+        { return false; }
+
+        for (int i = tokens.Length - 1; i >= 0; i--)
         {
-            result = default;
-            if (type is null) return false;
-            return false;
-            // if (type.Origin is null) return false;
-            // if (!type.Origin.Position.Range.Contains(position)) return false;
-            // 
-            // result = (type.Origin, type);
-            // return true;
-        }
+            Token token = tokens[i];
+            if (token.Position.Range.Start >= position) continue;
 
-        bool Handle2(Statement? statement, out (TypeInstance, GeneralType) result)
-        {
-            result = default;
-            if (statement is null) return false;
-
-            if (statement is TypeCast typeCast)
-            { return Handle3(typeCast.Type, typeCast.CompiledType, out result); }
-
-            if (statement is VariableDeclaration variableDeclaration)
-            { return Handle3(variableDeclaration.Type, variableDeclaration.CompiledType, out result); }
-
-            return false;
-        }
-
-        bool Handle3(TypeInstance? type1, GeneralType? type2, out (TypeInstance, GeneralType) result)
-        {
-            result = default;
-            if (type1 is null || type2 is null) return false;
-            if (!type1.Position.Range.Contains(position)) return false;
-
-            result = (type1, type2);
-            return true;
-        }
-
-        foreach (CompiledFunction function in CompilerResult.Functions)
-        {
-            if (function.FilePath != Uri)
-            { continue; }
-
-            if (Handle1(function.Type, out (TypeInstance, GeneralType) result1))
-            { return result1; }
-
-            foreach (GeneralType parameter in function.ParameterTypes)
+            if (token.TokenType == TokenType.CommentMultiline)
             {
-                if (Handle1(parameter, out (TypeInstance, GeneralType) result2))
-                { return result2; }
+                StringBuilder parsedResult = new();
+                string[] lines = token.Content.Split('\n');
+                for (int i1 = 0; i1 < lines.Length; i1++)
+                {
+                    string line = lines[i1];
+                    line = line.Trim();
+                    if (line.StartsWith('*')) line = line[1..];
+                    line = line.TrimStart();
+                    parsedResult.AppendLine(line);
+                }
+
+                result = parsedResult.ToString();
+                return true;
             }
+
+            break;
         }
 
-        foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
-        {
-            if (function.FilePath != Uri)
-            { continue; }
-
-            if (Handle1(function.Type, out (TypeInstance, GeneralType) result1))
-            { return result1; }
-
-            foreach (GeneralType parameter in function.ParameterTypes)
-            {
-                if (Handle1(parameter, out (TypeInstance, GeneralType) result2))
-                { return result2; }
-            }
-        }
-
-        Statement? statement = AST.GetStatementAt(position);
-        if (statement is not null)
-        {
-            foreach (Statement item in statement.GetStatementsRecursively(true))
-            {
-                if (Handle2(item, out (TypeInstance, GeneralType) result2))
-                { return result2; }
-            }
-        }
-
-        return null;
+        return false;
     }
 
     void Validate()
@@ -214,189 +179,376 @@ internal class DocumentBBCode : SingleDocumentHandler
         return result.ToArray();
     }
 
+    #region Hover()
+
+    static string GetFunctionHover<TFunction>(TFunction function)
+        where TFunction : FunctionThingDefinition, ICompiledFunction, IReadable
+    {
+        StringBuilder builder = new();
+        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(function.Modifiers);
+        if (modifiers.Any())
+        {
+            builder.AppendJoin(' ', modifiers);
+            builder.Append(' ');
+        }
+
+        builder.Append(function.Type);
+        builder.Append(' ');
+        builder.Append(function.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers));
+        return builder.ToString();
+    }
+
+    static string GetStructHover(CompiledStruct @struct)
+    {
+        StringBuilder builder = new();
+        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(@struct.Modifiers);
+        if (modifiers.Any())
+        {
+            builder.AppendJoin(' ', modifiers);
+            builder.Append(' ');
+        }
+
+        builder.Append(DeclarationKeywords.Struct);
+        builder.Append(' ');
+        builder.Append(@struct.Identifier);
+        return builder.ToString();
+    }
+
+    static string GetEnumHover(CompiledEnum @enum)
+    {
+        StringBuilder builder = new();
+        builder.Append(DeclarationKeywords.Enum);
+        builder.Append(' ');
+        builder.Append(@enum.Identifier);
+        return builder.ToString();
+    }
+
+    static string GetTypeHover(GeneralType type) => type switch
+    {
+        StructType structType => $"{DeclarationKeywords.Struct} {structType.Struct.Identifier.Content}",
+        EnumType enumType => $"{DeclarationKeywords.Enum} {enumType.Enum.Identifier.Content}",
+        _ => type.ToString()
+    };
+
+    static string GetValueHover(DataItem value) => value.Type switch
+    {
+        RuntimeType.Null => $"{null}",
+        RuntimeType.Byte => $"{value}",
+        RuntimeType.Integer => $"{value}",
+        RuntimeType.Single => $"{value}",
+        RuntimeType.Char => $"\'{value}\'",
+        _ => value.ToString(),
+    };
+
+    static void HandleTypeHovering(Statement statement, ref string? typeHover)
+    {
+        if (statement is StatementWithValue statementWithValue &&
+            statementWithValue.CompiledType is not null)
+        { typeHover = GetTypeHover(statementWithValue.CompiledType); }
+    }
+
+    static void HandleValueHovering(Statement statement, ref string? valueHover)
+    {
+        if (statement is StatementWithValue statementWithValue &&
+            statementWithValue.PredictedValue.HasValue)
+        { valueHover = GetValueHover(statementWithValue.PredictedValue.Value); }
+    }
+
+    bool HandleDefinitionHover(object? definition, ref string? definitionHover, ref string? docsHover) => definition switch
+    {
+        CompiledOperator v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledFunction v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledGeneralFunction v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledVariable v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        VariableDeclaration v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledParameter v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        ParameterDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledField v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        FieldDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledEnum v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledStruct v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        _ => false,
+    };
+
+    bool HandleDefinitionHover<TFunction>(TFunction function, ref string? definitionHover, ref string? docsHover)
+        where TFunction : FunctionThingDefinition, ICompiledFunction, IReadable
+    {
+        if (function.FilePath is null)
+        { return false; }
+
+        definitionHover = GetFunctionHover(function);
+        GetCommentDocumentation(function, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(CompiledEnum @enum, ref string? definitionHover, ref string? docsHover)
+    {
+        if (@enum.FilePath is null)
+        { return false; }
+
+        definitionHover = GetEnumHover(@enum);
+        GetCommentDocumentation(@enum, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(CompiledStruct @struct, ref string? definitionHover, ref string? docsHover)
+    {
+        if (@struct.FilePath is null)
+        { return false; }
+
+        definitionHover = GetStructHover(@struct);
+        GetCommentDocumentation(@struct, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(CompiledVariable variable, ref string? definitionHover, ref string? docsHover)
+    {
+        if (variable.FilePath is null)
+        { return false; }
+
+        StringBuilder builder = new();
+
+        if (variable.Modifiers.Contains(ModifierKeywords.Const))
+        { builder.Append("(constant) "); }
+        else
+        { builder.Append("(variable) "); }
+
+        if (variable.Modifiers.Length > 0)
+        {
+            builder.AppendJoin(' ', variable.Modifiers);
+            builder.Append(' ');
+        }
+        builder.Append(variable.Type);
+        builder.Append(' ');
+        builder.Append(variable.Identifier);
+        definitionHover = builder.ToString();
+
+        GetCommentDocumentation(variable, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(VariableDeclaration variable, ref string? definitionHover, ref string? docsHover)
+    {
+        if (variable.FilePath is null)
+        { return false; }
+
+        StringBuilder builder = new();
+
+        if (variable.Modifiers.Contains(ModifierKeywords.Const))
+        { builder.Append("(constant) "); }
+        else
+        { builder.Append("(variable) "); }
+
+        if (variable.Modifiers.Length > 0)
+        {
+            builder.AppendJoin(' ', variable.Modifiers);
+            builder.Append(' ');
+        }
+        builder.Append(variable.Type);
+        builder.Append(' ');
+        builder.Append(variable.Identifier);
+        definitionHover = builder.ToString();
+
+        GetCommentDocumentation(variable, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(CompiledParameter parameter, ref string? definitionHover, ref string? docsHover)
+    {
+        if (parameter.IsAnonymous)
+        { return false; }
+
+        StringBuilder builder = new();
+        builder.Append("(parameter) ");
+        if (parameter.Modifiers.Length > 0)
+        {
+            builder.AppendJoin(' ', parameter.Modifiers);
+            builder.Append(' ');
+        }
+        builder.Append(parameter.Type);
+        builder.Append(' ');
+        builder.Append(parameter.Identifier);
+        definitionHover = builder.ToString();
+
+        GetCommentDocumentation(parameter, parameter.Context.FilePath, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(ParameterDefinition parameter, ref string? definitionHover, ref string? docsHover)
+    {
+        StringBuilder builder = new();
+        builder.Append("(parameter) ");
+        if (parameter.Modifiers.Length > 0)
+        {
+            builder.AppendJoin(' ', parameter.Modifiers);
+            builder.Append(' ');
+        }
+        builder.Append(parameter.Type);
+        builder.Append(' ');
+        builder.Append(parameter.Identifier);
+        definitionHover = builder.ToString();
+
+        GetCommentDocumentation(parameter, parameter.Context.FilePath, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(CompiledField field, ref string? definitionHover, ref string? docsHover)
+    {
+        if (field.Context is null)
+        { return false; }
+        if (field.Context.FilePath is null)
+        { return false; }
+
+        definitionHover = $"(field) {field.Type} {field.Identifier}";
+        GetCommentDocumentation(field, field.Context.FilePath, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(FieldDefinition field, ref string? definitionHover, ref string? docsHover)
+    {
+        if (field.Context is null)
+        { return false; }
+        if (field.Context.FilePath is null)
+        { return false; }
+
+        definitionHover = $"(field) {field.Type} {field.Identifier}";
+        GetCommentDocumentation(field, field.Context.FilePath, out docsHover);
+        return true;
+    }
+
+    bool HandleReferenceHovering(Statement statement, ref string? definitionHover, ref string? docsHover)
+    {
+        if (statement is IReferenceableTo _ref1 &&
+            HandleDefinitionHover(_ref1.Reference, ref definitionHover, ref docsHover))
+        { return true; }
+
+        if (statement is VariableDeclaration variableDeclaration)
+        { return HandleDefinitionHover(variableDeclaration, ref definitionHover, ref docsHover); }
+
+        return false;
+    }
+
     public override Hover? Hover(HoverParams e)
     {
         Logger.Log($"Hover({e.Position.ToCool().ToStringMin()})");
 
         SinglePosition position = e.Position.ToCool();
 
-        Token? token = Tokens.GetTokenAt(position);
-        List<MarkedString> contents = new();
+        if (!Tokens.TryGetValue(e.TextDocument.Uri.ToUri(), out ImmutableArray<Token> tokens))
+        { return null; }
+
+        Token? token = tokens.GetTokenAt(position);
+        StringBuilder contents = new();
 
         if (token == null)
         { return null; }
 
         Range<SinglePosition> range = token.Position.Range;
 
+        string? typeHover = null;
+        string? valueHover = null;
+        string? definitionHover = null;
+        string? docsHover = null;
+
+        if (CompilerResult.GetFunctionAt(Uri, position, out CompiledFunction? function))
         {
-            CompiledFunction? function = CompilerResult.GetFunctionAt(Uri, position);
-            if (function != null)
-            { contents.Add(new MarkedString("bbcode", $"{function.Type} {function.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
+            HandleDefinitionHover(function, ref definitionHover, ref docsHover);
         }
-
+        else if (CompilerResult.GetGeneralFunctionAt(Uri, position, out CompiledGeneralFunction? generalFunction))
         {
-            CompiledGeneralFunction? function = CompilerResult.GetGeneralFunctionAt(Uri, position);
-            if (function != null)
-            { contents.Add(new MarkedString("bbcode", $"{function.Type} {function.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
+            HandleDefinitionHover(generalFunction, ref definitionHover, ref docsHover);
         }
-
+        else if (CompilerResult.GetOperatorAt(Uri, position, out CompiledOperator? @operator))
         {
-            CompiledOperator? @operator = CompilerResult.GetOperatorAt(Uri, position);
-            if (@operator != null)
-            { contents.Add(new MarkedString("bbcode", $"{@operator.Type} {@operator.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}")); }
+            HandleDefinitionHover(@operator, ref definitionHover, ref docsHover);
         }
-
+        else if (CompilerResult.GetStructAt(Uri, position, out CompiledStruct? @struct))
         {
-            CompiledStruct? @struct = CompilerResult.GetStructAt(Uri, position);
-            if (@struct != null)
-            { contents.Add(new MarkedString("bbcode", @struct.ToString())); }
+            HandleDefinitionHover(@struct, ref definitionHover, ref docsHover);
         }
-
+        else if (CompilerResult.GetEnumAt(Uri, position, out CompiledEnum? @enum))
         {
-            CompiledEnum? @enum = CompilerResult.GetEnumAt(Uri, position);
-            if (@enum != null)
-            { contents.Add(new MarkedString("bbcode", @enum.ToString())); }
+            HandleDefinitionHover(@enum, ref definitionHover, ref docsHover);
         }
-
-        static MarkedString GetTypeHover(GeneralType type)
+        else if (CompilerResult.GetFieldAt(Uri, position, out CompiledField? field))
         {
-            if (type is StructType structType)
-            { return new MarkedString("bbcode", $"{DeclarationKeywords.Struct} {structType.Struct.Identifier.Content}"); }
-
-            if (type is EnumType enumType)
-            { return new MarkedString("bbcode", $"{DeclarationKeywords.Enum} {enumType.Enum.Identifier.Content}"); }
-
-            return new MarkedString("bbcode", type.ToString());
+            HandleDefinitionHover(field, ref definitionHover, ref docsHover);
         }
-
-        static MarkedString GetValueHover(DataItem value)
+        else if (CompilerResult.GetParameterDefinitionAt(Uri, position, out ParameterDefinition? parameter, out _) &&
+                 parameter.Identifier.Position.Range.Contains(position))
         {
-            return value.Type switch
-            {
-                RuntimeType.Null => new MarkedString("bbcode", $"{null}"),
-                RuntimeType.Byte => new MarkedString("bbcode", $"{value}"),
-                RuntimeType.Integer => new MarkedString("bbcode", $"{value}"),
-                RuntimeType.Single => new MarkedString("bbcode", $"{value}"),
-                RuntimeType.Char => new MarkedString("bbcode", $"\'{value}\'"),
-                _ => new MarkedString(value.ToString()),
-            };
+            HandleDefinitionHover(parameter, ref definitionHover, ref docsHover);
         }
-
-        Statement? statement = AST.GetStatementAt(position);
-        if (statement is not null)
+        else if (AST.GetStatementAt(position, out Statement? statement))
         {
-            MarkedString? typeHover = null;
-            MarkedString? valueHover = null;
-            MarkedString? referenceHover = null;
-
-            static void HandleTypeHovering(Statement statement, ref MarkedString? typeHover)
-            {
-                if (statement is not StatementWithValue statementWithValue ||
-                    statementWithValue.CompiledType is null)
-                { return; }
-
-                typeHover = GetTypeHover(statementWithValue.CompiledType);
-            }
-
-            static void HandleValueHovering(Statement statement, ref MarkedString? valueHover)
-            {
-                if (statement is not StatementWithValue statementWithValue ||
-                    !statementWithValue.PredictedValue.HasValue)
-                { return; }
-
-                valueHover = GetValueHover(statementWithValue.PredictedValue.Value);
-            }
-
-            static void HandleReferenceHovering(Statement statement, ref MarkedString? referenceHover)
-            {
-                if (statement is IReferenceableTo _ref1)
-                {
-                    if (_ref1.Reference is CompiledOperator compiledOperator &&
-                        compiledOperator.FilePath is not null)
-                    {
-                        referenceHover = new MarkedString("bbcode", $"{compiledOperator.Type} {compiledOperator.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}");
-                    }
-                    else if (_ref1.Reference is CompiledFunction compiledFunction &&
-                        compiledFunction.FilePath is not null)
-                    {
-                        referenceHover = new MarkedString("bbcode", $"{compiledFunction.Type} {compiledFunction.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}");
-                    }
-                    else if (_ref1.Reference is MacroDefinition macroDefinition &&
-                        macroDefinition.FilePath is not null)
-                    {
-                        referenceHover = new MarkedString("bbcode", $"{macroDefinition.ToReadable()}");
-                    }
-                    else if (_ref1.Reference is CompiledGeneralFunction generalFunction &&
-                        generalFunction.FilePath is not null)
-                    {
-                        referenceHover = new MarkedString("bbcode", $"{generalFunction.Type} {generalFunction.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers)}");
-                    }
-                    else if (_ref1.Reference is CompiledVariable compiledVariable &&
-                             compiledVariable.FilePath is not null)
-                    {
-                        referenceHover = new MarkedString("bbcode", $"(variable) {compiledVariable.Type} {compiledVariable.Identifier}");
-                    }
-                    else if (_ref1.Reference is CompiledParameter compiledParameter &&
-                             !compiledParameter.IsAnonymous)
-                    {
-                        referenceHover = new MarkedString("bbcode", $"(parameter) {compiledParameter.Type} {compiledParameter.Identifier}");
-                    }
-                    else if (_ref1.Reference is CompiledField compiledField &&
-                             compiledField.Context is not null &&
-                             compiledField.Context.FilePath is not null)
-                    {
-                        referenceHover = new MarkedString("bbcode", $"(field) {compiledField.Type} {compiledField.Identifier}");
-                    }
-                }
-            }
-
             foreach (Statement item in statement.GetStatementsRecursively(true))
             {
                 if (!item.Position.Range.Contains(e.Position.ToCool()))
                 { continue; }
 
-                Position checkPosition = item switch
-                {
-                    AnyCall functionCall => functionCall.PrevStatement.Position,
-                    BinaryOperatorCall binaryOperatorCall => binaryOperatorCall.Operator.Position,
-                    UnaryOperatorCall unaryOperatorCall => unaryOperatorCall.Operator.Position,
-                    _ => item.Position,
-                };
+                Position checkPosition = Utils.GetInteractivePosition(item);
+
+                if (item is BinaryOperatorCall)
+                { checkPosition = item.Position; }
 
                 if (!checkPosition.Range.Contains(e.Position.ToCool()))
                 { continue; }
 
-                range = item.Position.Range;
+                range = checkPosition.Range;
 
                 HandleTypeHovering(item, ref typeHover);
-                HandleReferenceHovering(item, ref referenceHover);
+                HandleReferenceHovering(item, ref definitionHover, ref docsHover);
                 HandleValueHovering(item, ref valueHover);
             }
-
-            if (typeHover is not null) contents.Add(typeHover);
-            if (referenceHover is not null) contents.Add(referenceHover);
-            if (valueHover is not null) contents.Add(valueHover);
         }
 
+        if (typeHover is null &&
+            (AST, CompilerResult).GetTypeInstanceAt(Uri, e.Position.ToCool(), out TypeInstance? typeInstance, out GeneralType? generalType))
         {
-            (TypeInstance, GeneralType)? _type = GetTypeInstanceAt(e.Position.ToCool());
+            range = typeInstance.Position.Range;
+            typeHover = GetTypeHover(generalType);
+        }
 
-            if (_type.HasValue)
-            {
-                GeneralType type = _type.Value.Item2;
-                TypeInstance origin = _type.Value.Item1;
+        if (definitionHover is not null)
+        {
+            contents.AppendLine($"```{LanguageIdentifier}");
+            contents.AppendLine(definitionHover);
+            contents.AppendLine("```");
+            contents.AppendLine("---");
+        }
+        else if (typeHover is not null)
+        {
+            contents.AppendLine($"```{LanguageIdentifier}");
+            contents.AppendLine(typeHover);
+            contents.AppendLine("```");
+            contents.AppendLine("---");
+        }
 
-                range = origin.Position.Range;
-                contents.Add(GetTypeHover(type));
-            }
+        if (valueHover is not null)
+        {
+            contents.AppendLine($"```{LanguageIdentifier}");
+            contents.AppendLine(valueHover);
+            contents.AppendLine("```");
+            contents.AppendLine("---");
+        }
+
+        if (docsHover is not null)
+        {
+            contents.AppendLine(docsHover);
         }
 
         return new Hover()
         {
-            Contents = new MarkedStringsOrMarkupContent(contents),
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent()
+            {
+                Kind = MarkupKind.Markdown,
+                Value = contents.ToString(),
+            }),
             Range = range.ToOmniSharp(),
         };
     }
+
+    #endregion
 
     public override CodeLens[] CodeLens(CodeLensParams e)
     {
@@ -475,6 +627,85 @@ internal class DocumentBBCode : SingleDocumentHandler
         return result.ToArray();
     }
 
+    static void GetDeepestTypeInstance(ref TypeInstance? type1, ref GeneralType? type2, SinglePosition position)
+    {
+        if (type1 is null || type2 is null) return;
+
+        switch (type1)
+        {
+            case TypeInstanceSimple typeInstanceSimple:
+            {
+                if (typeInstanceSimple.Identifier.Position.Range.Contains(position))
+                {
+                    return;
+                }
+
+                // if (typeInstanceSimple.GenericTypes.HasValue)
+                // {
+                //     for (int i = 0; i < typeInstanceSimple.GenericTypes.Value.Length; i++)
+                //     {
+                //         TypeInstance item = typeInstanceSimple.GenericTypes.Value[i];
+                //         GeneralType item2 = ((StructType)type2).TypeParameters[i];
+                //         if (item.Position.Range.Contains(position))
+                //         {
+                //             return GetDeepestTypeInstance(item, item2, position, out result);
+                //         }
+                //     }
+                // }
+
+                break;
+            }
+
+            case TypeInstancePointer typeInstancePointer:
+            {
+                if (type2 is not PointerType pointerType)
+                { return; }
+
+                if (typeInstancePointer.To.Position.Range.Contains(position))
+                {
+                    type1 = typeInstancePointer.To;
+                    type2 = pointerType.To;
+                    GetDeepestTypeInstance(ref type1, ref type2, position);
+                    return;
+                }
+
+                break;
+            }
+        }
+
+        type1 = null;
+        type2 = null;
+    }
+
+    bool GetGotoDefinition(object? reference, [NotNullWhen(true)] out LocationLink? result)
+    {
+        result = null;
+        if (reference is null)
+        { return false; }
+
+        Uri file = Uri;
+
+        if (reference is IInFile inFile)
+        {
+            if (inFile.FilePath is null)
+            { return false; }
+            file = inFile.FilePath;
+        }
+
+        if (reference is IIdentifiable<Token> identifiable1)
+        {
+            result = new LocationLink()
+            {
+                TargetRange = identifiable1.Identifier.Position.ToOmniSharp(),
+                TargetSelectionRange = identifiable1.Identifier.Position.ToOmniSharp(),
+                TargetUri = DocumentUri.From(file),
+            };
+            return true;
+        }
+
+        return false;
+    }
+
     public override LocationOrLocationLinks? GotoDefinition(DefinitionParams e)
     {
         Logger.Log($"GotoDefinition({e.Position.ToCool().ToStringMin()})");
@@ -498,175 +729,59 @@ internal class DocumentBBCode : SingleDocumentHandler
             break;
         }
 
-        Statement? statement = AST.GetStatementAt(e.Position.ToCool());
-        if (statement is not null)
+        if (AST.GetStatementAt(e.Position.ToCool(), out Statement? statement))
         {
             foreach (Statement item in statement.GetStatementsRecursively(true))
             {
-                Position from = item.Position;
-
-                if (item is AnyCall anyCall &&
-                    anyCall.PrevStatement is Field field1)
-                { from = field1.Identifier.Position; }
-
-                if (item is BinaryOperatorCall binaryOperatorCall)
-                { from = binaryOperatorCall.Operator.Position; }
-
-                if (item is UnaryOperatorCall unaryOperatorCall)
-                { from = unaryOperatorCall.Operator.Position; }
-
-                if (item is Field field2)
-                { from = field2.Identifier.Position; }
-
-                if (item is ConstructorCall constructorCall)
-                { from = new Position(constructorCall.Keyword, constructorCall.Type); }
-
-                if (item is NewInstance newInstance)
-                { from = new Position(newInstance.Keyword, newInstance.Type); }
+                Position from = Utils.GetInteractivePosition(item);
 
                 if (!from.Range.Contains(e.Position.ToCool()))
                 { continue; }
 
-                if (item is IReferenceableTo _ref1)
+                if (item is IReferenceableTo _ref1 &&
+                    GetGotoDefinition(_ref1.Reference, out LocationLink? link))
                 {
-                    if (_ref1.Reference is CompiledFunction compiledFunction &&
-                        compiledFunction.FilePath is not null)
-                    {
-                        links.Add(new LocationOrLocationLink(new LocationLink()
-                        {
-                            OriginSelectionRange = from.ToOmniSharp(),
-                            TargetRange = compiledFunction.Identifier.Position.ToOmniSharp(),
-                            TargetSelectionRange = compiledFunction.Identifier.Position.ToOmniSharp(),
-                            TargetUri = DocumentUri.From(compiledFunction.FilePath),
-                        }));
-                    }
-                    else if (_ref1.Reference is MacroDefinition macroDefinition &&
-                        macroDefinition.FilePath is not null)
-                    {
-                        links.Add(new LocationOrLocationLink(new LocationLink()
-                        {
-                            OriginSelectionRange = from.ToOmniSharp(),
-                            TargetRange = macroDefinition.Identifier.Position.ToOmniSharp(),
-                            TargetSelectionRange = macroDefinition.Identifier.Position.ToOmniSharp(),
-                            TargetUri = DocumentUri.From(macroDefinition.FilePath),
-                        }));
-                    }
-                    else if (_ref1.Reference is CompiledGeneralFunction generalFunction &&
-                        generalFunction.FilePath is not null)
-                    {
-                        links.Add(new LocationOrLocationLink(new LocationLink()
-                        {
-                            OriginSelectionRange = from.ToOmniSharp(),
-                            TargetRange = generalFunction.Identifier.Position.ToOmniSharp(),
-                            TargetSelectionRange = generalFunction.Identifier.Position.ToOmniSharp(),
-                            TargetUri = DocumentUri.From(generalFunction.FilePath),
-                        }));
-                    }
-                    else if (_ref1.Reference is CompiledVariable compiledVariable &&
-                             compiledVariable.FilePath is not null)
-                    {
-                        links.Add(new LocationOrLocationLink(new LocationLink()
-                        {
-                            OriginSelectionRange = from.ToOmniSharp(),
-                            TargetRange = compiledVariable.Identifier.Position.ToOmniSharp(),
-                            TargetSelectionRange = compiledVariable.Identifier.Position.ToOmniSharp(),
-                            TargetUri = DocumentUri.From(compiledVariable.FilePath),
-                        }));
-                    }
-                    else if (_ref1.Reference is CompiledParameter compiledParameter &&
-                             !compiledParameter.IsAnonymous)
-                    {
-                        links.Add(new LocationOrLocationLink(new LocationLink()
-                        {
-                            OriginSelectionRange = from.ToOmniSharp(),
-                            TargetRange = compiledParameter.Identifier.Position.ToOmniSharp(),
-                            TargetSelectionRange = compiledParameter.Identifier.Position.ToOmniSharp(),
-                            TargetUri = e.TextDocument.Uri,
-                        }));
-                    }
-                    else if (_ref1.Reference is CompiledField compiledField &&
-                             compiledField.Context is not null &&
-                             compiledField.Context.FilePath is not null)
-                    {
-                        links.Add(new LocationOrLocationLink(new LocationLink()
-                        {
-                            OriginSelectionRange = from.ToOmniSharp(),
-                            TargetRange = compiledField.Identifier.Position.ToOmniSharp(),
-                            TargetSelectionRange = compiledField.Identifier.Position.ToOmniSharp(),
-                            TargetUri = DocumentUri.From(compiledField.Context.FilePath),
-                        }));
-                    }
-                }
-
-                if (item is IReferenceableTo<CompiledFunction> _ref2 &&
-                    _ref2.Reference is not null &&
-                    _ref2.Reference.FilePath is not null)
-                {
-                    links.Add(new LocationOrLocationLink(new LocationLink()
+                    links.Add(new LocationLink()
                     {
                         OriginSelectionRange = from.ToOmniSharp(),
-                        TargetRange = _ref2.Reference.Identifier.Position.ToOmniSharp(),
-                        TargetSelectionRange = _ref2.Reference.Identifier.Position.ToOmniSharp(),
-                        TargetUri = DocumentUri.From(_ref2.Reference.FilePath),
-                    }));
-                }
-
-                if (item is IReferenceableTo<CompiledOperator> _ref3 &&
-                    _ref3.Reference is not null &&
-                    _ref3.Reference.FilePath is not null)
-                {
-                    links.Add(new LocationOrLocationLink(new LocationLink()
-                    {
-                        OriginSelectionRange = from.ToOmniSharp(),
-                        TargetRange = _ref3.Reference.Identifier.Position.ToOmniSharp(),
-                        TargetSelectionRange = _ref3.Reference.Identifier.Position.ToOmniSharp(),
-                        TargetUri = DocumentUri.From(_ref3.Reference.FilePath),
-                    }));
-                }
-
-                if (item is IReferenceableTo<CompiledGeneralFunction> _ref4 &&
-                    _ref4.Reference is not null &&
-                    _ref4.Reference.FilePath is not null)
-                {
-                    links.Add(new LocationOrLocationLink(new LocationLink()
-                    {
-                        OriginSelectionRange = from.ToOmniSharp(),
-                        TargetRange = _ref4.Reference.Identifier.Position.ToOmniSharp(),
-                        TargetSelectionRange = _ref4.Reference.Identifier.Position.ToOmniSharp(),
-                        TargetUri = DocumentUri.From(_ref4.Reference.FilePath),
-                    }));
+                        TargetRange = link.TargetRange,
+                        TargetSelectionRange = link.TargetSelectionRange,
+                        TargetUri = link.TargetUri,
+                    });
                 }
             }
         }
 
         {
-            (TypeInstance, GeneralType)? _type = GetTypeInstanceAt(e.Position.ToCool());
-
-            if (_type.HasValue)
+            if ((AST, CompilerResult).GetTypeInstanceAt(Uri, e.Position.ToCool(), out TypeInstance? origin, out GeneralType? type))
             {
-                GeneralType type = _type.Value.Item2;
-                TypeInstance origin = _type.Value.Item1;
+                GetDeepestTypeInstance(ref origin, ref type, e.Position.ToCool());
 
-                if (type is StructType structType && structType.Struct.FilePath != null)
+                if (origin is not null &&
+                    type is not null)
                 {
-                    links.Add(new LocationOrLocationLink(new LocationLink()
+                    if (type is StructType structType &&
+                        GetGotoDefinition(structType.Struct, out LocationLink? link))
                     {
-                        OriginSelectionRange = origin.Position.ToOmniSharp(),
-                        TargetRange = structType.Struct.Identifier.Position.ToOmniSharp(),
-                        TargetSelectionRange = structType.Struct.Identifier.Position.ToOmniSharp(),
-                        TargetUri = DocumentUri.From(structType.Struct.FilePath),
-                    }));
-                }
-
-                if (type is EnumType enumType && enumType.Enum.FilePath != null)
-                {
-                    links.Add(new LocationOrLocationLink(new LocationLink()
+                        links.Add(new LocationLink()
+                        {
+                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            TargetRange = link.TargetRange,
+                            TargetSelectionRange = link.TargetSelectionRange,
+                            TargetUri = link.TargetUri,
+                        });
+                    }
+                    else if (type is EnumType enumType &&
+                        GetGotoDefinition(enumType.Enum, out link))
                     {
-                        OriginSelectionRange = origin.Position.ToOmniSharp(),
-                        TargetRange = enumType.Enum.Identifier.Position.ToOmniSharp(),
-                        TargetSelectionRange = enumType.Enum.Identifier.Position.ToOmniSharp(),
-                        TargetUri = DocumentUri.From(enumType.Enum.FilePath),
-                    }));
+                        links.Add(new LocationLink()
+                        {
+                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            TargetRange = link.TargetRange,
+                            TargetSelectionRange = link.TargetSelectionRange,
+                            TargetUri = link.TargetUri,
+                        });
+                    }
                 }
             }
         }
@@ -757,71 +872,59 @@ internal class DocumentBBCode : SingleDocumentHandler
 
         List<Location> result = new();
 
+        if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunction? function))
         {
-            CompiledFunction? function = CompilerResult.GetFunctionAt(Uri, e.Position.ToCool());
-            if (function is not null)
+            for (int i = 0; i < function.References.Count; i++)
             {
-                for (int i = 0; i < function.References.Count; i++)
+                Reference<StatementWithValue> reference = function.References[i];
+                if (reference.SourceFile == null) continue;
+                result.Add(new Location()
                 {
-                    Reference<StatementWithValue> reference = function.References[i];
-                    if (reference.SourceFile == null) continue;
-                    result.Add(new Location()
-                    {
-                        Range = reference.Source.Position.ToOmniSharp(),
-                        Uri = reference.SourceFile,
-                    });
-                }
+                    Range = reference.Source.Position.ToOmniSharp(),
+                    Uri = reference.SourceFile,
+                });
             }
         }
 
+        if (CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool(), out CompiledGeneralFunction? generalFunction))
         {
-            CompiledGeneralFunction? generalFunction = CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool());
-            if (generalFunction is not null)
+            for (int i = 0; i < generalFunction.References.Count; i++)
             {
-                for (int i = 0; i < generalFunction.References.Count; i++)
+                Reference<Statement> reference = generalFunction.References[i];
+                if (reference.SourceFile == null) continue;
+                result.Add(new Location()
                 {
-                    Reference<Statement> reference = generalFunction.References[i];
-                    if (reference.SourceFile == null) continue;
-                    result.Add(new Location()
-                    {
-                        Range = reference.Source.Position.ToOmniSharp(),
-                        Uri = reference.SourceFile,
-                    });
-                }
+                    Range = reference.Source.Position.ToOmniSharp(),
+                    Uri = reference.SourceFile,
+                });
             }
         }
 
+        if (CompilerResult.GetOperatorAt(Uri, e.Position.ToCool(), out CompiledOperator? @operator))
         {
-            CompiledOperator? @operator = CompilerResult.GetOperatorAt(Uri, e.Position.ToCool());
-            if (@operator is not null)
+            for (int i = 0; i < @operator.References.Count; i++)
             {
-                for (int i = 0; i < @operator.References.Count; i++)
+                Reference<StatementWithValue> reference = @operator.References[i];
+                if (reference.SourceFile == null) continue;
+                result.Add(new Location()
                 {
-                    Reference<StatementWithValue> reference = @operator.References[i];
-                    if (reference.SourceFile == null) continue;
-                    result.Add(new Location()
-                    {
-                        Range = reference.Source.Position.ToOmniSharp(),
-                        Uri = reference.SourceFile,
-                    });
-                }
+                    Range = reference.Source.Position.ToOmniSharp(),
+                    Uri = reference.SourceFile,
+                });
             }
         }
 
+        if (CompilerResult.GetStructAt(Uri, e.Position.ToCool(), out CompiledStruct? @struct))
         {
-            CompiledStruct? @struct = CompilerResult.GetStructAt(Uri, e.Position.ToCool());
-            if (@struct is not null)
+            for (int i = 0; i < @struct.References.Count; i++)
             {
-                for (int i = 0; i < @struct.References.Count; i++)
+                Reference<TypeInstance> reference = @struct.References[i];
+                if (reference.SourceFile == null) continue;
+                result.Add(new Location()
                 {
-                    Reference<TypeInstance> reference = @struct.References[i];
-                    if (reference.SourceFile == null) continue;
-                    result.Add(new Location()
-                    {
-                        Range = reference.Source.Position.ToOmniSharp(),
-                        Uri = reference.SourceFile,
-                    });
-                }
+                    Range = reference.Source.Position.ToOmniSharp(),
+                    Uri = reference.SourceFile,
+                });
             }
         }
 
@@ -835,9 +938,10 @@ internal class DocumentBBCode : SingleDocumentHandler
 
     public override void GetSemanticTokens(SemanticTokensBuilder builder, ITextDocumentIdentifierParams e)
     {
-        if (Tokens == null) return;
+        if (!Tokens.TryGetValue(e.TextDocument.Uri.ToUri(), out ImmutableArray<Token> tokens))
+        { return; }
 
-        foreach (Token token in Tokens)
+        foreach (Token token in tokens)
         {
             switch (token.AnalyzedType)
             {
@@ -848,27 +952,17 @@ internal class DocumentBBCode : SingleDocumentHandler
                 case TokenAnalyzedType.Struct:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Struct, SemanticTokenModifier.Defaults);
                     break;
-                case TokenAnalyzedType.Keyword:
-                    break;
                 case TokenAnalyzedType.FunctionName:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Function, SemanticTokenModifier.Defaults);
                     break;
                 case TokenAnalyzedType.VariableName:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Variable, SemanticTokenModifier.Defaults);
                     break;
+                case TokenAnalyzedType.ConstantName:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Variable, SemanticTokenModifier.Readonly);
+                    break;
                 case TokenAnalyzedType.ParameterName:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Parameter, SemanticTokenModifier.Defaults);
-                    break;
-                case TokenAnalyzedType.Namespace:
-                case TokenAnalyzedType.Library:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Namespace, SemanticTokenModifier.Defaults);
-                    break;
-                case TokenAnalyzedType.Class:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Class, SemanticTokenModifier.Defaults);
-                    break;
-                case TokenAnalyzedType.Statement:
-                    break;
-                case TokenAnalyzedType.BuiltinType:
                     break;
                 case TokenAnalyzedType.Enum:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Enum, SemanticTokenModifier.Defaults);
@@ -879,44 +973,22 @@ internal class DocumentBBCode : SingleDocumentHandler
                 case TokenAnalyzedType.TypeParameter:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.TypeParameter, SemanticTokenModifier.Defaults);
                     break;
-                case TokenAnalyzedType.CompileTag:
-                case TokenAnalyzedType.CompileTagParameter:
-                    break;
-                case TokenAnalyzedType.FieldName:
-                    break;
+
                 default:
                     switch (token.TokenType)
                     {
-                        case TokenType.Identifier:
-                            break;
-                        case TokenType.LiteralString:
-                        case TokenType.LiteralCharacter:
-                            builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.String, SemanticTokenModifier.Defaults);
-                            break;
+                        // case TokenType.LiteralString:
+                        // case TokenType.LiteralCharacter:
+                        //     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.String, SemanticTokenModifier.Defaults);
+                        //     break;
                         case TokenType.LiteralNumber:
                         case TokenType.LiteralHex:
                         case TokenType.LiteralBinary:
                         case TokenType.LiteralFloat:
                             builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Number, SemanticTokenModifier.Defaults);
                             break;
-                        case TokenType.Operator:
-                            break;
-                        case TokenType.Comment:
-                        case TokenType.CommentMultiline:
-                            builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Comment, SemanticTokenModifier.Defaults);
-                            break;
-                        case TokenType.Whitespace:
-                            break;
-                        case TokenType.LineBreak:
-                            break;
-                        case TokenType.PreprocessIdentifier:
-                            break;
-                        case TokenType.PreprocessArgument:
-                            break;
                         case TokenType.PreprocessSkipped:
                             builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Comment, SemanticTokenModifier.Defaults);
-                            break;
-                        default:
                             break;
                     }
                     break;

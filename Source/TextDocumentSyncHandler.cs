@@ -10,9 +10,7 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     readonly ILanguageServerFacade Router;
     readonly Buffers Buffers;
 
-    readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter[] {
-        new() { Pattern = "**/*.bbc" }
-    });
+    readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter() { Pattern = "**/*.bbc" });
 
     public TextDocumentSyncHandler(ILanguageServerFacade router, Buffers bufferManager)
     {

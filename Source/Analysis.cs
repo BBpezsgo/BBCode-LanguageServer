@@ -235,22 +235,19 @@ public static class Analysis
         string? basePath = null;
         string? configFile = file.DirectoryName != null ? Path.Combine(file.DirectoryName, "config.json") : null;
 
-        try
+        if (configFile != null && File.Exists(configFile))
         {
-            if (configFile != null && File.Exists(configFile))
+            string configRaw = File.ReadAllText(configFile);
+
+            System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(configRaw, new System.Text.Json.JsonDocumentOptions()
             {
-                string configRaw = File.ReadAllText(configFile);
-                System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(configRaw, new System.Text.Json.JsonDocumentOptions()
-                {
-                    AllowTrailingCommas = true,
-                    CommentHandling = System.Text.Json.JsonCommentHandling.Skip,
-                });
-                if (doc.RootElement.TryGetProperty("base", out System.Text.Json.JsonElement property))
-                { basePath = property.GetString(); }
-            }
+                AllowTrailingCommas = true,
+                CommentHandling = System.Text.Json.JsonCommentHandling.Skip,
+            });
+
+            if (doc.RootElement.TryGetProperty("base", out System.Text.Json.JsonElement property))
+            { basePath = property.GetString(); }
         }
-        catch (Exception)
-        { }
 
         if (basePath != null && file.DirectoryName != null)
         {

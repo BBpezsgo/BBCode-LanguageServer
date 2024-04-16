@@ -69,7 +69,7 @@ public static class Analysis
     static bool Tokenize(
         Dictionary<Uri, List<Diagnostic>> diagnostics,
         Uri file,
-        [NotNullWhen(true)] out Token[]? tokens)
+        [NotNullWhen(true)] out ImmutableArray<Token> tokens)
     {
         try
         {
@@ -94,13 +94,13 @@ public static class Analysis
             Logger.Log($"{exception.GetType()}: {exception}");
         }
 
-        tokens = null;
+        tokens = ImmutableArray<Token>.Empty;
         return false;
     }
 
     static bool Parse(
         Dictionary<Uri, List<Diagnostic>> diagnostics,
-        Token[] tokens,
+        ImmutableArray<Token> tokens,
         Uri file,
         [NotNullWhen(true)] out ParserResult parserResult)
     {
@@ -265,11 +265,11 @@ public static class Analysis
 
         AnalysisResult result = AnalysisResult.Empty;
 
-        if (!Tokenize(result.Diagnostics, file, out Token[]? tokens))
+        if (!Tokenize(result.Diagnostics, file, out ImmutableArray<Token> tokens))
         { return result; }
         result.Tokens = new Dictionary<Uri, ImmutableArray<Token>>()
         {
-            { file, tokens.ToImmutableArray() }
+            { file, tokens }
         }.ToImmutableDictionary();
 
         if (!Parse(result.Diagnostics, tokens, file, out ParserResult parserResult))

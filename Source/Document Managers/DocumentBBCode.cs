@@ -92,7 +92,7 @@ internal class DocumentBBCode : SingleDocumentHandler
 
     void Validate()
     {
-        Logger.Log($"Validating \"{Uri}\" ...");
+        Logger.Log($"Validating: \"{Uri}\"");
 
         AnalysisResult analysisResult = Analysis.Analyze(Uri);
 
@@ -344,7 +344,7 @@ internal class DocumentBBCode : SingleDocumentHandler
             builder.AppendJoin(' ', variable.Modifiers);
             builder.Append(' ');
         }
-        builder.Append(variable.Type);
+        builder.Append(variable.CompiledType?.ToString() ?? variable.Type.ToString());
         builder.Append(' ');
         builder.Append(variable.Identifier);
         definitionHover = builder.ToString();
@@ -743,7 +743,7 @@ internal class DocumentBBCode : SingleDocumentHandler
                 {
                     links.Add(new LocationLink()
                     {
-                        OriginSelectionRange = from.ToOmniSharp(),
+                        OriginSelectionRange = from.Range.ToOmniSharp(),
                         TargetRange = link.TargetRange,
                         TargetSelectionRange = link.TargetSelectionRange,
                         TargetUri = link.TargetUri,
@@ -796,6 +796,23 @@ internal class DocumentBBCode : SingleDocumentHandler
         List<SymbolInformationOrDocumentSymbol> result = new();
 
         foreach (CompiledFunction function in CompilerResult.Functions)
+        {
+            DocumentUri? uri = function.FilePath is null ? null : (DocumentUri)function.FilePath;
+            if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
+
+            result.Add(new SymbolInformation()
+            {
+                Kind = SymbolKind.Function,
+                Name = function.Identifier.Content,
+                Location = new Location()
+                {
+                    Range = function.Position.Range.ToOmniSharp(),
+                    Uri = uri ?? e.TextDocument.Uri,
+                },
+            });
+        }
+
+        foreach (CompiledOperator function in CompilerResult.Operators)
         {
             DocumentUri? uri = function.FilePath is null ? null : (DocumentUri)function.FilePath;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -938,6 +955,8 @@ internal class DocumentBBCode : SingleDocumentHandler
 
     public override void GetSemanticTokens(SemanticTokensBuilder builder, ITextDocumentIdentifierParams e)
     {
+        Tokens = Analysis.Analyze(Uri).Tokens;
+
         if (!Tokens.TryGetValue(e.TextDocument.Uri.ToUri(), out ImmutableArray<Token> tokens))
         { return; }
 

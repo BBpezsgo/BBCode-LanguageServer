@@ -23,7 +23,7 @@ public class OmniSharpService
     /// <exception cref="ServiceException"/>
     public string GetDocumentContent(DocumentUri uri)
     {
-        string? text = Buffers?.GetText(uri);
+        string? text = Buffers?.GetValue(uri);
         if (text != null) return text;
         throw new ServiceException($"Document \"{uri}\" is not buffered");
     }
@@ -82,14 +82,20 @@ public class OmniSharpService
         {
             if (e.Capabilities?.TextDocument != null)
             {
-                e.Capabilities.TextDocument.SemanticTokens = new Supports<SemanticTokensCapability?>(true, new SemanticTokensCapability()
+                e.Capabilities.TextDocument.SemanticTokens = new SemanticTokensCapability()
                 {
                     TokenTypes = new Container<SemanticTokenType>(SemanticTokenType.Defaults),
                     TokenModifiers = new Container<SemanticTokenModifier>(SemanticTokenModifier.Defaults),
                     MultilineTokenSupport = false,
                     OverlappingTokenSupport = false,
                     Formats = new Container<SemanticTokenFormat>(SemanticTokenFormat.Defaults),
-                });
+                    Requests = new SemanticTokensCapabilityRequests()
+                    {
+                        Full = new Supports<SemanticTokensCapabilityRequestFull?>(true),
+                        Range = new Supports<SemanticTokensCapabilityRequestRange?>(false),
+                    },
+                    ServerCancelSupport = false,
+                };
             }
             server.Window.Log($"Initialize ...");
             this.ServiceProvider = (server as OmniSharp.Extensions.LanguageServer.Server.LanguageServer)?.Services;

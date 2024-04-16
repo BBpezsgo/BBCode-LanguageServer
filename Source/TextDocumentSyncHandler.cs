@@ -10,7 +10,7 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     readonly ILanguageServerFacade Router;
     readonly Buffers Buffers;
 
-    readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter() { Pattern = "**/*.bbc" });
+    static readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter() { Pattern = "**/*.bbc" });
 
     public TextDocumentSyncHandler(ILanguageServerFacade router, Buffers bufferManager)
     {
@@ -18,7 +18,7 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
         Buffers = bufferManager;
     }
 
-    public TextDocumentChangeRegistrationOptions GetRegistrationOptions() => new()
+    public static TextDocumentChangeRegistrationOptions GetRegistrationOptions() => new()
     {
         DocumentSelector = DocumentSelector,
         SyncKind = TextDocumentSyncKind.Full,
@@ -29,40 +29,34 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
     public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
-        Logger.Log($"OnDocumentOpen({request.TextDocument.Uri})");
+        Logger.Log($"Document opened: \"{request.TextDocument.Uri}\"");
 
-        Microsoft.Language.Xml.StringBuffer buffer = Buffers.Update(request);
-
-        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument, buffer).OnOpened(request);
+        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument, Buffers.Update(request)).OnOpened(request);
 
         return Unit.Task;
     }
 
     public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
     {
-        Logger.Log($"OnDocumentChange({request.TextDocument.Uri})");
+        Logger.Log($"Document changed: \"{request.TextDocument.Uri}\"");
 
-        Microsoft.Language.Xml.StringBuffer buffer = Buffers.Update(request);
-
-        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument, buffer).OnChanged(request);
+        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument, Buffers.Update(request)).OnChanged(request);
 
         return Unit.Task;
     }
 
     public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
     {
-        Logger.Log($"OnDocumentSave({request.TextDocument.Uri})");
+        Logger.Log($"Document saved: \"{request.TextDocument.Uri}\"");
 
-        // Microsoft.Language.Xml.StringBuffer? buffer = Buffers.Update(request);
-
-        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument).OnSaved(request);
+        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument, Buffers.Update(request)).OnSaved(request);
 
         return Unit.Task;
     }
 
     public override Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
     {
-        Logger.Log($"OnDocumentClose({request.TextDocument.Uri})");
+        Logger.Log($"Document closed: \"{request.TextDocument.Uri}\"");
 
         OmniSharpService.Instance?.Documents.Remove(request.TextDocument);
 

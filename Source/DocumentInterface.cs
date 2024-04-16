@@ -91,12 +91,12 @@ public class Documents
 
     public void Remove(TextDocumentIdentifier documentId)
     {
-        Logger.Log($"Unregister document \"{documentId.Uri}\" ...");
+        Logger.Log($"Unregister document: \"{documentId.Uri}\"");
         for (int i = _documents.Count - 1; i >= 0; i--)
         {
             if (_documents[i].Uri == documentId.Uri)
             {
-                Logger.Log($"Document \"{documentId.Uri}\" unregistered");
+                Logger.Log($"Document unregistered: \"{documentId.Uri}\"");
                 _documents.RemoveAt(i);
             }
         }
@@ -110,7 +110,7 @@ public class Documents
             {
                 if (_documents[i].Uri == _documents[j].Uri)
                 {
-                    Logger.Log($"Unregister duplicated document \"{_documents[i].Uri}\"");
+                    Logger.Log($"Unregister duplicated document: \"{_documents[i].Uri}\"");
                     _documents.RemoveAt(i);
                 }
             }
@@ -121,56 +121,34 @@ public class Documents
         => TryGet(documentId.Uri, out SingleDocumentHandler? document) ? document : null;
 
     /// <exception cref="ServiceException"/>
-    public SingleDocumentHandler GetOrCreate(TextDocumentIdentifier documentId)
+    public SingleDocumentHandler GetOrCreate(TextDocumentIdentifier documentId, string? content = null)
     {
         RemoveDuplicates();
 
         if (TryGet(documentId.Uri, out SingleDocumentHandler? document))
         { return document; }
 
-        Logger.Log($"Register document \"{documentId.Uri}\" ...");
+        Logger.Log($"Register document: \"{documentId.Uri}\"");
 
         if (documentId.Uri.Scheme == "file")
         {
-            string path = System.Net.WebUtility.UrlDecode(documentId.Uri.ToUri().AbsolutePath);
-            if (!System.IO.File.Exists(path))
-            { throw new ServiceException($"File \"{path}\" not found"); }
+            if (content is null)
+            {
+                string path = System.Net.WebUtility.UrlDecode(documentId.Uri.ToUri().AbsolutePath);
+                if (!System.IO.File.Exists(path))
+                { throw new ServiceException($"File not found: \"{path}\""); }
+                content = System.IO.File.ReadAllText(path);
+            }
 
             string extension = documentId.Extension();
-            string content = System.IO.File.ReadAllText(path);
 
-            Logger.Log($"Document \"{documentId.Uri}\" registered");
+            Logger.Log($"Document registered: \"{documentId.Uri}\"");
             document = GenerateDocument(documentId.Uri, content, extension, this);
             _documents.Add(document);
 
             return document;
         }
 
-        throw new ServiceException($"Unknown document uri scheme \"{documentId.Uri.Scheme}\"");
-    }
-
-    /// <exception cref="ServiceException"/>
-    public SingleDocumentHandler GetOrCreate(TextDocumentIdentifier documentId, Microsoft.Language.Xml.StringBuffer buffer)
-    {
-        RemoveDuplicates();
-
-        if (TryGet(documentId.Uri, out SingleDocumentHandler? document))
-        { return document; }
-
-        Logger.Log($"Register document \"{documentId.Uri}\" ...");
-
-        if (documentId.Uri.Scheme == "file")
-        {
-            string extension = documentId.Extension();
-            string content = buffer.GetText(0, buffer.Length);
-
-            Logger.Log($"Document \"{documentId.Uri}\" registered");
-            document = GenerateDocument(documentId.Uri, content, extension, this);
-            _documents.Add(document);
-
-            return document;
-        }
-
-        throw new ServiceException($"Unknown document uri scheme \"{documentId.Uri.Scheme}\"");
+        throw new ServiceException($"Unknown document uri scheme: \"{documentId.Uri.Scheme}\"");
     }
 }

@@ -215,7 +215,7 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
 {
     protected override Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Tokenize ...");
+        Logger.Log($"Tokenize");
         OmniSharpService.Instance?.Documents.Get(identifier.TextDocument)?.GetSemanticTokens(builder, identifier);
     }, cancellationToken);
 
@@ -230,10 +230,7 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
             TokenModifiers = capability.TokenModifiers,
             TokenTypes = capability.TokenTypes,
         },
-        Full = new SemanticTokensCapabilityRequestFull
-        {
-            Delta = false,
-        },
+        Full = true,
         Range = false,
     };
 }

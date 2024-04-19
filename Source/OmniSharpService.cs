@@ -12,24 +12,12 @@ public class OmniSharpService
     public ILanguageServer? Server { get; private set; }
     public IServiceProvider? ServiceProvider { get; private set; }
     public Documents Documents { get; }
-    Buffers? Buffers;
 
     public OmniSharpService()
     {
         Instance = this;
         Documents = new Documents();
     }
-
-    /// <exception cref="ServiceException"/>
-    public string GetDocumentContent(DocumentUri uri)
-    {
-        string? text = Buffers?.GetValue(uri);
-        if (text != null) return text;
-        throw new ServiceException($"Document \"{uri}\" is not buffered");
-    }
-
-    public string GetDocumentContent(TextDocumentIdentifier document)
-        => GetDocumentContent(document.Uri);
 
     public async Task CreateAsync()
     {
@@ -46,7 +34,6 @@ public class OmniSharpService
         {
             Section = "terminal",
         });
-        services.AddSingleton<Buffers>();
     }
 
     void Configure(LanguageServerOptions options)
@@ -99,7 +86,6 @@ public class OmniSharpService
             }
             server.Window.Log($"Initialize ...");
             this.ServiceProvider = (server as OmniSharp.Extensions.LanguageServer.Server.LanguageServer)?.Services;
-            this.Buffers = ServiceProvider?.GetService<Buffers>();
             return Task.CompletedTask;
         });
 

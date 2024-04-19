@@ -2,11 +2,11 @@
 
 using DocumentManagers;
 
-public abstract class SingleDocumentHandler
+public abstract class DocumentHandler
 {
     public Uri Uri => DocumentUri.ToUri();
     public DocumentUri DocumentUri { get; private set; }
-    public string Text { get; private set; }
+    public string Content { get; private set; }
     public string LanguageId { get; private set; }
     public string Path
     {
@@ -18,34 +18,49 @@ public abstract class SingleDocumentHandler
             return result;
         }
     }
-    protected Documents App { get; }
+    protected Documents Documents { get; }
 
-    protected SingleDocumentHandler(DocumentUri uri, string content, string languageId, Documents app)
+    protected DocumentHandler(DocumentUri uri, string content, string languageId, Documents app)
     {
         DocumentUri = uri;
-        Text = content;
+        Content = content;
         LanguageId = languageId;
-        App = app;
+        Documents = app;
     }
 
     public virtual void OnOpened(DidOpenTextDocumentParams e)
     {
+        Logger.Log($"Document buffer updated ({e.TextDocument.Text.Length}): \"{e.TextDocument}\"");
+        Content = e.TextDocument.Text;
+
         DocumentUri = e.TextDocument.Uri;
-        Text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
         LanguageId = e.TextDocument.Extension();
     }
 
     public virtual void OnChanged(DidChangeTextDocumentParams e)
     {
+        string? text = e.ContentChanges.FirstOrDefault()?.Text;
+
+        if (text != null)
+        {
+            Logger.Log($"Document buffer updated ({text.Length}): \"{e.TextDocument}\"");
+            DocumentUri = text;
+        }
+
         DocumentUri = e.TextDocument.Uri;
-        Text = OmniSharpService.Instance?.GetDocumentContent(e.TextDocument) ?? string.Empty;
         LanguageId = e.TextDocument.Extension();
     }
 
     public virtual void OnSaved(DidSaveTextDocumentParams e)
     {
+        if (e.Text != null)
+        {
+            Logger.Log($"Document buffer updated ({e.Text.Length}): \"{e.TextDocument}\"");
+            Content = e.Text;
+        }
+
         DocumentUri = e.TextDocument.Uri;
-        Text = e.Text ?? string.Empty;
+        Content = e.Text ?? string.Empty;
         LanguageId = e.TextDocument.Extension();
     }
 
@@ -57,25 +72,27 @@ public abstract class SingleDocumentHandler
     public abstract CompletionItem[] Completion(CompletionParams e);
     public abstract LocationOrLocationLinks? GotoDefinition(DefinitionParams e);
     public abstract SymbolInformationOrDocumentSymbol[] Symbols(DocumentSymbolParams e);
+
+    public override string ToString() => $"{Path}";
 }
 
 public class Documents
 {
-    readonly List<SingleDocumentHandler> _documents;
+    readonly List<DocumentHandler> _documents;
 
     public Documents()
     {
-        _documents = new List<SingleDocumentHandler>();
+        _documents = new List<DocumentHandler>();
     }
 
     /// <exception cref="ServiceException"/>
-    public static SingleDocumentHandler GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface) => languageId switch
+    public static DocumentHandler GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface) => languageId switch
     {
         DocumentBBCode.LanguageIdentifier => new DocumentBBCode(uri, content, languageId, documentInterface),
         _ => throw new ServiceException($"Unknown language \"{languageId}\"")
     };
 
-    public bool TryGet(DocumentUri uri, [NotNullWhen(true)] out SingleDocumentHandler? document)
+    public bool TryGet(DocumentUri uri, [NotNullWhen(true)] out DocumentHandler? document)
     {
         for (int i = 0; i < _documents.Count; i++)
         {
@@ -117,15 +134,15 @@ public class Documents
         }
     }
 
-    public SingleDocumentHandler? Get(TextDocumentIdentifier documentId)
-        => TryGet(documentId.Uri, out SingleDocumentHandler? document) ? document : null;
+    public DocumentHandler? Get(TextDocumentIdentifier documentId)
+        => TryGet(documentId.Uri, out DocumentHandler? document) ? document : null;
 
     /// <exception cref="ServiceException"/>
-    public SingleDocumentHandler GetOrCreate(TextDocumentIdentifier documentId, string? content = null)
+    public DocumentHandler GetOrCreate(TextDocumentIdentifier documentId, string? content = null)
     {
         RemoveDuplicates();
 
-        if (TryGet(documentId.Uri, out SingleDocumentHandler? document))
+        if (TryGet(documentId.Uri, out DocumentHandler? document))
         { return document; }
 
         Logger.Log($"Register document: \"{documentId.Uri}\"");

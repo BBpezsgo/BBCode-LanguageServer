@@ -10,16 +10,17 @@ using Position = LanguageCore.Position;
 
 namespace LanguageServer.DocumentManagers;
 
-internal class DocumentBBCode : SingleDocumentHandler
+internal class DocumentBBCode : DocumentHandler
 {
     public const string LanguageIdentifier = "bbc";
 
-    ImmutableDictionary<Uri, ImmutableArray<Token>> Tokens = ImmutableDictionary.Create<Uri, ImmutableArray<Token>>();
-    ParserResult AST;
-    CompilerResult CompilerResult;
+    public ImmutableArray<Token> Tokens { get; set; }
+    public ParserResult AST { get; set; }
+    public CompilerResult CompilerResult { get; set; }
 
     public DocumentBBCode(DocumentUri uri, string content, string languageId, Documents app) : base(uri, content, languageId, app)
     {
+        Tokens = ImmutableArray<Token>.Empty;
         AST = ParserResult.Empty;
         CompilerResult = CompilerResult.Empty;
     }
@@ -59,12 +60,9 @@ internal class DocumentBBCode : SingleDocumentHandler
         if (file is null)
         { return false; }
 
-        if (!Tokens.TryGetValue(file, out ImmutableArray<Token> tokens))
-        { return false; }
-
-        for (int i = tokens.Length - 1; i >= 0; i--)
+        for (int i = Tokens.Length - 1; i >= 0; i--)
         {
-            Token token = tokens[i];
+            Token token = Tokens[i];
             if (token.Position.Range.Start >= position) continue;
 
             if (token.TokenType == TokenType.CommentMultiline)
@@ -102,19 +100,17 @@ internal class DocumentBBCode : SingleDocumentHandler
 
         foreach (KeyValuePair<Uri, List<Diagnostic>> diagnostics in analysisResult.Diagnostics)
         {
-            IEnumerable<Diagnostic> filteredDiagnostics = diagnostics.Value.Where(item => !item.Range.IsEmpty());
-
             OmniSharpService.Instance?.Server?.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams()
             {
                 Uri = diagnostics.Key,
-                Diagnostics = new Container<Diagnostic>(filteredDiagnostics),
+                Diagnostics = diagnostics.Value,
             });
         }
     }
 
     public override CompletionItem[] Completion(CompletionParams e)
     {
-        Logger.Log($"Completion({e})");
+        // Logger.Log($"Completion({e})");
 
         List<CompletionItem> result = new();
 
@@ -430,14 +426,11 @@ internal class DocumentBBCode : SingleDocumentHandler
 
     public override Hover? Hover(HoverParams e)
     {
-        Logger.Log($"Hover({e.Position.ToCool().ToStringMin()})");
+        // Logger.Log($"Hover({e.Position.ToCool().ToStringMin()})");
 
         SinglePosition position = e.Position.ToCool();
 
-        if (!Tokens.TryGetValue(e.TextDocument.Uri.ToUri(), out ImmutableArray<Token> tokens))
-        { return null; }
-
-        Token? token = tokens.GetTokenAt(position);
+        Token? token = Tokens.GetTokenAt(position);
         StringBuilder contents = new();
 
         if (token == null)
@@ -708,7 +701,7 @@ internal class DocumentBBCode : SingleDocumentHandler
 
     public override LocationOrLocationLinks? GotoDefinition(DefinitionParams e)
     {
-        Logger.Log($"GotoDefinition({e.Position.ToCool().ToStringMin()})");
+        // Logger.Log($"GotoDefinition({e.Position.ToCool().ToStringMin()})");
 
         List<LocationOrLocationLink> links = new();
 
@@ -791,7 +784,7 @@ internal class DocumentBBCode : SingleDocumentHandler
 
     public override SymbolInformationOrDocumentSymbol[] Symbols(DocumentSymbolParams e)
     {
-        Logger.Log($"Symbols()");
+        // Logger.Log($"Symbols()");
 
         List<SymbolInformationOrDocumentSymbol> result = new();
 
@@ -885,7 +878,7 @@ internal class DocumentBBCode : SingleDocumentHandler
 
     public override Location[] References(ReferenceParams e)
     {
-        Logger.Log($"References({e.Position.ToCool().ToStringMin()})");
+        // Logger.Log($"References({e.Position.ToCool().ToStringMin()})");
 
         List<Location> result = new();
 
@@ -957,10 +950,7 @@ internal class DocumentBBCode : SingleDocumentHandler
     {
         Tokens = Analysis.Analyze(Uri).Tokens;
 
-        if (!Tokens.TryGetValue(e.TextDocument.Uri.ToUri(), out ImmutableArray<Token> tokens))
-        { return; }
-
-        foreach (Token token in tokens)
+        foreach (Token token in Tokens)
         {
             switch (token.AnalyzedType)
             {

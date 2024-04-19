@@ -16,40 +16,28 @@ public class ServiceException : Exception
 
 public static class Extensions
 {
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Hint> hints, Uri currentPath, string? source = null)
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Hint> hints, string? source = null)
     {
         foreach (Hint hint in hints)
-        {
-            if (hint.Uri is null || hint.Uri != currentPath) continue;
-            yield return hint.ToOmniSharp(source);
-        }
+        { yield return hint.ToOmniSharp(source); }
     }
 
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Information> informations, Uri currentPath, string? source = null)
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Information> informations, string? source = null)
     {
         foreach (Information information in informations)
-        {
-            if (information.Uri is null || information.Uri != currentPath) continue;
-            yield return information.ToOmniSharp(source);
-        }
+        { yield return information.ToOmniSharp(source); }
     }
 
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Warning> warnings, Uri currentPath, string? source = null)
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Warning> warnings, string? source = null)
     {
         foreach (Warning warning in warnings)
-        {
-            if (warning.Uri is null || warning.Uri != currentPath) continue;
-            yield return warning.ToOmniSharp(source);
-        }
+        { yield return warning.ToOmniSharp(source); }
     }
 
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Error> errors, Uri currentPath, string? source = null)
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Error> errors, string? source = null)
     {
         foreach (Error error in errors)
-        {
-            if (error.Uri is null || error.Uri != currentPath) continue;
-            yield return error.ToOmniSharp(source);
-        }
+        { yield return error.ToOmniSharp(source); }
     }
 
     [return: NotNullIfNotNull(nameof(warning))]

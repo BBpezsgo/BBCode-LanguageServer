@@ -8,14 +8,12 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
     [SuppressMessage("CodeQuality", "IDE0052")]
     readonly ILanguageServerFacade Router;
-    readonly Buffers Buffers;
 
     static readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter() { Pattern = "**/*.bbc" });
 
-    public TextDocumentSyncHandler(ILanguageServerFacade router, Buffers bufferManager)
+    public TextDocumentSyncHandler(ILanguageServerFacade router)
     {
         Router = router;
-        Buffers = bufferManager;
     }
 
     public static TextDocumentChangeRegistrationOptions GetRegistrationOptions() => new()
@@ -31,7 +29,7 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     {
         Logger.Log($"Document opened: \"{request.TextDocument.Uri}\"");
 
-        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument, Buffers.Update(request)).OnOpened(request);
+        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument).OnOpened(request);
 
         return Unit.Task;
     }
@@ -40,7 +38,7 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     {
         Logger.Log($"Document changed: \"{request.TextDocument.Uri}\"");
 
-        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument, Buffers.Update(request)).OnChanged(request);
+        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument).OnChanged(request);
 
         return Unit.Task;
     }
@@ -49,7 +47,7 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     {
         Logger.Log($"Document saved: \"{request.TextDocument.Uri}\"");
 
-        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument, Buffers.Update(request)).OnSaved(request);
+        OmniSharpService.Instance?.Documents.GetOrCreate(request.TextDocument).OnSaved(request);
 
         return Unit.Task;
     }

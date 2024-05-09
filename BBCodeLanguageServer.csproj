@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <BaseOutputPath>C:\Users\bazsi\Documents\GitHub\InterpreterVSCodeExtension\language-server</BaseOutputPath>
+    <BaseOutputPath>C:\Users\bazsi\Projects\BBLang\VSCodeExtension\language-server</BaseOutputPath>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <ApplicationIcon>icon.ico</ApplicationIcon>
@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\BBCode\BBCodeInterpreter.csproj" />
+    <ProjectReference Include="..\Core\BBCodeInterpreter.csproj" />
   </ItemGroup>
 
 </Project>

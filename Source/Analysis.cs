@@ -154,7 +154,6 @@ public static class Analysis
         try
         {
             ParserResult ast = Parser.Parse(tokens, file);
-            ast.SetFile(file);
 
             diagnostics.AddDiagnostics(ast.Errors, v => v.ToOmniSharp("Parser"));
 

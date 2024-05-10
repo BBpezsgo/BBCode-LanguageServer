@@ -230,7 +230,7 @@ public static class Analysis
 
             CodeGeneratorForMain.Generate(
                 compilerResult,
-                new GeneratorSettings()
+                new MainGeneratorSettings()
                 {
                     CheckNullPointers = false,
                     DontOptimize = true,

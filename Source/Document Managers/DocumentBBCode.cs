@@ -60,9 +60,13 @@ internal class DocumentBBCode : DocumentHandler
         if (file is null)
         { return false; }
 
-        for (int i = Tokens.Length - 1; i >= 0; i--)
+        if (!Documents.TryGet(file, out DocumentHandler? document) ||
+            document is not DocumentBBCode documentBBC)
+        { return false; }
+
+        for (int i = documentBBC.Tokens.Length - 1; i >= 0; i--)
         {
-            Token token = Tokens[i];
+            Token token = documentBBC.Tokens[i];
             if (token.Position.Range.Start >= position) continue;
 
             if (token.TokenType == TokenType.CommentMultiline)
@@ -181,6 +185,16 @@ internal class DocumentBBCode : DocumentHandler
         where TFunction : FunctionThingDefinition, ICompiledFunction, IReadable
     {
         StringBuilder builder = new();
+
+        if (function.Template != null)
+        {
+            builder.Append(function.Template.Keyword);
+            builder.Append('<');
+            builder.AppendJoin(", ", function.Template.Parameters);
+            builder.Append('>');
+            builder.Append("\r\n");
+        }
+
         IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(function.Modifiers);
         if (modifiers.Any())
         {
@@ -190,11 +204,41 @@ internal class DocumentBBCode : DocumentHandler
 
         builder.Append(function.Type);
         builder.Append(' ');
-        builder.Append(function.ToReadable(ToReadableFlags.ParameterIdentifiers | ToReadableFlags.Modifiers));
+        builder.Append(function.Identifier.ToString());
+        builder.Append('(');
+        for (int i = 0; i < function.Parameters.Count; i++)
+        {
+            if (i > 0) builder.Append(", ");
+            builder.AppendJoin(' ', function.Parameters[i].Modifiers);
+            if (function.Parameters[i].Modifiers.Length > 0)
+            { builder.Append(' '); }
+
+            builder.Append(function.ParameterTypes[i].ToString());
+
+            builder.Append(' ');
+            builder.Append(function.Parameters[i].Identifier.ToString());
+        }
+        builder.Append(')');
         return builder.ToString();
     }
 
     static string GetStructHover(CompiledStruct @struct)
+    {
+        StringBuilder builder = new();
+        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(@struct.Modifiers);
+        if (modifiers.Any())
+        {
+            builder.AppendJoin(' ', modifiers);
+            builder.Append(' ');
+        }
+
+        builder.Append(DeclarationKeywords.Struct);
+        builder.Append(' ');
+        builder.Append(@struct.Identifier);
+        return builder.ToString();
+    }
+
+    static string GetStructHover(StructDefinition @struct)
     {
         StringBuilder builder = new();
         IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(@struct.Modifiers);
@@ -219,10 +263,20 @@ internal class DocumentBBCode : DocumentHandler
         return builder.ToString();
     }
 
+    static string GetEnumHover(EnumDefinition @enum)
+    {
+        StringBuilder builder = new();
+        builder.Append(DeclarationKeywords.Enum);
+        builder.Append(' ');
+        builder.Append(@enum.Identifier);
+        return builder.ToString();
+    }
+
     static string GetTypeHover(GeneralType type) => type switch
     {
         StructType structType => $"{DeclarationKeywords.Struct} {structType.Struct.Identifier.Content}",
         EnumType enumType => $"{DeclarationKeywords.Enum} {enumType.Enum.Identifier.Content}",
+        GenericType genericType => $"(generic) {genericType}",
         _ => type.ToString()
     };
 
@@ -263,6 +317,10 @@ internal class DocumentBBCode : DocumentHandler
         FieldDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledEnum v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledStruct v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+
+        EnumDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        StructDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+
         _ => false,
     };
 
@@ -287,7 +345,27 @@ internal class DocumentBBCode : DocumentHandler
         return true;
     }
 
+    bool HandleDefinitionHover(EnumDefinition @enum, ref string? definitionHover, ref string? docsHover)
+    {
+        if (@enum.FilePath is null)
+        { return false; }
+
+        definitionHover = GetEnumHover(@enum);
+        GetCommentDocumentation(@enum, out docsHover);
+        return true;
+    }
+
     bool HandleDefinitionHover(CompiledStruct @struct, ref string? definitionHover, ref string? docsHover)
+    {
+        if (@struct.FilePath is null)
+        { return false; }
+
+        definitionHover = GetStructHover(@struct);
+        GetCommentDocumentation(@struct, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(StructDefinition @struct, ref string? definitionHover, ref string? docsHover)
     {
         if (@struct.FilePath is null)
         { return false; }
@@ -431,7 +509,6 @@ internal class DocumentBBCode : DocumentHandler
         SinglePosition position = e.Position.ToCool();
 
         Token? token = Tokens.GetTokenAt(position);
-        StringBuilder contents = new();
 
         if (token == null)
         { return null; }
@@ -459,13 +536,25 @@ internal class DocumentBBCode : DocumentHandler
         {
             HandleDefinitionHover(@struct, ref definitionHover, ref docsHover);
         }
+        else if (CompilerResult.GetThingAt<StructDefinition, Token>(AST.Structs, Uri, position, out StructDefinition? @struct2))
+        {
+            HandleDefinitionHover(@struct2, ref definitionHover, ref docsHover);
+        }
         else if (CompilerResult.GetEnumAt(Uri, position, out CompiledEnum? @enum))
         {
             HandleDefinitionHover(@enum, ref definitionHover, ref docsHover);
         }
+        else if (CompilerResult.GetThingAt<EnumDefinition, Token>(AST.Enums, Uri, position, out EnumDefinition? @enum2))
+        {
+            HandleDefinitionHover(@enum2, ref definitionHover, ref docsHover);
+        }
         else if (CompilerResult.GetFieldAt(Uri, position, out CompiledField? field))
         {
             HandleDefinitionHover(field, ref definitionHover, ref docsHover);
+        }
+        else if (AST.GetFieldAt(Uri, position, out FieldDefinition? field2))
+        {
+            HandleDefinitionHover(field2, ref definitionHover, ref docsHover);
         }
         else if (CompilerResult.GetParameterDefinitionAt(Uri, position, out ParameterDefinition? parameter, out _) &&
                  parameter.Identifier.Position.Range.Contains(position))
@@ -494,6 +583,18 @@ internal class DocumentBBCode : DocumentHandler
                 HandleValueHovering(item, ref valueHover);
             }
         }
+        else
+        {
+            foreach (UsingDefinition @using in AST.Usings)
+            {
+                if (new Position(@using.Path).Range.Contains(e.Position.ToCool()))
+                {
+                    if (@using.CompiledUri != null)
+                    { definitionHover = $"using \"{@using.CompiledUri.Replace('\\', '/')}\""; }
+                    break;
+                }
+            }
+        }
 
         if (typeHover is null &&
             (AST, CompilerResult).GetTypeInstanceAt(Uri, e.Position.ToCool(), out TypeInstance? typeInstance, out GeneralType? generalType))
@@ -502,31 +603,34 @@ internal class DocumentBBCode : DocumentHandler
             typeHover = GetTypeHover(generalType);
         }
 
+        StringBuilder contents = new();
+
         if (definitionHover is not null)
         {
+            if (contents.Length > 0) contents.AppendLine("---");
             contents.AppendLine($"```{LanguageIdentifier}");
             contents.AppendLine(definitionHover);
             contents.AppendLine("```");
-            contents.AppendLine("---");
         }
         else if (typeHover is not null)
         {
+            if (contents.Length > 0) contents.AppendLine("---");
             contents.AppendLine($"```{LanguageIdentifier}");
             contents.AppendLine(typeHover);
             contents.AppendLine("```");
-            contents.AppendLine("---");
         }
 
         if (valueHover is not null)
         {
+            if (contents.Length > 0) contents.AppendLine("---");
             contents.AppendLine($"```{LanguageIdentifier}");
             contents.AppendLine(valueHover);
             contents.AppendLine("```");
-            contents.AppendLine("---");
         }
 
         if (docsHover is not null)
         {
+            if (contents.Length > 0) contents.AppendLine("---");
             contents.AppendLine(docsHover);
         }
 
@@ -603,18 +707,30 @@ internal class DocumentBBCode : DocumentHandler
             });
         }
 
-        foreach (CompiledStruct function in CompilerResult.Structs)
+        foreach (CompiledStruct @struct in CompilerResult.Structs)
         {
-            if (function.FilePath != Uri) continue;
+            if (@struct.FilePath != Uri) continue;
 
             result.Add(new CodeLens()
             {
-                Range = function.Identifier.Position.Range.ToOmniSharp(),
+                Range = @struct.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.Count} reference",
+                    Title = $"{@struct.References.Count} reference",
                 },
             });
+
+            foreach (CompiledField field in @struct.Fields)
+            {
+                result.Add(new CodeLens()
+                {
+                    Range = field.Identifier.Position.Range.ToOmniSharp(),
+                    Command = new Command()
+                    {
+                        Title = $"{field.References.Count} reference",
+                    },
+                });
+            }
         }
 
         return result.ToArray();
@@ -775,6 +891,17 @@ internal class DocumentBBCode : DocumentHandler
                             TargetUri = link.TargetUri,
                         });
                     }
+                    else if (type is GenericType genericType &&
+                             genericType.Definition != null)
+                    {
+                        links.Add(new LocationLink()
+                        {
+                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            TargetRange = genericType.Definition.Position.Range.ToOmniSharp(),
+                            TargetSelectionRange = genericType.Definition.Position.Range.ToOmniSharp(),
+                            TargetUri = DocumentUri,
+                        });
+                    }
                 }
             }
         }
@@ -884,9 +1011,8 @@ internal class DocumentBBCode : DocumentHandler
 
         if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunction? function))
         {
-            for (int i = 0; i < function.References.Count; i++)
+            foreach (Reference<StatementWithValue> reference in function.References)
             {
-                Reference<StatementWithValue> reference = function.References[i];
                 if (reference.SourceFile == null) continue;
                 result.Add(new Location()
                 {
@@ -898,9 +1024,8 @@ internal class DocumentBBCode : DocumentHandler
 
         if (CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool(), out CompiledGeneralFunction? generalFunction))
         {
-            for (int i = 0; i < generalFunction.References.Count; i++)
+            foreach (Reference<Statement> reference in generalFunction.References)
             {
-                Reference<Statement> reference = generalFunction.References[i];
                 if (reference.SourceFile == null) continue;
                 result.Add(new Location()
                 {
@@ -912,9 +1037,8 @@ internal class DocumentBBCode : DocumentHandler
 
         if (CompilerResult.GetOperatorAt(Uri, e.Position.ToCool(), out CompiledOperator? @operator))
         {
-            for (int i = 0; i < @operator.References.Count; i++)
+            foreach (Reference<StatementWithValue> reference in @operator.References)
             {
-                Reference<StatementWithValue> reference = @operator.References[i];
                 if (reference.SourceFile == null) continue;
                 result.Add(new Location()
                 {
@@ -926,9 +1050,21 @@ internal class DocumentBBCode : DocumentHandler
 
         if (CompilerResult.GetStructAt(Uri, e.Position.ToCool(), out CompiledStruct? @struct))
         {
-            for (int i = 0; i < @struct.References.Count; i++)
+            foreach (Reference<TypeInstance> reference in @struct.References)
             {
-                Reference<TypeInstance> reference = @struct.References[i];
+                if (reference.SourceFile == null) continue;
+                result.Add(new Location()
+                {
+                    Range = reference.Source.Position.ToOmniSharp(),
+                    Uri = reference.SourceFile,
+                });
+            }
+        }
+
+        if (CompilerResult.GetFieldAt(Uri, e.Position.ToCool(), out CompiledField? compiledField))
+        {
+            foreach (Reference<Statement> reference in compiledField.References)
+            {
                 if (reference.SourceFile == null) continue;
                 result.Add(new Location()
                 {

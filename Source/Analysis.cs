@@ -318,9 +318,22 @@ public static class Analysis
             return result;
         }
 
+        if (OmniSharpService.Instance is not null)
+        {
+            foreach (KeyValuePair<Uri, CollectedAST> ast in compilerResult.Raw)
+            {
+                DocumentHandler doc = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(ast.Key));
+                if (doc is DocumentBBCode docBBC)
+                {
+                    docBBC.AST = ast.Value.ParserResult;
+                    docBBC.Tokens = ast.Value.Tokens;
+                }
+            }
+        }
+
         result.CompilerResult = compilerResult;
         result.AST = compilerResult.Raw[file].ParserResult;
-        result.Tokens = compilerResult.Raw[file].ParserResult.Tokens;
+        result.Tokens = compilerResult.Raw[file].Tokens;
 
         if (!Generate(result.Diagnostics, compilerResult, file))
         { return result; }

@@ -84,14 +84,13 @@ public class OmniSharpService
                     ServerCancelSupport = false,
                 };
             }
-            server.Window.Log($"Initialize ...");
             this.ServiceProvider = (server as OmniSharp.Extensions.LanguageServer.Server.LanguageServer)?.Services;
             return Task.CompletedTask;
         });
 
         options.OnInitialized((server, e, result, cancellationToken) =>
         {
-            server.Window.Log($"Initialized");
+            server.Window.Log($"[LanguageServer]: Initialized");
             return Task.CompletedTask;
         });
 

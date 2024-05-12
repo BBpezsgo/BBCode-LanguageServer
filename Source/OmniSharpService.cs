@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 
 namespace LanguageServer;
 
@@ -12,6 +13,7 @@ public class OmniSharpService
     public ILanguageServer? Server { get; private set; }
     public IServiceProvider? ServiceProvider { get; private set; }
     public Documents Documents { get; }
+    public JToken? Config { get; private set; }
 
     public OmniSharpService()
     {
@@ -101,7 +103,8 @@ public class OmniSharpService
         });
     }
 
-    [SuppressMessage("Performance", "CA1822")]
-    public void OnConfigChanged(DidChangeConfigurationParams _)
-    { }
+    public void OnConfigChanged(DidChangeConfigurationParams e)
+    {
+        Config = e.Settings;
+    }
 }

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.IO;
 using LanguageCore;
-using LanguageCore.BBCode.Generator;
+using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Runtime;
@@ -96,9 +96,9 @@ public static class Analysis
         if (!force &&
             OmniSharpService.Instance is not null &&
             OmniSharpService.Instance.Documents.TryGet(file, out DocumentHandler? document) &&
-            document is DocumentBBCode bbcDocument)
+            document is DocumentBBLang documentBBLang)
         {
-            tokens = bbcDocument.Tokens;
+            tokens = documentBBLang.Tokens;
             return true;
         }
 
@@ -114,8 +114,8 @@ public static class Analysis
             if (OmniSharpService.Instance is not null)
             {
                 DocumentHandler document2 = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(file));
-                if (document2 is DocumentBBCode bbcDocument2)
-                { bbcDocument2.Tokens = tokenizerResult.Tokens; }
+                if (document2 is DocumentBBLang documentBBLang2)
+                { documentBBLang2.Tokens = tokenizerResult.Tokens; }
             }
 
             tokens = tokenizerResult.Tokens;
@@ -145,9 +145,9 @@ public static class Analysis
         if (!force &&
             OmniSharpService.Instance is not null &&
             OmniSharpService.Instance.Documents.TryGet(file, out DocumentHandler? document) &&
-            document is DocumentBBCode bbcDocument)
+            document is DocumentBBLang documentBBLang)
         {
-            parserResult = bbcDocument.AST;
+            parserResult = documentBBLang.AST;
             return true;
         }
 
@@ -184,9 +184,9 @@ public static class Analysis
         if (!force &&
             OmniSharpService.Instance is not null &&
             OmniSharpService.Instance.Documents.TryGet(file, out DocumentHandler? document) &&
-            document is DocumentBBCode bbcDocument)
+            document is DocumentBBLang documentBBLang)
         {
-            compilerResult = bbcDocument.CompilerResult;
+            compilerResult = documentBBLang.CompilerResult;
             return true;
         }
 
@@ -322,11 +322,11 @@ public static class Analysis
         {
             foreach (KeyValuePair<Uri, CollectedAST> ast in compilerResult.Raw)
             {
-                DocumentHandler doc = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(ast.Key));
-                if (doc is DocumentBBCode docBBC)
+                DocumentHandler document = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(ast.Key));
+                if (document is DocumentBBLang documentBBLang)
                 {
-                    docBBC.AST = ast.Value.ParserResult;
-                    docBBC.Tokens = ast.Value.Tokens;
+                    documentBBLang.AST = ast.Value.ParserResult;
+                    documentBBLang.Tokens = ast.Value.Tokens;
                 }
             }
         }

@@ -88,7 +88,7 @@ public class Documents
     /// <exception cref="ServiceException"/>
     public static DocumentHandler GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface) => languageId switch
     {
-        DocumentBBCode.LanguageIdentifier => new DocumentBBCode(uri, content, languageId, documentInterface),
+        LanguageCore.LanguageConstants.LanguageId => new DocumentBBLang(uri, content, languageId, documentInterface),
         _ => throw new ServiceException($"Unknown language \"{languageId}\"")
     };
 

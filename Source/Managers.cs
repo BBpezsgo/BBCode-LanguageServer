@@ -30,7 +30,7 @@ public class DocumentSymbolHandler : IDocumentSymbolHandler
         capability.HierarchicalDocumentSymbolSupport = true;
         return new DocumentSymbolRegistrationOptions()
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
+            DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
         };
     }
 }
@@ -60,7 +60,7 @@ public class CompletionHandler : ICompletionHandler
         capability.ContextSupport = false;
         return new CompletionRegistrationOptions()
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
+            DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
             ResolveProvider = false,
         };
     }
@@ -88,7 +88,7 @@ public class CodeLensHandler : ICodeLensHandler
 
     public CodeLensRegistrationOptions GetRegistrationOptions(CodeLensCapability capability, ClientCapabilities clientCapabilities) => new()
     {
-        DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
+        DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
         ResolveProvider = false,
     };
 }
@@ -114,7 +114,7 @@ public class DefinitionHandler : IDefinitionHandler
 
     public DefinitionRegistrationOptions GetRegistrationOptions(DefinitionCapability capability, ClientCapabilities clientCapabilities) => new()
     {
-        DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
+        DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
     };
 }
 
@@ -139,7 +139,7 @@ public class HoverHandler : IHoverHandler
 
     public HoverRegistrationOptions GetRegistrationOptions(HoverCapability capability, ClientCapabilities clientCapabilities) => new()
     {
-        DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
+        DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
     };
 }
 
@@ -166,7 +166,7 @@ public class ReferencesHandler : IReferencesHandler
 
     public ReferenceRegistrationOptions GetRegistrationOptions(ReferenceCapability capability, ClientCapabilities clientCapabilities) => new()
     {
-        DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
+        DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
     };
 }
 
@@ -191,7 +191,7 @@ public class SignatureHelpHandler : ISignatureHelpHandler
 
     public SignatureHelpRegistrationOptions GetRegistrationOptions(SignatureHelpCapability capability, ClientCapabilities clientCapabilities) => new()
     {
-        DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
+        DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
         TriggerCharacters = new Container<string>("(", ","),
     };
 }
@@ -224,7 +224,7 @@ public class SemanticTokensHandler : SemanticTokensHandlerBase
 
     protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities) => new()
     {
-        DocumentSelector = TextDocumentSelector.ForLanguage(DocumentBBCode.LanguageIdentifier),
+        DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
         Legend = new SemanticTokensLegend
         {
             TokenModifiers = capability.TokenModifiers,

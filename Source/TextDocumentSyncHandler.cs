@@ -9,7 +9,7 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     [SuppressMessage("CodeQuality", "IDE0052")]
     readonly ILanguageServerFacade Router;
 
-    static readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter() { Pattern = "**/*.bbc" });
+    static readonly TextDocumentSelector DocumentSelector = new(new TextDocumentFilter() { Pattern = $"**/*.{LanguageCore.LanguageConstants.LanguageExtension}" });
 
     public TextDocumentSyncHandler(ILanguageServerFacade router)
     {

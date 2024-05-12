@@ -10,15 +10,13 @@ using Position = LanguageCore.Position;
 
 namespace LanguageServer.DocumentManagers;
 
-internal class DocumentBBCode : DocumentHandler
+internal class DocumentBBLang : DocumentHandler
 {
-    public const string LanguageIdentifier = "bbc";
-
     public ImmutableArray<Token> Tokens { get; set; }
     public ParserResult AST { get; set; }
     public CompilerResult CompilerResult { get; set; }
 
-    public DocumentBBCode(DocumentUri uri, string content, string languageId, Documents app) : base(uri, content, languageId, app)
+    public DocumentBBLang(DocumentUri uri, string content, string languageId, Documents app) : base(uri, content, languageId, app)
     {
         Tokens = ImmutableArray<Token>.Empty;
         AST = ParserResult.Empty;
@@ -61,12 +59,12 @@ internal class DocumentBBCode : DocumentHandler
         { return false; }
 
         if (!Documents.TryGet(file, out DocumentHandler? document) ||
-            document is not DocumentBBCode documentBBC)
+            document is not DocumentBBLang documentBBLang)
         { return false; }
 
-        for (int i = documentBBC.Tokens.Length - 1; i >= 0; i--)
+        for (int i = documentBBLang.Tokens.Length - 1; i >= 0; i--)
         {
-            Token token = documentBBC.Tokens[i];
+            Token token = documentBBLang.Tokens[i];
             if (token.Position.Range.Start >= position) continue;
 
             if (token.TokenType == TokenType.CommentMultiline)
@@ -590,7 +588,7 @@ internal class DocumentBBCode : DocumentHandler
                 if (new Position(@using.Path).Range.Contains(e.Position.ToCool()))
                 {
                     if (@using.CompiledUri != null)
-                    { definitionHover = $"using \"{@using.CompiledUri.Replace('\\', '/')}\""; }
+                    { definitionHover = $"{@using.Keyword} \"{@using.CompiledUri.Replace('\\', '/')}\""; }
                     break;
                 }
             }
@@ -608,14 +606,14 @@ internal class DocumentBBCode : DocumentHandler
         if (definitionHover is not null)
         {
             if (contents.Length > 0) contents.AppendLine("---");
-            contents.AppendLine($"```{LanguageIdentifier}");
+            contents.AppendLine($"```{LanguageConstants.LanguageId}");
             contents.AppendLine(definitionHover);
             contents.AppendLine("```");
         }
         else if (typeHover is not null)
         {
             if (contents.Length > 0) contents.AppendLine("---");
-            contents.AppendLine($"```{LanguageIdentifier}");
+            contents.AppendLine($"```{LanguageConstants.LanguageId}");
             contents.AppendLine(typeHover);
             contents.AppendLine("```");
         }
@@ -623,7 +621,7 @@ internal class DocumentBBCode : DocumentHandler
         if (valueHover is not null)
         {
             if (contents.Length > 0) contents.AppendLine("---");
-            contents.AppendLine($"```{LanguageIdentifier}");
+            contents.AppendLine($"```{LanguageConstants.LanguageId}");
             contents.AppendLine(valueHover);
             contents.AppendLine("```");
         }

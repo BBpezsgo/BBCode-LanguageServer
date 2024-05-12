@@ -87,7 +87,7 @@ public static class Utils
         if (function.Type.Position.Range.Contains(position))
         {
             typeInstance = function.Type;
-            generalType = (function as ICompiledFunction).Type;
+            generalType = ((ICompiledFunction)function).Type;
             return true;
         }
 

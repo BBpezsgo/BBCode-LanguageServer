@@ -43,7 +43,7 @@ public static class Utils
     {
         foreach (TFunction function in functions)
         {
-            if (function.FilePath != file)
+            if (function.File != file)
             { continue; }
 
             if (GetParameterDefinitionAt(function, position, out parameter, out parameterType))
@@ -106,7 +106,7 @@ public static class Utils
     {
         foreach (TFunction function in functions)
         {
-            if (function.FilePath != file)
+            if (function.File != file)
             { continue; }
 
             if (GetReturnTypeAt(function, position, out typeInstance, out generalType))

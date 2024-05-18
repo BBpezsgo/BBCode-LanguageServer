@@ -34,9 +34,9 @@ public static class Extensions
         { yield return warning.ToOmniSharp(source); }
     }
 
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Error> errors, string? source = null)
+    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<LanguageError> errors, string? source = null)
     {
-        foreach (Error error in errors)
+        foreach (LanguageError error in errors)
         { yield return error.ToOmniSharp(source); }
     }
 
@@ -68,7 +68,7 @@ public static class Extensions
     };
 
     [return: NotNullIfNotNull(nameof(error))]
-    public static Diagnostic? ToOmniSharp(this Error? error, string? source = null) => error is null ? null : new Diagnostic()
+    public static Diagnostic? ToOmniSharp(this LanguageError? error, string? source = null) => error is null ? null : new Diagnostic()
     {
         Severity = DiagnosticSeverity.Error,
         Range = error.Position.ToOmniSharp(),
@@ -86,7 +86,7 @@ public static class Extensions
     };
 
     public static DocumentUri? Uri(this FunctionThingDefinition function)
-        => function.FilePath is null ? null : (DocumentUri)function.FilePath;
+        => function.File is null ? null : (DocumentUri)function.File;
 
     public static TValue EnsureExistence<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key, TValue value) where TKey : notnull
     {

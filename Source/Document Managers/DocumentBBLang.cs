@@ -20,7 +20,7 @@ internal class DocumentBBLang : DocumentHandler
     {
         Tokens = ImmutableArray<Token>.Empty;
         AST = ParserResult.Empty;
-        CompilerResult = CompilerResult.Empty;
+        CompilerResult = CompilerResult.MakeEmpty(uri.ToUri());
     }
 
     public override void OnChanged(DidChangeTextDocumentParams e)
@@ -49,7 +49,7 @@ internal class DocumentBBLang : DocumentHandler
 
     bool GetCommentDocumentation<TDefinition>(TDefinition definition, [NotNullWhen(true)] out string? result)
         where TDefinition : IPositioned, IInFile
-        => GetCommentDocumentation(definition.Position.Range.Start, definition.FilePath, out result);
+        => GetCommentDocumentation(definition.Position.Range.Start, definition.File, out result);
 
     bool GetCommentDocumentation(SinglePosition position, Uri? file, [NotNullWhen(true)] out string? result)
     {
@@ -325,7 +325,7 @@ internal class DocumentBBLang : DocumentHandler
     bool HandleDefinitionHover<TFunction>(TFunction function, ref string? definitionHover, ref string? docsHover)
         where TFunction : FunctionThingDefinition, ICompiledFunction, IReadable
     {
-        if (function.FilePath is null)
+        if (function.File is null)
         { return false; }
 
         definitionHover = GetFunctionHover(function);
@@ -335,7 +335,7 @@ internal class DocumentBBLang : DocumentHandler
 
     bool HandleDefinitionHover(CompiledEnum @enum, ref string? definitionHover, ref string? docsHover)
     {
-        if (@enum.FilePath is null)
+        if (@enum.File is null)
         { return false; }
 
         definitionHover = GetEnumHover(@enum);
@@ -345,7 +345,7 @@ internal class DocumentBBLang : DocumentHandler
 
     bool HandleDefinitionHover(EnumDefinition @enum, ref string? definitionHover, ref string? docsHover)
     {
-        if (@enum.FilePath is null)
+        if (@enum.File is null)
         { return false; }
 
         definitionHover = GetEnumHover(@enum);
@@ -355,7 +355,7 @@ internal class DocumentBBLang : DocumentHandler
 
     bool HandleDefinitionHover(CompiledStruct @struct, ref string? definitionHover, ref string? docsHover)
     {
-        if (@struct.FilePath is null)
+        if (@struct.File is null)
         { return false; }
 
         definitionHover = GetStructHover(@struct);
@@ -365,7 +365,7 @@ internal class DocumentBBLang : DocumentHandler
 
     bool HandleDefinitionHover(StructDefinition @struct, ref string? definitionHover, ref string? docsHover)
     {
-        if (@struct.FilePath is null)
+        if (@struct.File is null)
         { return false; }
 
         definitionHover = GetStructHover(@struct);
@@ -375,7 +375,7 @@ internal class DocumentBBLang : DocumentHandler
 
     bool HandleDefinitionHover(CompiledVariable variable, ref string? definitionHover, ref string? docsHover)
     {
-        if (variable.FilePath is null)
+        if (variable.File is null)
         { return false; }
 
         StringBuilder builder = new();
@@ -401,7 +401,7 @@ internal class DocumentBBLang : DocumentHandler
 
     bool HandleDefinitionHover(VariableDeclaration variable, ref string? definitionHover, ref string? docsHover)
     {
-        if (variable.FilePath is null)
+        if (variable.File is null)
         { return false; }
 
         StringBuilder builder = new();
@@ -442,7 +442,7 @@ internal class DocumentBBLang : DocumentHandler
         builder.Append(parameter.Identifier);
         definitionHover = builder.ToString();
 
-        GetCommentDocumentation(parameter, parameter.Context.FilePath, out docsHover);
+        GetCommentDocumentation(parameter, parameter.Context.File, out docsHover);
         return true;
     }
 
@@ -460,7 +460,7 @@ internal class DocumentBBLang : DocumentHandler
         builder.Append(parameter.Identifier);
         definitionHover = builder.ToString();
 
-        GetCommentDocumentation(parameter, parameter.Context.FilePath, out docsHover);
+        GetCommentDocumentation(parameter, parameter.Context.File, out docsHover);
         return true;
     }
 
@@ -468,11 +468,11 @@ internal class DocumentBBLang : DocumentHandler
     {
         if (field.Context is null)
         { return false; }
-        if (field.Context.FilePath is null)
+        if (field.Context.File is null)
         { return false; }
 
         definitionHover = $"(field) {field.Type} {field.Identifier}";
-        GetCommentDocumentation(field, field.Context.FilePath, out docsHover);
+        GetCommentDocumentation(field, field.Context.File, out docsHover);
         return true;
     }
 
@@ -480,11 +480,11 @@ internal class DocumentBBLang : DocumentHandler
     {
         if (field.Context is null)
         { return false; }
-        if (field.Context.FilePath is null)
+        if (field.Context.File is null)
         { return false; }
 
         definitionHover = $"(field) {field.Type} {field.Identifier}";
-        GetCommentDocumentation(field, field.Context.FilePath, out docsHover);
+        GetCommentDocumentation(field, field.Context.File, out docsHover);
         return true;
     }
 
@@ -651,7 +651,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledFunction function in CompilerResult.Functions)
         {
-            if (function.FilePath != Uri) continue;
+            if (function.File != Uri) continue;
 
             result.Add(new CodeLens()
             {
@@ -665,7 +665,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
         {
-            if (function.FilePath != Uri) continue;
+            if (function.File != Uri) continue;
 
             result.Add(new CodeLens()
             {
@@ -679,7 +679,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledOperator function in CompilerResult.Operators)
         {
-            if (function.FilePath != Uri) continue;
+            if (function.File != Uri) continue;
 
             result.Add(new CodeLens()
             {
@@ -693,7 +693,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledConstructor function in CompilerResult.Constructors)
         {
-            if (function.FilePath != Uri) continue;
+            if (function.File != Uri) continue;
 
             result.Add(new CodeLens()
             {
@@ -707,7 +707,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledStruct @struct in CompilerResult.Structs)
         {
-            if (@struct.FilePath != Uri) continue;
+            if (@struct.File != Uri) continue;
 
             result.Add(new CodeLens()
             {
@@ -794,9 +794,9 @@ internal class DocumentBBLang : DocumentHandler
 
         if (reference is IInFile inFile)
         {
-            if (inFile.FilePath is null)
+            if (inFile.File is null)
             { return false; }
-            file = inFile.FilePath;
+            file = inFile.File;
         }
 
         if (reference is IIdentifiable<Token> identifiable1)
@@ -915,7 +915,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledFunction function in CompilerResult.Functions)
         {
-            DocumentUri? uri = function.FilePath is null ? null : (DocumentUri)function.FilePath;
+            DocumentUri? uri = function.File is null ? null : (DocumentUri)function.File;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
             result.Add(new SymbolInformation()
@@ -932,7 +932,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledOperator function in CompilerResult.Operators)
         {
-            DocumentUri? uri = function.FilePath is null ? null : (DocumentUri)function.FilePath;
+            DocumentUri? uri = function.File is null ? null : (DocumentUri)function.File;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
             result.Add(new SymbolInformation()
@@ -949,7 +949,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
         {
-            DocumentUri? uri = function.FilePath is null ? null : (DocumentUri)function.FilePath;
+            DocumentUri? uri = function.File is null ? null : (DocumentUri)function.File;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
             result.Add(new SymbolInformation()
@@ -966,7 +966,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledStruct @struct in CompilerResult.Structs)
         {
-            DocumentUri? uri = @struct.FilePath is null ? null : (DocumentUri)@struct.FilePath;
+            DocumentUri? uri = @struct.File is null ? null : (DocumentUri)@struct.File;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
             result.Add(new SymbolInformation()
@@ -983,7 +983,7 @@ internal class DocumentBBLang : DocumentHandler
 
         foreach (CompiledEnum @enum in CompilerResult.Enums)
         {
-            DocumentUri? uri = @enum.FilePath is null ? null : (DocumentUri)@enum.FilePath;
+            DocumentUri? uri = @enum.File is null ? null : (DocumentUri)@enum.File;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
 
             result.Add(new SymbolInformation()

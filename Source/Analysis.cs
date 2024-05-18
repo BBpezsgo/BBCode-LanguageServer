@@ -26,20 +26,6 @@ public struct AnalysisResult
     };
 }
 
-public readonly struct AnalyzedFile
-{
-    public readonly ParserResult AST;
-    public readonly CompilerResult CompilerResult;
-
-    public static AnalyzedFile Empty => new(ParserResult.Empty, CompilerResult.Empty);
-
-    public AnalyzedFile(ParserResult ast, CompilerResult compilerResult)
-    {
-        AST = ast;
-        CompilerResult = compilerResult;
-    }
-}
-
 public static class Analysis
 {
     static readonly TokenizerSettings TokenizerSettings = new(TokenizerSettings.Default)
@@ -57,14 +43,14 @@ public static class Analysis
         }
     }
 
-    static void AddDiagnostics<TValue>(
+    static void AddDiagnostics<TDiagnostics>(
         this Dictionary<Uri, List<Diagnostic>> diagnostics,
-        TValue value,
-        Func<TValue, Diagnostic> converter)
-        where TValue : IInFile
+        TDiagnostics value,
+        Func<TDiagnostics, Diagnostic> converter)
+        where TDiagnostics : IDiagnostics
     {
-        if (value.FilePath is null) return;
-        List<Diagnostic> list = diagnostics.EnsureExistence(value.FilePath, new List<Diagnostic>());
+        if (value.File is null) return;
+        List<Diagnostic> list = diagnostics.EnsureExistence(value.File, new List<Diagnostic>());
         Diagnostic converted = converter.Invoke(value);
 
         foreach (Diagnostic item in list)
@@ -77,13 +63,13 @@ public static class Analysis
         list.Add(converted);
     }
 
-    static void AddDiagnostics<TValue>(
+    static void AddDiagnostics<TDiagnostics>(
         this Dictionary<Uri, List<Diagnostic>> diagnostics,
-        IEnumerable<TValue> values,
-        Func<TValue, Diagnostic> converter)
-        where TValue : IInFile
+        IEnumerable<TDiagnostics> values,
+        Func<TDiagnostics, Diagnostic> converter)
+        where TDiagnostics : IDiagnostics
     {
-        foreach (TValue value in values)
+        foreach (TDiagnostics value in values)
         { diagnostics.AddDiagnostics(value, converter); }
     }
 

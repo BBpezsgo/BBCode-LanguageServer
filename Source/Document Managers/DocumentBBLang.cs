@@ -128,18 +128,6 @@ internal class DocumentBBLang : DocumentHandler
             });
         }
 
-        foreach (CompiledEnum @enum in CompilerResult.Enums)
-        {
-            result.Add(new CompletionItem()
-            {
-                Deprecated = false,
-                Detail = null,
-                Kind = CompletionItemKind.Enum,
-                Label = @enum.Identifier.Content,
-                Preselect = false,
-            });
-        }
-
         foreach (CompiledStruct @struct in CompilerResult.Structs)
         {
             result.Add(new CompletionItem()
@@ -252,28 +240,9 @@ internal class DocumentBBLang : DocumentHandler
         return builder.ToString();
     }
 
-    static string GetEnumHover(CompiledEnum @enum)
-    {
-        StringBuilder builder = new();
-        builder.Append(DeclarationKeywords.Enum);
-        builder.Append(' ');
-        builder.Append(@enum.Identifier);
-        return builder.ToString();
-    }
-
-    static string GetEnumHover(EnumDefinition @enum)
-    {
-        StringBuilder builder = new();
-        builder.Append(DeclarationKeywords.Enum);
-        builder.Append(' ');
-        builder.Append(@enum.Identifier);
-        return builder.ToString();
-    }
-
     static string GetTypeHover(GeneralType type) => type switch
     {
         StructType structType => $"{DeclarationKeywords.Struct} {structType.Struct.Identifier.Content}",
-        EnumType enumType => $"{DeclarationKeywords.Enum} {enumType.Enum.Identifier.Content}",
         GenericType genericType => $"(generic) {genericType}",
         _ => type.ToString()
     };
@@ -313,10 +282,8 @@ internal class DocumentBBLang : DocumentHandler
         ParameterDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledField v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         FieldDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
-        CompiledEnum v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledStruct v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
 
-        EnumDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         StructDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
 
         _ => false,
@@ -330,26 +297,6 @@ internal class DocumentBBLang : DocumentHandler
 
         definitionHover = GetFunctionHover(function);
         GetCommentDocumentation(function, out docsHover);
-        return true;
-    }
-
-    bool HandleDefinitionHover(CompiledEnum @enum, ref string? definitionHover, ref string? docsHover)
-    {
-        if (@enum.File is null)
-        { return false; }
-
-        definitionHover = GetEnumHover(@enum);
-        GetCommentDocumentation(@enum, out docsHover);
-        return true;
-    }
-
-    bool HandleDefinitionHover(EnumDefinition @enum, ref string? definitionHover, ref string? docsHover)
-    {
-        if (@enum.File is null)
-        { return false; }
-
-        definitionHover = GetEnumHover(@enum);
-        GetCommentDocumentation(@enum, out docsHover);
         return true;
     }
 
@@ -537,14 +484,6 @@ internal class DocumentBBLang : DocumentHandler
         else if (CompilerResult.GetThingAt<StructDefinition, Token>(AST.Structs, Uri, position, out StructDefinition? @struct2))
         {
             HandleDefinitionHover(@struct2, ref definitionHover, ref docsHover);
-        }
-        else if (CompilerResult.GetEnumAt(Uri, position, out CompiledEnum? @enum))
-        {
-            HandleDefinitionHover(@enum, ref definitionHover, ref docsHover);
-        }
-        else if (CompilerResult.GetThingAt<EnumDefinition, Token>(AST.Enums, Uri, position, out EnumDefinition? @enum2))
-        {
-            HandleDefinitionHover(@enum2, ref definitionHover, ref docsHover);
         }
         else if (CompilerResult.GetFieldAt(Uri, position, out CompiledField? field))
         {
@@ -878,17 +817,6 @@ internal class DocumentBBLang : DocumentHandler
                             TargetUri = link.TargetUri,
                         });
                     }
-                    else if (type is EnumType enumType &&
-                        GetGotoDefinition(enumType.Enum, out link))
-                    {
-                        links.Add(new LocationLink()
-                        {
-                            OriginSelectionRange = origin.Position.ToOmniSharp(),
-                            TargetRange = link.TargetRange,
-                            TargetSelectionRange = link.TargetSelectionRange,
-                            TargetUri = link.TargetUri,
-                        });
-                    }
                     else if (type is GenericType genericType &&
                              genericType.Definition != null)
                     {
@@ -976,23 +904,6 @@ internal class DocumentBBLang : DocumentHandler
                 Location = new Location()
                 {
                     Range = @struct.Position.ToOmniSharp(),
-                    Uri = uri ?? e.TextDocument.Uri,
-                },
-            });
-        }
-
-        foreach (CompiledEnum @enum in CompilerResult.Enums)
-        {
-            DocumentUri? uri = @enum.File is null ? null : (DocumentUri)@enum.File;
-            if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
-
-            result.Add(new SymbolInformation()
-            {
-                Kind = SymbolKind.Enum,
-                Name = @enum.Identifier.Content,
-                Location = new Location()
-                {
-                    Range = @enum.Position.ToOmniSharp(),
                     Uri = uri ?? e.TextDocument.Uri,
                 },
             });
@@ -1106,12 +1017,6 @@ internal class DocumentBBLang : DocumentHandler
                     break;
                 case TokenAnalyzedType.ParameterName:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Parameter, SemanticTokenModifier.Defaults);
-                    break;
-                case TokenAnalyzedType.Enum:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Enum, SemanticTokenModifier.Defaults);
-                    break;
-                case TokenAnalyzedType.EnumMember:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.EnumMember, SemanticTokenModifier.Defaults);
                     break;
                 case TokenAnalyzedType.TypeParameter:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.TypeParameter, SemanticTokenModifier.Defaults);

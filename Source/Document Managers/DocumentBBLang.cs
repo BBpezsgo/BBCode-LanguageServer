@@ -116,33 +116,78 @@ internal class DocumentBBLang : DocumentHandler
 
         List<CompletionItem> result = new();
 
+        Dictionary<string, int> functionOverloads = new();
+
         foreach (CompiledFunction function in CompilerResult.Functions)
+        {
+            if (!function.CanUse(e.TextDocument.Uri.ToUri()))
+            { continue; }
+
+            if (functionOverloads.TryGetValue(function.Identifier.Content, out int value))
+            { functionOverloads[function.Identifier.Content] = value + 1; }
+            else
+            { functionOverloads[function.Identifier.Content] = 1; }
+        }
+
+        foreach ((string function, int overloads) in functionOverloads)
         {
             result.Add(new CompletionItem()
             {
-                Deprecated = false,
-                Detail = function.ToReadable(),
                 Kind = CompletionItemKind.Function,
-                Label = function.Identifier.Content,
-                Preselect = false,
+                Label = function,
+                LabelDetails = new CompletionItemLabelDetails()
+                {
+                    Description = overloads <= 1 ? null : $"{overloads} overloads",
+                },
+                InsertText = $"{function}($1)",
+                InsertTextFormat = InsertTextFormat.Snippet,
             });
         }
 
         foreach (CompiledStruct @struct in CompilerResult.Structs)
         {
+            if (!@struct.CanUse(e.TextDocument.Uri.ToUri()))
+            { continue; }
+
             result.Add(new CompletionItem()
             {
-                Deprecated = false,
-                Detail = null,
                 Kind = CompletionItemKind.Struct,
                 Label = @struct.Identifier.Content,
-                Preselect = false,
             });
+        }
+
+        foreach ((ImmutableArray<Statement> statements, Uri file) in CompilerResult.TopLevelStatements)
+        {
+            foreach (VariableDeclaration statement in statements.OfType<VariableDeclaration>())
+            {
+                if (!statement.CanUse(e.TextDocument.Uri.ToUri()))
+                { continue; }
+
+                if (statement.Modifiers.Contains(ModifierKeywords.Const))
+                {
+                    result.Add(new CompletionItem()
+                    {
+                        Kind = CompletionItemKind.Constant,
+                        Label = statement.Identifier.Content,
+                    });
+                }
+                else
+                {
+                    result.Add(new CompletionItem()
+                    {
+                        Kind = CompletionItemKind.Variable,
+                        Label = statement.Identifier.Content,
+                    });
+                }
+            }
         }
 
         SinglePosition position = e.Position.ToCool();
         foreach (CompiledFunction function in CompilerResult.Functions)
         {
+            if (function.File != e.TextDocument.Uri.ToUri())
+            { continue; }
+
             if (function.Block == null) continue;
             if (function.Block.Position.Range.Contains(position))
             {
@@ -150,11 +195,8 @@ internal class DocumentBBLang : DocumentHandler
                 {
                     result.Add(new CompletionItem()
                     {
-                        Deprecated = false,
-                        Detail = null,
                         Kind = CompletionItemKind.Variable,
                         Label = parameter.Identifier.Content,
-                        Preselect = false,
                     });
                 }
 
@@ -247,7 +289,7 @@ internal class DocumentBBLang : DocumentHandler
         _ => type.ToString()
     };
 
-    static string GetValueHover(DataItem value) => value.Type switch
+    static string GetValueHover(CompiledValue value) => value.Type switch
     {
         RuntimeType.Null => $"{null}",
         RuntimeType.Byte => $"{value}",
@@ -524,7 +566,7 @@ internal class DocumentBBLang : DocumentHandler
         {
             foreach (UsingDefinition @using in AST.Usings)
             {
-                if (new Position(@using.Path).Range.Contains(e.Position.ToCool()))
+                if (new Position(@using.Path.Or(@using.Keyword)).Range.Contains(e.Position.ToCool()))
                 {
                     if (@using.CompiledUri != null)
                     { definitionHover = $"{@using.Keyword} \"{@using.CompiledUri.Replace('\\', '/')}\""; }
@@ -768,7 +810,7 @@ internal class DocumentBBLang : DocumentHandler
             links.Add(new LocationOrLocationLink(new LocationLink()
             {
                 TargetUri = DocumentUri.From(@using.CompiledUri),
-                OriginSelectionRange = new Position(@using.Path).ToOmniSharp(),
+                OriginSelectionRange = new Position(@using.Path.Or(@using.Keyword)).ToOmniSharp(),
                 TargetRange = Position.Zero.ToOmniSharp(),
                 TargetSelectionRange = Position.Zero.ToOmniSharp(),
             }));
@@ -988,6 +1030,67 @@ internal class DocumentBBLang : DocumentHandler
 
     public override SignatureHelp? SignatureHelp(SignatureHelpParams e)
     {
+        SinglePosition position = e.Position.ToCool();
+
+        AnyCall? call = null;
+
+        foreach (IEnumerable<Statement>? items in CompilerResult.StatementsIn(e.TextDocument.Uri.ToUri()).Select(statement => statement.GetStatementsRecursively(true)))
+        {
+            foreach (Statement? item in items)
+            {
+                if (item is not AnyCall anyCall) continue;
+                if (!new Position(anyCall.Brackets).Range.Contains(position)) continue;
+                call = anyCall;
+            }
+        }
+
+        if (call is not null &&
+            call.Reference is CompiledFunction compiledFunction)
+        {
+            int? activeParameter = null;
+            for (int i = 0; i < call.Commas.Length; i++)
+            {
+                if (position >= call.Commas[i].Position.Range.Start)
+                {
+                    activeParameter = i;
+                    break;
+                }
+            }
+
+            return new SignatureHelp()
+            {
+                ActiveSignature = 0,
+                ActiveParameter = activeParameter,
+                Signatures = new Container<SignatureInformation>(
+                    new SignatureInformation()
+                    {
+                        Label = compiledFunction.Identifier.Content,
+                        ActiveParameter = activeParameter,
+                        Parameters = new Container<ParameterInformation>(
+                            Enumerable.Range(0, compiledFunction.Parameters.Count)
+                            .Select(i =>
+                            {
+                                string identifier = compiledFunction.Parameters[i].Identifier.Content;
+                                GeneralType type = compiledFunction.ParameterTypes[i];
+                                return new ParameterInformation()
+                                {
+                                    Label = identifier,
+                                };
+                            })
+                        ),
+                        Documentation =
+                            GetCommentDocumentation(compiledFunction, compiledFunction.File, out string? docs)
+                            ? new StringOrMarkupContent(new MarkupContent()
+                            {
+                                Kind = MarkupKind.Markdown,
+                                Value = docs,
+                            })
+                            : null,
+                    }
+                ),
+            };
+        }
+
         return null;
     }
 

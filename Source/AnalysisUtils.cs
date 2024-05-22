@@ -260,7 +260,7 @@ public static class Utils
         UnaryOperatorCall v => v.Operator.Position,
         VariableDeclaration v => v.Identifier.Position,
         Field v => v.Identifier.Position,
-        ConstructorCall v => new Position(v.Keyword, v.Type),
+        ConstructorCall v => new Position([v.Keyword, v.Type]),
         _ => statement.Position,
     };
 }

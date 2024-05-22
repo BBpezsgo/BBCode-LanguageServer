@@ -293,6 +293,11 @@ public static class Analysis
 
         string? basePath = GetBasePath(file);
 
+        result.Diagnostics = new Dictionary<Uri, List<Diagnostic>>()
+        {
+            { file, new List<Diagnostic>() }
+        };
+
         if (!Compile(result.Diagnostics, file, true, new CompilerSettings() { BasePath = basePath }, out CompilerResult compilerResult))
         {
             if (Tokenize(result.Diagnostics, file, true, out ImmutableArray<Token> tokens))

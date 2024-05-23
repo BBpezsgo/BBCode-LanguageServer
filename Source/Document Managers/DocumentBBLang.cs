@@ -962,9 +962,10 @@ internal class DocumentBBLang : DocumentHandler
 
         if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunction? function))
         {
-            foreach (Reference<StatementWithValue> reference in function.References)
+            foreach (Reference<StatementWithValue?> reference in function.References)
             {
                 if (reference.SourceFile == null) continue;
+                if (reference.Source == null) continue;
                 result.Add(new Location()
                 {
                     Range = reference.Source.Position.ToOmniSharp(),

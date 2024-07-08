@@ -12,3 +12,4 @@ global using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 global using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 global using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 global using OmniSharp.Extensions.LanguageServer.Server;
+global using Maths;

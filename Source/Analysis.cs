@@ -178,11 +178,16 @@ public static class Analysis
 
         try
         {
+            string[] additionalImports = new string[]
+            {
+                "../StandardLibrary/Primitives.bbc"
+            };
+
             AnalysisCollection analysisCollection = new();
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
-            CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, analysisCollection, TokenizerSettings, null);
+            CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, analysisCollection, TokenizerSettings, null, additionalImports);
 
             diagnostics.AddDiagnostics(analysisCollection.Warnings, v => v.ToOmniSharp("Compiler"));
             diagnostics.AddDiagnostics(analysisCollection.Errors, v => v.ToOmniSharp("Compiler"));
@@ -256,7 +261,7 @@ public static class Analysis
     static string? GetBasePath(Uri uri)
     {
         if (!uri.IsFile) return null;
-        string file = uri.LocalPath;
+        string file = uri.AbsolutePath;
         if (!File.Exists(file)) return null;
         return GetBasePath(new FileInfo(file));
     }

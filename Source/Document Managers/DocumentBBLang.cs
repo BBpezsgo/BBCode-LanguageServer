@@ -286,6 +286,7 @@ internal class DocumentBBLang : DocumentHandler
     {
         StructType structType => $"{DeclarationKeywords.Struct} {structType.Struct.Identifier.Content}",
         GenericType genericType => $"(generic) {genericType}",
+        AliasType aliasType => $"{aliasType.Value}",
         _ => type.ToString()
     };
 
@@ -746,7 +747,7 @@ internal class DocumentBBLang : DocumentHandler
 
             case TypeInstancePointer typeInstancePointer:
             {
-                if (type2 is not PointerType pointerType)
+                if (!type2.Is(out PointerType? pointerType))
                 { return; }
 
                 if (typeInstancePointer.To.Position.Range.Contains(position))
@@ -848,7 +849,7 @@ internal class DocumentBBLang : DocumentHandler
                 if (origin is not null &&
                     type is not null)
                 {
-                    if (type is StructType structType &&
+                    if (type.Is(out StructType? structType) &&
                         GetGotoDefinition(structType.Struct, out LocationLink? link))
                     {
                         links.Add(new LocationLink()
@@ -859,7 +860,7 @@ internal class DocumentBBLang : DocumentHandler
                             TargetUri = link.TargetUri,
                         });
                     }
-                    else if (type is GenericType genericType &&
+                    else if (type.Is(out GenericType? genericType) &&
                              genericType.Definition != null)
                     {
                         links.Add(new LocationLink()
@@ -868,6 +869,17 @@ internal class DocumentBBLang : DocumentHandler
                             TargetRange = genericType.Definition.Position.Range.ToOmniSharp(),
                             TargetSelectionRange = genericType.Definition.Position.Range.ToOmniSharp(),
                             TargetUri = DocumentUri,
+                        });
+                    }
+                    else if (type is AliasType aliasType &&
+                             aliasType.Definition != null)
+                    {
+                        links.Add(new LocationLink()
+                        {
+                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            TargetRange = aliasType.Definition.Position.Range.ToOmniSharp(),
+                            TargetSelectionRange = aliasType.Definition.Position.Range.ToOmniSharp(),
+                            TargetUri = aliasType.Definition.File,
                         });
                     }
                 }

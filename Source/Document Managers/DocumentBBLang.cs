@@ -220,7 +220,7 @@ internal class DocumentBBLang : DocumentHandler
             builder.Append('<');
             builder.AppendJoin(", ", function.Template.Parameters);
             builder.Append('>');
-            builder.Append("\r\n");
+            builder.Append(Environment.NewLine);
         }
 
         IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(function.Modifiers);

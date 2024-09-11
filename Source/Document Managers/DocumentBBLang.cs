@@ -286,7 +286,7 @@ internal class DocumentBBLang : DocumentHandler
     {
         StructType structType => $"{DeclarationKeywords.Struct} {structType.Struct.Identifier.Content}",
         GenericType genericType => $"(generic) {genericType}",
-        AliasType aliasType => $"{aliasType.Value}",
+        AliasType aliasType => $"(alias) {aliasType}",
         _ => type.ToString()
     };
 

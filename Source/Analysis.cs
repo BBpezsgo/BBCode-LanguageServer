@@ -221,7 +221,7 @@ public static class Analysis
 
             CodeGeneratorForMain.Generate(
                 compilerResult,
-                new MainGeneratorSettings()
+                new MainGeneratorSettings(MainGeneratorSettings.Default)
                 {
                     CheckNullPointers = false,
                     DontOptimize = true,

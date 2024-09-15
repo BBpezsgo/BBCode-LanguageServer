@@ -3,8 +3,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 
 namespace LanguageServer.Handlers;
 
-using DocumentManagers;
-
 public class DocumentSymbolHandler : IDocumentSymbolHandler
 {
     Task<SymbolInformationOrDocumentSymbolContainer?> IRequestHandler<DocumentSymbolParams, SymbolInformationOrDocumentSymbolContainer?>.Handle(DocumentSymbolParams e, CancellationToken cancellationToken) => Task.Run(() =>

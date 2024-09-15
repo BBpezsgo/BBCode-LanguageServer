@@ -1,10 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
+using LanguageServer.Handlers;
 
 namespace LanguageServer;
-
-using Handlers;
 
 public class OmniSharpService
 {

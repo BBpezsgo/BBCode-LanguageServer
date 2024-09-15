@@ -1,6 +1,6 @@
-﻿namespace LanguageServer;
+﻿using LanguageServer.DocumentManagers;
 
-using DocumentManagers;
+namespace LanguageServer;
 
 public abstract class DocumentHandler
 {

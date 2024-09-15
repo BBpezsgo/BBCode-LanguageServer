@@ -4,13 +4,12 @@ using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
-using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
 using Position = LanguageCore.Position;
 
 namespace LanguageServer.DocumentManagers;
 
-internal class DocumentBBLang : DocumentHandler
+class DocumentBBLang : DocumentHandler
 {
     public ImmutableArray<Token> Tokens { get; set; }
     public ParserResult AST { get; set; }
@@ -156,7 +155,7 @@ internal class DocumentBBLang : DocumentHandler
             });
         }
 
-        foreach ((ImmutableArray<Statement> statements, Uri file) in CompilerResult.TopLevelStatements)
+        foreach ((ImmutableArray<Statement> statements, _) in CompilerResult.TopLevelStatements)
         {
             foreach (VariableDeclaration statement in statements.OfType<VariableDeclaration>())
             {

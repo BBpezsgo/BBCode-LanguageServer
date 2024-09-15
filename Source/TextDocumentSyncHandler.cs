@@ -2,8 +2,6 @@
 
 namespace LanguageServer.Handlers;
 
-using LanguageServer;
-
 class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
     [SuppressMessage("CodeQuality", "IDE0052")]

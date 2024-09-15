@@ -8,6 +8,15 @@
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
+    <AnalysisLevel>preview-all</AnalysisLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <WarningLevel>9999</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <WarningLevel>9999</WarningLevel>
   </PropertyGroup>
 
   <ItemGroup>

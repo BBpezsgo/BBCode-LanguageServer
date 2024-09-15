@@ -1,0 +1,48 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# IDE0160: Convert to block scoped namespace
+csharp_style_namespace_declarations = file_scoped
+
+# IDE0040: Add accessibility modifiers
+dotnet_style_require_accessibility_modifiers = omit_if_default
+
+# IDE0210: Convert to top-level statements
+csharp_style_prefer_top_level_statements = false
+
+# IDE0290: Use primary constructor
+csharp_style_prefer_primary_constructors = false
+
+# IDE0301: Simplify collection initialization
+dotnet_style_prefer_collection_expression = never
+
+# IDE0022: Use block body for method
+dotnet_diagnostic.IDE0022.severity = silent
+
+# IDE0058: Expression value is never used
+dotnet_diagnostic.IDE0058.severity = silent
+
+# IDE0011: Add braces
+csharp_prefer_braces = when_multiline
+
+# IDE0045: Convert to conditional expression
+dotnet_diagnostic.IDE0045.severity = silent
+
+# IDE0010: Add missing cases
+dotnet_diagnostic.IDE0010.severity = silent
+
+# IDE0046: Convert to conditional expression
+dotnet_diagnostic.IDE0046.severity = silent
+
+# IDE0130: Namespace does not match folder structure
+dotnet_style_namespace_match_folder = false

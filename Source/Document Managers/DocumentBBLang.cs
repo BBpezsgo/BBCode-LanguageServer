@@ -292,10 +292,13 @@ class DocumentBBLang : DocumentHandler
     static string GetValueHover(CompiledValue value) => value.Type switch
     {
         RuntimeType.Null => $"{null}",
-        RuntimeType.Byte => $"{value}",
-        RuntimeType.Integer => $"{value}",
-        RuntimeType.Single => $"{value}",
+        RuntimeType.U8 => $"{value}",
+        RuntimeType.I8 => $"{value}",
         RuntimeType.Char => $"\'{value}\'",
+        RuntimeType.I16 => $"{value}",
+        RuntimeType.U32 => $"{value}",
+        RuntimeType.I32 => $"{value}",
+        RuntimeType.F32 => $"{value}",
         _ => value.ToString(),
     };
 
@@ -722,43 +725,43 @@ class DocumentBBLang : DocumentHandler
         switch (type1)
         {
             case TypeInstanceSimple typeInstanceSimple:
-            {
-                if (typeInstanceSimple.Identifier.Position.Range.Contains(position))
                 {
-                    return;
+                    if (typeInstanceSimple.Identifier.Position.Range.Contains(position))
+                    {
+                        return;
+                    }
+
+                    // if (typeInstanceSimple.GenericTypes.HasValue)
+                    // {
+                    //     for (int i = 0; i < typeInstanceSimple.GenericTypes.Value.Length; i++)
+                    //     {
+                    //         TypeInstance item = typeInstanceSimple.GenericTypes.Value[i];
+                    //         GeneralType item2 = ((StructType)type2).TypeParameters[i];
+                    //         if (item.Position.Range.Contains(position))
+                    //         {
+                    //             return GetDeepestTypeInstance(item, item2, position, out result);
+                    //         }
+                    //     }
+                    // }
+
+                    break;
                 }
-
-                // if (typeInstanceSimple.GenericTypes.HasValue)
-                // {
-                //     for (int i = 0; i < typeInstanceSimple.GenericTypes.Value.Length; i++)
-                //     {
-                //         TypeInstance item = typeInstanceSimple.GenericTypes.Value[i];
-                //         GeneralType item2 = ((StructType)type2).TypeParameters[i];
-                //         if (item.Position.Range.Contains(position))
-                //         {
-                //             return GetDeepestTypeInstance(item, item2, position, out result);
-                //         }
-                //     }
-                // }
-
-                break;
-            }
 
             case TypeInstancePointer typeInstancePointer:
-            {
-                if (!type2.Is(out PointerType? pointerType))
-                { return; }
-
-                if (typeInstancePointer.To.Position.Range.Contains(position))
                 {
-                    type1 = typeInstancePointer.To;
-                    type2 = pointerType.To;
-                    GetDeepestTypeInstance(ref type1, ref type2, position);
-                    return;
-                }
+                    if (!type2.Is(out PointerType? pointerType))
+                    { return; }
 
-                break;
-            }
+                    if (typeInstancePointer.To.Position.Range.Contains(position))
+                    {
+                        type1 = typeInstancePointer.To;
+                        type2 = pointerType.To;
+                        GetDeepestTypeInstance(ref type1, ref type2, position);
+                        return;
+                    }
+
+                    break;
+                }
         }
 
         type1 = null;

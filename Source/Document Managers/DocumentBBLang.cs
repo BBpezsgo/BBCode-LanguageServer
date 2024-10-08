@@ -284,8 +284,8 @@ class DocumentBBLang : DocumentHandler
     static string GetTypeHover(GeneralType type) => type switch
     {
         StructType structType => $"{DeclarationKeywords.Struct} {structType.Struct.Identifier.Content}",
-        GenericType genericType => $"(generic) {genericType}",
-        AliasType aliasType => $"(alias) {aliasType}",
+        GenericType genericType => $"(generic) {genericType.Identifier}",
+        AliasType aliasType => $"{DeclarationKeywords.Alias} {aliasType.Identifier} {aliasType.Value}",
         _ => type.ToString()
     };
 

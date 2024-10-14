@@ -202,7 +202,10 @@ public static class Utils
             if (statement is TypeStatement typeStatement)
             { return Handle3(typeStatement.Type, typeStatement.CompiledType, out typeInstance, out generalType); }
 
-            if (statement is TypeCast typeCast)
+            if (statement is BasicTypeCast basicTypeCast)
+            { return Handle3(basicTypeCast.Type, basicTypeCast.CompiledType, out typeInstance, out generalType); }
+
+            if (statement is ManagedTypeCast typeCast)
             { return Handle3(typeCast.Type, typeCast.CompiledType, out typeInstance, out generalType); }
 
             if (statement is VariableDeclaration variableDeclaration)

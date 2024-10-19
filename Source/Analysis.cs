@@ -185,7 +185,7 @@ public static class Analysis
 
             AnalysisCollection analysisCollection = new();
 
-            Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+            List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
             CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, analysisCollection, TokenizerSettings, null, additionalImports);
 

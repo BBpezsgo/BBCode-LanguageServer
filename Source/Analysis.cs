@@ -7,19 +7,20 @@ using LanguageCore.Parser;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
 using LanguageServer.DocumentManagers;
+using OmniSharpDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 
 namespace LanguageServer;
 
 public struct AnalysisResult
 {
-    public Dictionary<Uri, List<Diagnostic>> Diagnostics;
+    public Dictionary<Uri, List<OmniSharpDiagnostic>> Diagnostics;
     public ImmutableArray<Token> Tokens;
     public ParserResult? AST;
     public CompilerResult? CompilerResult;
 
     public static AnalysisResult Empty => new()
     {
-        Diagnostics = new Dictionary<Uri, List<Diagnostic>>(),
+        Diagnostics = new Dictionary<Uri, List<OmniSharpDiagnostic>>(),
         Tokens = ImmutableArray<Token>.Empty,
         AST = null,
         CompilerResult = null,
@@ -33,7 +34,7 @@ public static class Analysis
         TokenizeComments = true,
     };
 
-    static void HandleCatchedExceptions(Dictionary<Uri, List<Diagnostic>> diagnostics, LanguageException exception, string? source)
+    static void HandleCatchedExceptions(Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics, LanguageException exception, string? source)
     {
         diagnostics.AddDiagnostics(exception, v => v.ToOmniSharp(source));
 
@@ -44,16 +45,16 @@ public static class Analysis
     }
 
     static void AddDiagnostics<TDiagnostics>(
-        this Dictionary<Uri, List<Diagnostic>> diagnostics,
+        this Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics,
         TDiagnostics value,
-        Func<TDiagnostics, Diagnostic> converter)
-        where TDiagnostics : IDiagnostics
+        Func<TDiagnostics, OmniSharpDiagnostic> converter)
+        where TDiagnostics : IDiagnostic
     {
         if (value.File is null) return;
-        List<Diagnostic> list = diagnostics.EnsureExistence(value.File, new List<Diagnostic>());
-        Diagnostic converted = converter.Invoke(value);
+        List<OmniSharpDiagnostic> list = diagnostics.EnsureExistence(value.File, new List<OmniSharpDiagnostic>());
+        OmniSharpDiagnostic converted = converter.Invoke(value);
 
-        foreach (Diagnostic item in list)
+        foreach (OmniSharpDiagnostic item in list)
         {
             if (item.Message == converted.Message &&
                 item.Range == converted.Range)
@@ -64,17 +65,17 @@ public static class Analysis
     }
 
     static void AddDiagnostics<TDiagnostics>(
-        this Dictionary<Uri, List<Diagnostic>> diagnostics,
+        this Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics,
         IEnumerable<TDiagnostics> values,
-        Func<TDiagnostics, Diagnostic> converter)
-        where TDiagnostics : IDiagnostics
+        Func<TDiagnostics, OmniSharpDiagnostic> converter)
+        where TDiagnostics : IDiagnostic
     {
         foreach (TDiagnostics value in values)
         { diagnostics.AddDiagnostics(value, converter); }
     }
 
     static bool Tokenize(
-        Dictionary<Uri, List<Diagnostic>> diagnostics,
+        Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics,
         Uri file,
         bool force,
         [NotNullWhen(true)] out ImmutableArray<Token> tokens)
@@ -95,7 +96,7 @@ public static class Analysis
                 TokenizeComments = true,
             });
 
-            diagnostics.AddDiagnostics(tokenizerResult.Warnings, v => v.ToOmniSharp("Tokenizer"));
+            diagnostics.AddDiagnostics(tokenizerResult.Diagnostics, v => v.ToOmniSharp("Tokenizer"));
 
             if (OmniSharpService.Instance is not null)
             {
@@ -122,7 +123,7 @@ public static class Analysis
     }
 
     static bool Parse(
-        Dictionary<Uri, List<Diagnostic>> diagnostics,
+        Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics,
         ImmutableArray<Token> tokens,
         Uri file,
         bool force,
@@ -161,7 +162,7 @@ public static class Analysis
     }
 
     static bool Compile(
-        Dictionary<Uri, List<Diagnostic>> diagnostics,
+        Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics,
         Uri file,
         bool force,
         CompilerSettings settings,
@@ -183,17 +184,16 @@ public static class Analysis
                 "../StandardLibrary/Primitives.bbc"
             };
 
-            AnalysisCollection analysisCollection = new();
+            Diagnostics _diagnostics = new();
 
             List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
-            CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, analysisCollection, TokenizerSettings, null, additionalImports);
+            CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, _diagnostics, TokenizerSettings, null, additionalImports);
 
-            diagnostics.AddDiagnostics(analysisCollection.Warnings, v => v.ToOmniSharp("Compiler"));
-            diagnostics.AddDiagnostics(analysisCollection.Errors, v => v.ToOmniSharp("Compiler"));
+            diagnostics.AddDiagnostics(_diagnostics, v => v.ToOmniSharp("Compiler"));
 
             compilerResult = compiled;
-            return analysisCollection.Errors.Count == 0;
+            return _diagnostics.Count == 0;
         }
         catch (LanguageException exception)
         {
@@ -210,14 +210,14 @@ public static class Analysis
     }
 
     static bool Generate(
-        Dictionary<Uri, List<Diagnostic>> diagnostics,
+        Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics,
         CompilerResult compilerResult,
         Uri file
         )
     {
         try
         {
-            AnalysisCollection analysisCollection = new();
+            Diagnostics _diagnostics = new();
 
             CodeGeneratorForMain.Generate(
                 compilerResult,
@@ -232,14 +232,11 @@ public static class Analysis
                     CompileLevel = CompileLevel.All,
                 },
                 null,
-                analysisCollection);
+                _diagnostics);
 
-            diagnostics.AddDiagnostics(analysisCollection.Hints, v => v.ToOmniSharp("CodeGenerator"));
-            diagnostics.AddDiagnostics(analysisCollection.Informations, v => v.ToOmniSharp("CodeGenerator"));
-            diagnostics.AddDiagnostics(analysisCollection.Warnings, v => v.ToOmniSharp("CodeGenerator"));
-            diagnostics.AddDiagnostics(analysisCollection.Errors, v => v.ToOmniSharp("CodeGenerator"));
+            diagnostics.AddDiagnostics(_diagnostics, v => v.ToOmniSharp("CodeGenerator"));
 
-            if (analysisCollection.Errors.Count > 0)
+            if (_diagnostics.Count > 0)
             { return false; }
 
             Logger.Log($"Successfully compiled {file}");
@@ -298,9 +295,9 @@ public static class Analysis
 
         string? basePath = GetBasePath(file);
 
-        result.Diagnostics = new Dictionary<Uri, List<Diagnostic>>()
+        result.Diagnostics = new Dictionary<Uri, List<OmniSharpDiagnostic>>()
         {
-            { file, new List<Diagnostic>() }
+            { file, new List<OmniSharpDiagnostic>() }
         };
 
         if (!Compile(result.Diagnostics, file, true, new CompilerSettings() { BasePath = basePath }, out CompilerResult compilerResult))

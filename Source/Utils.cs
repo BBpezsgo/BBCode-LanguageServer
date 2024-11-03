@@ -4,6 +4,8 @@ using LanguageCore.Parser;
 using OmniSharpPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using OmniSharpRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 using Position = LanguageCore.Position;
+using OmniSharpDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
+using System.Diagnostics;
 
 namespace LanguageServer;
 
@@ -16,68 +18,32 @@ public class ServiceException : Exception
 
 public static class Extensions
 {
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Hint> hints, string? source = null)
+    public static IEnumerable<OmniSharpDiagnostic> ToOmniSharp(this IEnumerable<LanguageCore.Diagnostic> hints, string? source = null)
     {
-        foreach (Hint hint in hints)
-        { yield return hint.ToOmniSharp(source); }
+        foreach (LanguageCore.Diagnostic diagnostics in hints)
+        { yield return diagnostics.ToOmniSharp(source); }
     }
 
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Information> informations, string? source = null)
+    public static DiagnosticSeverity ToOmniSharp(this DiagnosticsLevel level) => level switch
     {
-        foreach (Information information in informations)
-        { yield return information.ToOmniSharp(source); }
-    }
-
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<Warning> warnings, string? source = null)
-    {
-        foreach (Warning warning in warnings)
-        { yield return warning.ToOmniSharp(source); }
-    }
-
-    public static IEnumerable<Diagnostic> ToOmniSharp(this IEnumerable<LanguageError> errors, string? source = null)
-    {
-        foreach (LanguageError error in errors)
-        { yield return error.ToOmniSharp(source); }
-    }
-
-    [return: NotNullIfNotNull(nameof(warning))]
-    public static Diagnostic? ToOmniSharp(this Warning? warning, string? source = null) => warning is null ? null : new Diagnostic()
-    {
-        Severity = DiagnosticSeverity.Warning,
-        Range = warning.Position.ToOmniSharp(),
-        Message = warning.Message,
-        Source = source,
+        DiagnosticsLevel.Error => DiagnosticSeverity.Error,
+        DiagnosticsLevel.Warning => DiagnosticSeverity.Warning,
+        DiagnosticsLevel.Information => DiagnosticSeverity.Information,
+        DiagnosticsLevel.Hint => DiagnosticSeverity.Hint,
+        _ => throw new UnreachableException(),
     };
 
-    [return: NotNullIfNotNull(nameof(information))]
-    public static Diagnostic? ToOmniSharp(this Information? information, string? source = null) => information is null ? null : new Diagnostic()
+    [return: NotNullIfNotNull(nameof(diagnostic))]
+    public static OmniSharpDiagnostic? ToOmniSharp(this LanguageCore.Diagnostic? diagnostic, string? source = null) => diagnostic is null ? null : new OmniSharpDiagnostic()
     {
-        Severity = DiagnosticSeverity.Information,
-        Range = information.Position.ToOmniSharp(),
-        Message = information.Message,
-        Source = source,
-    };
-
-    [return: NotNullIfNotNull(nameof(hint))]
-    public static Diagnostic? ToOmniSharp(this Hint? hint, string? source = null) => hint is null ? null : new Diagnostic()
-    {
-        Severity = DiagnosticSeverity.Hint,
-        Range = hint.Position.ToOmniSharp(),
-        Message = hint.Message,
+        Severity = diagnostic.Level.ToOmniSharp(),
+        Range = diagnostic.Position.ToOmniSharp(),
+        Message = diagnostic.Message,
         Source = source,
     };
 
     [return: NotNullIfNotNull(nameof(error))]
-    public static Diagnostic? ToOmniSharp(this LanguageError? error, string? source = null) => error is null ? null : new Diagnostic()
-    {
-        Severity = DiagnosticSeverity.Error,
-        Range = error.Position.ToOmniSharp(),
-        Message = error.Message,
-        Source = source,
-    };
-
-    [return: NotNullIfNotNull(nameof(error))]
-    public static Diagnostic? ToOmniSharp(this LanguageException? error, string? source = null) => error is null ? null : new Diagnostic()
+    public static OmniSharpDiagnostic? ToOmniSharp(this LanguageException? error, string? source = null) => error is null ? null : new OmniSharpDiagnostic()
     {
         Severity = DiagnosticSeverity.Error,
         Range = error.Position.ToOmniSharp(),

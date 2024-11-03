@@ -99,7 +99,7 @@ class DocumentBBLang : DocumentHandler
         AST = analysisResult.AST ?? ParserResult.Empty;
         CompilerResult = analysisResult.CompilerResult ?? CompilerResult;
 
-        foreach (KeyValuePair<Uri, List<Diagnostic>> diagnostics in analysisResult.Diagnostics)
+        foreach (KeyValuePair<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> diagnostics in analysisResult.Diagnostics)
         {
             OmniSharpService.Instance?.Server?.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams()
             {

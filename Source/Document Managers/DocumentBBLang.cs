@@ -5,6 +5,7 @@ using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Tokenizing;
+using OmniSharpLocation = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using Position = LanguageCore.Position;
 
 namespace LanguageServer.DocumentManagers;
@@ -906,7 +907,7 @@ class DocumentBBLang : DocumentHandler
             {
                 Kind = SymbolKind.Function,
                 Name = function.Identifier.Content,
-                Location = new Location()
+                Location = new OmniSharpLocation()
                 {
                     Range = function.Position.Range.ToOmniSharp(),
                     Uri = uri ?? e.TextDocument.Uri,
@@ -923,7 +924,7 @@ class DocumentBBLang : DocumentHandler
             {
                 Kind = SymbolKind.Function,
                 Name = function.Identifier.Content,
-                Location = new Location()
+                Location = new OmniSharpLocation()
                 {
                     Range = function.Position.Range.ToOmniSharp(),
                     Uri = uri ?? e.TextDocument.Uri,
@@ -940,7 +941,7 @@ class DocumentBBLang : DocumentHandler
             {
                 Kind = SymbolKind.Function,
                 Name = function.Identifier.Content,
-                Location = new Location()
+                Location = new OmniSharpLocation()
                 {
                     Range = function.Position.Range.ToOmniSharp(),
                     Uri = uri ?? e.TextDocument.Uri,
@@ -957,7 +958,7 @@ class DocumentBBLang : DocumentHandler
             {
                 Kind = SymbolKind.Struct,
                 Name = @struct.Identifier.Content,
-                Location = new Location()
+                Location = new OmniSharpLocation()
                 {
                     Range = @struct.Position.ToOmniSharp(),
                     Uri = uri ?? e.TextDocument.Uri,
@@ -968,11 +969,11 @@ class DocumentBBLang : DocumentHandler
         return result.ToArray();
     }
 
-    public override Location[] References(ReferenceParams e)
+    public override OmniSharpLocation[] References(ReferenceParams e)
     {
         // Logger.Log($"References({e.Position.ToCool().ToStringMin()})");
 
-        List<Location> result = new();
+        List<OmniSharpLocation> result = new();
 
         if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunction? function))
         {
@@ -980,7 +981,7 @@ class DocumentBBLang : DocumentHandler
             {
                 if (reference.SourceFile == null) continue;
                 if (reference.Source == null) continue;
-                result.Add(new Location()
+                result.Add(new OmniSharpLocation()
                 {
                     Range = reference.Source.Position.ToOmniSharp(),
                     Uri = reference.SourceFile,
@@ -994,7 +995,7 @@ class DocumentBBLang : DocumentHandler
             {
                 if (reference.SourceFile == null) continue;
                 if (reference.Source == null) continue;
-                result.Add(new Location()
+                result.Add(new OmniSharpLocation()
                 {
                     Range = reference.Source.Position.ToOmniSharp(),
                     Uri = reference.SourceFile,
@@ -1007,7 +1008,7 @@ class DocumentBBLang : DocumentHandler
             foreach (Reference<StatementWithValue> reference in @operator.References)
             {
                 if (reference.SourceFile == null) continue;
-                result.Add(new Location()
+                result.Add(new OmniSharpLocation()
                 {
                     Range = reference.Source.Position.ToOmniSharp(),
                     Uri = reference.SourceFile,
@@ -1020,7 +1021,7 @@ class DocumentBBLang : DocumentHandler
             foreach (Reference<TypeInstance> reference in @struct.References)
             {
                 if (reference.SourceFile == null) continue;
-                result.Add(new Location()
+                result.Add(new OmniSharpLocation()
                 {
                     Range = reference.Source.Position.ToOmniSharp(),
                     Uri = reference.SourceFile,
@@ -1033,7 +1034,7 @@ class DocumentBBLang : DocumentHandler
             foreach (Reference<Statement> reference in compiledField.References)
             {
                 if (reference.SourceFile == null) continue;
-                result.Add(new Location()
+                result.Add(new OmniSharpLocation()
                 {
                     Range = reference.Source.Position.ToOmniSharp(),
                     Uri = reference.SourceFile,

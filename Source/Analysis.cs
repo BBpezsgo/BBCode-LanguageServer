@@ -142,10 +142,10 @@ public static class Analysis
         {
             ParserResult ast = Parser.Parse(tokens, file);
 
-            diagnostics.AddDiagnostics(ast.Errors, v => v.ToOmniSharp("Parser"));
+            diagnostics.AddDiagnostics(ast.Errors.Diagnostics, v => v.ToOmniSharp("Parser"));
 
             parserResult = ast;
-            return ast.Errors.Length == 0;
+            return !ast.Errors.HasErrors;
         }
         catch (LanguageException exception)
         {
@@ -184,16 +184,16 @@ public static class Analysis
                 "../StandardLibrary/Primitives.bbc"
             };
 
-            Diagnostics _diagnostics = new();
+            DiagnosticsCollection _diagnostics = new();
 
             List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
             CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, _diagnostics, TokenizerSettings, null, additionalImports);
 
-            diagnostics.AddDiagnostics(_diagnostics, v => v.ToOmniSharp("Compiler"));
+            diagnostics.AddDiagnostics(_diagnostics.Diagnostics, v => v.ToOmniSharp("Compiler"));
 
             compilerResult = compiled;
-            return _diagnostics.Count == 0;
+            return !_diagnostics.HasErrors;
         }
         catch (LanguageException exception)
         {
@@ -217,7 +217,7 @@ public static class Analysis
     {
         try
         {
-            Diagnostics _diagnostics = new();
+            DiagnosticsCollection _diagnostics = new();
 
             CodeGeneratorForMain.Generate(
                 compilerResult,
@@ -234,9 +234,9 @@ public static class Analysis
                 null,
                 _diagnostics);
 
-            diagnostics.AddDiagnostics(_diagnostics, v => v.ToOmniSharp("CodeGenerator"));
+            diagnostics.AddDiagnostics(_diagnostics.Diagnostics, v => v.ToOmniSharp("CodeGenerator"));
 
-            if (_diagnostics.Count > 0)
+            if (_diagnostics.HasErrors)
             { return false; }
 
             Logger.Log($"Successfully compiled {file}");

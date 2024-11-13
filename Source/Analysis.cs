@@ -34,6 +34,22 @@ public static class Analysis
         TokenizeComments = true,
     };
 
+    static readonly ImmutableArray<string> AdditionalImports = ImmutableArray.Create<string>
+    (
+        "../StandardLibrary/Primitives.bbc"
+    );
+
+    static readonly MainGeneratorSettings GeneratorSettings = new MainGeneratorSettings(MainGeneratorSettings.Default)
+    {
+        CheckNullPointers = false,
+        DontOptimize = false,
+        ExternalFunctionsCache = false,
+        GenerateComments = false,
+        GenerateDebugInstructions = false,
+        PrintInstructions = false,
+        CompileLevel = CompileLevel.All,
+    };
+
     static void AddDiagnostics(
         this Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics,
         LanguageCore.Diagnostic value,
@@ -49,6 +65,8 @@ public static class Analysis
                 item.Range == converted.Range)
             { return; }
         }
+
+        list.Add(converted);
     }
 
     static void AddDiagnostics(
@@ -81,24 +99,22 @@ public static class Analysis
             return true;
         }
 
+        DiagnosticsCollection tokenizerDiagnostics = new();
+
         try
         {
-            DiagnosticsCollection tokenizerDiagnostics = new();
-            TokenizerResult tokenizerResult = AnyTokenizer.Tokenize(file, tokenizerDiagnostics, PreprocessorVariables.Normal, new TokenizerSettings(TokenizerSettings.Default)
+            tokens = AnyTokenizer.Tokenize(file, tokenizerDiagnostics, PreprocessorVariables.Normal, new TokenizerSettings(TokenizerSettings.Default)
             {
                 TokenizeComments = true,
-            });
-
-            diagnostics.AddDiagnostics(tokenizerDiagnostics, "Tokenizer");
+            }).Tokens;
 
             if (OmniSharpService.Instance is not null)
             {
                 DocumentHandler document2 = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(file));
                 if (document2 is DocumentBBLang documentBBLang2)
-                { documentBBLang2.Tokens = tokenizerResult.Tokens; }
+                { documentBBLang2.Tokens = tokens; }
             }
 
-            tokens = tokenizerResult.Tokens;
             return !tokenizerDiagnostics.HasErrors;
         }
         catch (LanguageException exception)
@@ -109,6 +125,10 @@ public static class Analysis
         catch (Exception exception)
         {
             Logger.Log($"{exception.GetType()}: {exception}");
+        }
+        finally
+        {
+            diagnostics.AddDiagnostics(tokenizerDiagnostics, "Tokenizer");
         }
 
         tokens = ImmutableArray<Token>.Empty;
@@ -131,14 +151,11 @@ public static class Analysis
             return true;
         }
 
+        DiagnosticsCollection parserDiagnostics = new();
+
         try
         {
-            DiagnosticsCollection parserDiagnostics = new();
-            ParserResult ast = Parser.Parse(tokens, file, parserDiagnostics);
-
-            diagnostics.AddDiagnostics(parserDiagnostics.Diagnostics, "Parser");
-
-            parserResult = ast;
+            parserResult = Parser.Parse(tokens, file, parserDiagnostics);
             return !parserDiagnostics.HasErrors;
         }
         catch (LanguageException exception)
@@ -149,6 +166,10 @@ public static class Analysis
         catch (Exception exception)
         {
             Logger.Log($"{exception.GetType()}: {exception}");
+        }
+        finally
+        {
+            diagnostics.AddDiagnostics(parserDiagnostics.Diagnostics, "Parser");
         }
 
         parserResult = default;
@@ -171,22 +192,12 @@ public static class Analysis
             return true;
         }
 
+        DiagnosticsCollection _diagnostics = new();
+        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+
         try
         {
-            string[] additionalImports = new string[]
-            {
-                "../StandardLibrary/Primitives.bbc"
-            };
-
-            DiagnosticsCollection _diagnostics = new();
-
-            List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
-
-            CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, _diagnostics, TokenizerSettings, null, additionalImports);
-
-            diagnostics.AddDiagnostics(_diagnostics.Diagnostics, "Compiler");
-
-            compilerResult = compiled;
+            compilerResult = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, _diagnostics, TokenizerSettings, null, AdditionalImports);
             return !_diagnostics.HasErrors;
         }
         catch (LanguageException exception)
@@ -197,6 +208,10 @@ public static class Analysis
         catch (Exception exception)
         {
             Logger.Log($"{exception.GetType()}: {exception}");
+        }
+        finally
+        {
+            diagnostics.AddDiagnostics(_diagnostics.Diagnostics, "Compiler");
         }
 
         compilerResult = default;
@@ -209,26 +224,15 @@ public static class Analysis
         Uri file
         )
     {
+        DiagnosticsCollection _diagnostics = new();
+
         try
         {
-            DiagnosticsCollection _diagnostics = new();
-
             CodeGeneratorForMain.Generate(
                 compilerResult,
-                new MainGeneratorSettings(MainGeneratorSettings.Default)
-                {
-                    CheckNullPointers = false,
-                    DontOptimize = true,
-                    ExternalFunctionsCache = false,
-                    GenerateComments = false,
-                    GenerateDebugInstructions = false,
-                    PrintInstructions = false,
-                    CompileLevel = CompileLevel.All,
-                },
+                GeneratorSettings,
                 null,
                 _diagnostics);
-
-            diagnostics.AddDiagnostics(_diagnostics.Diagnostics, "CodeGenerator");
 
             if (_diagnostics.HasErrors)
             { return false; }
@@ -245,42 +249,17 @@ public static class Analysis
         {
             Logger.Error($"{exception.GetType()}: {exception}");
         }
+        finally
+        {
+            diagnostics.AddDiagnostics(_diagnostics.Diagnostics, "CodeGenerator");
+        }
 
         return false;
     }
 
     static string? GetBasePath(Uri uri)
     {
-        if (!uri.IsFile) return null;
-        string file = uri.AbsolutePath;
-        if (!File.Exists(file)) return null;
-        return GetBasePath(new FileInfo(file));
-    }
-    static string? GetBasePath(FileInfo file)
-    {
-        string? basePath = null;
-        string? configFile = file.DirectoryName != null ? Path.Combine(file.DirectoryName, "config.json") : null;
-
-        if (configFile != null && File.Exists(configFile))
-        {
-            string configRaw = File.ReadAllText(configFile);
-
-            System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(configRaw, new System.Text.Json.JsonDocumentOptions()
-            {
-                AllowTrailingCommas = true,
-                CommentHandling = System.Text.Json.JsonCommentHandling.Skip,
-            });
-
-            if (doc.RootElement.TryGetProperty("base", out System.Text.Json.JsonElement property))
-            { basePath = property.GetString(); }
-        }
-
-        if (basePath != null && file.DirectoryName != null)
-        {
-            basePath = Path.GetFullPath(basePath, file.DirectoryName);
-        }
-
-        return basePath;
+        return "/home/BB/Projects/BBLang/Core/StandardLibrary";
     }
 
     public static AnalysisResult Analyze(Uri file)

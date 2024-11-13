@@ -30,6 +30,7 @@ public static class Extensions
         DiagnosticsLevel.Warning => DiagnosticSeverity.Warning,
         DiagnosticsLevel.Information => DiagnosticSeverity.Information,
         DiagnosticsLevel.Hint => DiagnosticSeverity.Hint,
+        DiagnosticsLevel.OptimizationNotice => DiagnosticSeverity.Information,
         _ => throw new UnreachableException(),
     };
 

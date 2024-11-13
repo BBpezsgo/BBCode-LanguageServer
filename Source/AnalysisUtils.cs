@@ -262,6 +262,7 @@ public static class Utils
         VariableDeclaration v => v.Identifier.Position,
         Field v => v.Identifier.Position,
         ConstructorCall v => new Position([v.Keyword, v.Type]),
+        ManagedTypeCast v => new Position([v.Type, v.Brackets]),
         _ => statement.Position,
     };
 }

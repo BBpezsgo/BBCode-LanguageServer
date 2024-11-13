@@ -1141,7 +1141,20 @@ class DocumentBBLang : DocumentHandler
                 case TokenAnalyzedType.TypeParameter:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.TypeParameter, SemanticTokenModifier.Defaults);
                     break;
-
+                case TokenAnalyzedType.None:
+                    break;
+                case TokenAnalyzedType.Keyword:
+                    break;
+                case TokenAnalyzedType.FieldName:
+                    break;
+                case TokenAnalyzedType.CompileTag:
+                    break;
+                case TokenAnalyzedType.CompileTagParameter:
+                    break;
+                case TokenAnalyzedType.Statement:
+                    break;
+                case TokenAnalyzedType.BuiltinType:
+                    break;
                 default:
                     switch (token.TokenType)
                     {

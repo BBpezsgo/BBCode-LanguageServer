@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.IO;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
@@ -39,7 +38,7 @@ public static class Analysis
         "../StandardLibrary/Primitives.bbc"
     );
 
-    static readonly MainGeneratorSettings GeneratorSettings = new MainGeneratorSettings(MainGeneratorSettings.Default)
+    static readonly MainGeneratorSettings GeneratorSettings = new(MainGeneratorSettings.Default)
     {
         CheckNullPointers = false,
         DontOptimize = false,
@@ -286,20 +285,20 @@ public static class Analysis
 
         if (OmniSharpService.Instance is not null)
         {
-            foreach (KeyValuePair<Uri, CollectedAST> ast in compilerResult.Raw)
+            foreach (CollectedAST ast in compilerResult.Raw)
             {
-                DocumentHandler document = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(ast.Key));
+                DocumentHandler document = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(ast.Uri));
                 if (document is DocumentBBLang documentBBLang)
                 {
-                    documentBBLang.AST = ast.Value.AST;
-                    documentBBLang.Tokens = ast.Value.Tokens.Tokens;
+                    documentBBLang.AST = ast.AST;
+                    documentBBLang.Tokens = ast.Tokens.Tokens;
                 }
             }
         }
 
         result.CompilerResult = compilerResult;
-        result.AST = compilerResult.Raw[file].AST;
-        result.Tokens = compilerResult.Raw[file].Tokens.Tokens;
+        result.AST = compilerResult.Raw.First(v => v.Uri == file).AST;
+        result.Tokens = compilerResult.Raw.First(v => v.Uri == file).Tokens.Tokens;
 
         if (!Generate(result.Diagnostics, compilerResult, file))
         { return result; }

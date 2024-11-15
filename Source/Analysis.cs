@@ -285,20 +285,20 @@ public static class Analysis
 
         if (OmniSharpService.Instance is not null)
         {
-            foreach (CollectedAST ast in compilerResult.Raw)
+            foreach (ParsedFile parsedFile in compilerResult.Raw)
             {
-                DocumentHandler document = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(ast.Uri));
+                DocumentHandler document = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(parsedFile.File));
                 if (document is DocumentBBLang documentBBLang)
                 {
-                    documentBBLang.AST = ast.AST;
-                    documentBBLang.Tokens = ast.Tokens.Tokens;
+                    documentBBLang.AST = parsedFile.AST;
+                    documentBBLang.Tokens = parsedFile.Tokens.Tokens;
                 }
             }
         }
 
         result.CompilerResult = compilerResult;
-        result.AST = compilerResult.Raw.First(v => v.Uri == file).AST;
-        result.Tokens = compilerResult.Raw.First(v => v.Uri == file).Tokens.Tokens;
+        result.AST = compilerResult.Raw.First(v => v.File == file).AST;
+        result.Tokens = compilerResult.Raw.First(v => v.File == file).Tokens.Tokens;
 
         if (!Generate(result.Diagnostics, compilerResult, file))
         { return result; }

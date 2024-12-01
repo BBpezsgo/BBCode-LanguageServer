@@ -295,7 +295,7 @@ class DocumentBBLang : DocumentHandler
         RuntimeType.Null => $"{null}",
         RuntimeType.U8 => $"{value}",
         RuntimeType.I8 => $"{value}",
-        RuntimeType.Char => $"\'{value}\'",
+        RuntimeType.U16 => $"{value}",
         RuntimeType.I16 => $"{value}",
         RuntimeType.U32 => $"{value}",
         RuntimeType.I32 => $"{value}",

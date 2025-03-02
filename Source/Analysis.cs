@@ -196,7 +196,7 @@ public static class Analysis
 
         try
         {
-            compilerResult = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, null, _diagnostics, TokenizerSettings, null, AdditionalImports);
+            compilerResult = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, _diagnostics, null, AdditionalImports);
             return !_diagnostics.HasErrors;
         }
         catch (LanguageException exception)

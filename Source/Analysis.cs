@@ -1,4 +1,6 @@
 ﻿using System.Collections.Immutable;
+using System.IO;
+using System.Net.Http;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
@@ -28,25 +30,16 @@ public struct AnalysisResult
 
 public static class Analysis
 {
-    static readonly TokenizerSettings TokenizerSettings = new(TokenizerSettings.Default)
-    {
-        TokenizeComments = true,
-    };
-
     static readonly ImmutableArray<string> AdditionalImports = ImmutableArray.Create<string>
     (
-        "../StandardLibrary/Primitives.bbc"
+        "Primitives"
     );
 
     static readonly MainGeneratorSettings GeneratorSettings = new(MainGeneratorSettings.Default)
     {
         CheckNullPointers = false,
         DontOptimize = false,
-        ExternalFunctionsCache = false,
         GenerateComments = false,
-        GenerateDebugInstructions = false,
-        PrintInstructions = false,
-        CompileLevel = CompileLevel.All,
     };
 
     static void AddDiagnostics(
@@ -102,7 +95,20 @@ public static class Analysis
 
         try
         {
-            tokens = AnyTokenizer.Tokenize(file, tokenizerDiagnostics, PreprocessorVariables.Normal, new TokenizerSettings(TokenizerSettings.Default)
+            string content;
+            if (file.IsFile)
+            {
+                content = File.ReadAllText(file.AbsolutePath);
+            }
+            else
+            {
+                using HttpClient client = new();
+                using HttpResponseMessage res = client.GetAsync(file, HttpCompletionOption.ResponseHeadersRead).Result;
+                res.EnsureSuccessStatusCode();
+                content = res.Content.ReadAsStringAsync().Result;
+            }
+
+            tokens = Tokenizer.Tokenize(content, tokenizerDiagnostics, PreprocessorVariables.Normal, file, new TokenizerSettings(TokenizerSettings.Default)
             {
                 TokenizeComments = true,
             }).Tokens;
@@ -177,7 +183,7 @@ public static class Analysis
 
     static bool Compile(
         Dictionary<Uri, List<OmniSharpDiagnostic>> diagnostics,
-        Uri file,
+        string file,
         bool force,
         CompilerSettings settings,
         [NotNullWhen(true)] out CompilerResult compilerResult)
@@ -192,11 +198,10 @@ public static class Analysis
         }
 
         DiagnosticsCollection _diagnostics = new();
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
         try
         {
-            compilerResult = Compiler.CompileFile(file, externalFunctions, settings, PreprocessorVariables.Normal, _diagnostics, null, AdditionalImports);
+            compilerResult = StatementCompiler.CompileFile(file, settings, _diagnostics);
             return !_diagnostics.HasErrors;
         }
         catch (LanguageException exception)
@@ -272,7 +277,22 @@ public static class Analysis
             { file, new List<OmniSharpDiagnostic>() }
         };
 
-        if (!Compile(result.Diagnostics, file, true, new CompilerSettings() { BasePath = basePath }, out CompilerResult compilerResult))
+        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        if (!Compile(result.Diagnostics, file.ToString(), true, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+        {
+            ExternalFunctions = externalFunctions.ToImmutableArray(),
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string?[]
+                    {
+                        basePath
+                    },
+                }
+            ),
+        }, out CompilerResult compilerResult))
         {
             if (Tokenize(result.Diagnostics, file, true, out ImmutableArray<Token> tokens))
             { result.Tokens = tokens; }
@@ -285,7 +305,7 @@ public static class Analysis
 
         if (OmniSharpService.Instance is not null)
         {
-            foreach (ParsedFile parsedFile in compilerResult.Raw)
+            foreach (ParsedFile parsedFile in compilerResult.RawTokens)
             {
                 DocumentHandler document = OmniSharpService.Instance.Documents.GetOrCreate(new TextDocumentIdentifier(parsedFile.File));
                 if (document is DocumentBBLang documentBBLang)
@@ -297,8 +317,8 @@ public static class Analysis
         }
 
         result.CompilerResult = compilerResult;
-        result.AST = compilerResult.Raw.First(v => v.File == file).AST;
-        result.Tokens = compilerResult.Raw.First(v => v.File == file).Tokens.Tokens;
+        result.AST = compilerResult.RawTokens.First(v => v.File == file).AST;
+        result.Tokens = compilerResult.RawTokens.First(v => v.File == file).Tokens.Tokens;
 
         if (!Generate(result.Diagnostics, compilerResult, file))
         { return result; }

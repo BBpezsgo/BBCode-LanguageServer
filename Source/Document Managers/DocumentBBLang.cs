@@ -3,7 +3,7 @@ using System.Text;
 using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
+using LanguageCore.Parser.Statements;
 using LanguageCore.Tokenizing;
 using OmniSharpLocation = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using Position = LanguageCore.Position;
@@ -118,7 +118,7 @@ class DocumentBBLang : DocumentHandler
 
         Dictionary<string, int> functionOverloads = new();
 
-        foreach (CompiledFunction function in CompilerResult.Functions)
+        foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
         {
             if (!function.CanUse(e.TextDocument.Uri.ToUri()))
             { continue; }
@@ -156,7 +156,7 @@ class DocumentBBLang : DocumentHandler
             });
         }
 
-        foreach ((ImmutableArray<Statement> statements, _) in CompilerResult.TopLevelStatements)
+        foreach ((ImmutableArray<Statement> statements, _) in CompilerResult.RawStatements)
         {
             foreach (VariableDeclaration statement in statements.OfType<VariableDeclaration>())
             {
@@ -183,7 +183,7 @@ class DocumentBBLang : DocumentHandler
         }
 
         SinglePosition position = e.Position.ToCool();
-        foreach (CompiledFunction function in CompilerResult.Functions)
+        foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
         {
             if (function.File != e.TextDocument.Uri.ToUri())
             { continue; }
@@ -210,7 +210,7 @@ class DocumentBBLang : DocumentHandler
     #region Hover()
 
     static string GetFunctionHover<TFunction>(TFunction function)
-        where TFunction : FunctionThingDefinition, ICompiledFunction, IReadable
+        where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition, IReadable
     {
         StringBuilder builder = new();
 
@@ -319,10 +319,10 @@ class DocumentBBLang : DocumentHandler
 
     bool HandleDefinitionHover(object? definition, ref string? definitionHover, ref string? docsHover) => definition switch
     {
-        CompiledOperator v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
-        CompiledFunction v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
-        CompiledGeneralFunction v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
-        CompiledVariable v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledOperatorDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledFunctionDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledGeneralFunctionDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        // CompiledVariable v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         VariableDeclaration v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledParameter v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         ParameterDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
@@ -336,7 +336,7 @@ class DocumentBBLang : DocumentHandler
     };
 
     bool HandleDefinitionHover<TFunction>(TFunction function, ref string? definitionHover, ref string? docsHover)
-        where TFunction : FunctionThingDefinition, ICompiledFunction, IReadable
+        where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition, IReadable
     {
         if (function.File is null)
         { return false; }
@@ -366,6 +366,7 @@ class DocumentBBLang : DocumentHandler
         return true;
     }
 
+    /*
     bool HandleDefinitionHover(CompiledVariable variable, ref string? definitionHover, ref string? docsHover)
     {
         if (variable.File is null)
@@ -391,6 +392,7 @@ class DocumentBBLang : DocumentHandler
         GetCommentDocumentation(variable, out docsHover);
         return true;
     }
+    */
 
     bool HandleDefinitionHover(VariableDeclaration variable, ref string? definitionHover, ref string? docsHover)
     {
@@ -511,15 +513,15 @@ class DocumentBBLang : DocumentHandler
         string? definitionHover = null;
         string? docsHover = null;
 
-        if (CompilerResult.GetFunctionAt(Uri, position, out CompiledFunction? function))
+        if (CompilerResult.GetFunctionAt(Uri, position, out CompiledFunctionDefinition? function))
         {
             HandleDefinitionHover(function, ref definitionHover, ref docsHover);
         }
-        else if (CompilerResult.GetGeneralFunctionAt(Uri, position, out CompiledGeneralFunction? generalFunction))
+        else if (CompilerResult.GetGeneralFunctionAt(Uri, position, out CompiledGeneralFunctionDefinition? generalFunction))
         {
             HandleDefinitionHover(generalFunction, ref definitionHover, ref docsHover);
         }
-        else if (CompilerResult.GetOperatorAt(Uri, position, out CompiledOperator? @operator))
+        else if (CompilerResult.GetOperatorAt(Uri, position, out CompiledOperatorDefinition? @operator))
         {
             HandleDefinitionHover(@operator, ref definitionHover, ref docsHover);
         }
@@ -634,7 +636,7 @@ class DocumentBBLang : DocumentHandler
     {
         List<CodeLens> result = new();
 
-        foreach (CompiledFunction function in CompilerResult.Functions)
+        foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
         {
             if (function.File != Uri) continue;
 
@@ -648,7 +650,7 @@ class DocumentBBLang : DocumentHandler
             });
         }
 
-        foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
+        foreach (CompiledGeneralFunctionDefinition function in CompilerResult.GeneralFunctionDefinitions)
         {
             if (function.File != Uri) continue;
 
@@ -662,7 +664,7 @@ class DocumentBBLang : DocumentHandler
             });
         }
 
-        foreach (CompiledOperator function in CompilerResult.Operators)
+        foreach (CompiledOperatorDefinition function in CompilerResult.OperatorDefinitions)
         {
             if (function.File != Uri) continue;
 
@@ -676,7 +678,7 @@ class DocumentBBLang : DocumentHandler
             });
         }
 
-        foreach (CompiledConstructor function in CompilerResult.Constructors)
+        foreach (CompiledConstructorDefinition function in CompilerResult.ConstructorDefinitions)
         {
             if (function.File != Uri) continue;
 
@@ -898,7 +900,7 @@ class DocumentBBLang : DocumentHandler
 
         List<SymbolInformationOrDocumentSymbol> result = new();
 
-        foreach (CompiledFunction function in CompilerResult.Functions)
+        foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
         {
             DocumentUri? uri = function.File is null ? null : (DocumentUri)function.File;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -915,7 +917,7 @@ class DocumentBBLang : DocumentHandler
             });
         }
 
-        foreach (CompiledOperator function in CompilerResult.Operators)
+        foreach (CompiledOperatorDefinition function in CompilerResult.OperatorDefinitions)
         {
             DocumentUri? uri = function.File is null ? null : (DocumentUri)function.File;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -932,7 +934,7 @@ class DocumentBBLang : DocumentHandler
             });
         }
 
-        foreach (CompiledGeneralFunction function in CompilerResult.GeneralFunctions)
+        foreach (CompiledGeneralFunctionDefinition function in CompilerResult.GeneralFunctionDefinitions)
         {
             DocumentUri? uri = function.File is null ? null : (DocumentUri)function.File;
             if (uri is not null && !uri.Equals(e.TextDocument.Uri)) continue;
@@ -975,7 +977,7 @@ class DocumentBBLang : DocumentHandler
 
         List<OmniSharpLocation> result = new();
 
-        if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunction? function))
+        if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunctionDefinition? function))
         {
             foreach (Reference<StatementWithValue?> reference in function.References)
             {
@@ -989,7 +991,7 @@ class DocumentBBLang : DocumentHandler
             }
         }
 
-        if (CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool(), out CompiledGeneralFunction? generalFunction))
+        if (CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool(), out CompiledGeneralFunctionDefinition? generalFunction))
         {
             foreach (Reference<Statement?> reference in generalFunction.References)
             {
@@ -1003,7 +1005,7 @@ class DocumentBBLang : DocumentHandler
             }
         }
 
-        if (CompilerResult.GetOperatorAt(Uri, e.Position.ToCool(), out CompiledOperator? @operator))
+        if (CompilerResult.GetOperatorAt(Uri, e.Position.ToCool(), out CompiledOperatorDefinition? @operator))
         {
             foreach (Reference<StatementWithValue> reference in @operator.References)
             {
@@ -1062,7 +1064,7 @@ class DocumentBBLang : DocumentHandler
         }
 
         if (call is not null &&
-            call.Reference is CompiledFunction compiledFunction)
+            call.Reference is CompiledFunctionDefinition compiledFunction)
         {
             int? activeParameter = null;
             for (int i = 0; i < call.Commas.Length; i++)

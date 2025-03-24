@@ -2,7 +2,7 @@
 using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
+using LanguageCore.Parser.Statements;
 using LanguageCore.Tokenizing;
 using Position = LanguageCore.Position;
 
@@ -15,7 +15,7 @@ public static class Utils
         SinglePosition position,
         [NotNullWhen(true)] out ParameterDefinition? parameter,
         [NotNullWhen(true)] out GeneralType? parameterType)
-        where TFunction : ICompiledFunction
+        where TFunction : ICompiledFunctionDefinition
     {
         for (int i = 0; i < function.ParameterTypes.Count; i++)
         {
@@ -37,7 +37,7 @@ public static class Utils
         SinglePosition position,
         [NotNullWhen(true)] out ParameterDefinition? parameter,
         [NotNullWhen(true)] out GeneralType? parameterType)
-        where TFunction : ICompiledFunction, IInFile
+        where TFunction : ICompiledFunctionDefinition, IInFile
     {
         foreach (TFunction function in functions)
         {
@@ -60,16 +60,16 @@ public static class Utils
         [NotNullWhen(true)] out ParameterDefinition? parameter,
         [NotNullWhen(true)] out GeneralType? parameterType)
     {
-        if (GetParameterDefinitionAt(compilerResult.Functions, file, position, out parameter, out parameterType))
+        if (GetParameterDefinitionAt(compilerResult.FunctionDefinitions, file, position, out parameter, out parameterType))
         { return true; }
 
-        if (GetParameterDefinitionAt(compilerResult.Operators, file, position, out parameter, out parameterType))
+        if (GetParameterDefinitionAt(compilerResult.OperatorDefinitions, file, position, out parameter, out parameterType))
         { return true; }
 
-        if (GetParameterDefinitionAt(compilerResult.GeneralFunctions, file, position, out parameter, out parameterType))
+        if (GetParameterDefinitionAt(compilerResult.GeneralFunctionDefinitions, file, position, out parameter, out parameterType))
         { return true; }
 
-        if (GetParameterDefinitionAt(compilerResult.Constructors, file, position, out parameter, out parameterType))
+        if (GetParameterDefinitionAt(compilerResult.ConstructorDefinitions, file, position, out parameter, out parameterType))
         { return true; }
 
         return false;
@@ -80,12 +80,12 @@ public static class Utils
         SinglePosition position,
         [NotNullWhen(true)] out TypeInstance? typeInstance,
         [NotNullWhen(true)] out GeneralType? generalType)
-        where TFunction : FunctionDefinition, ICompiledFunction
+        where TFunction : FunctionDefinition, ICompiledFunctionDefinition
     {
         if (function.Type.Position.Range.Contains(position))
         {
             typeInstance = function.Type;
-            generalType = ((ICompiledFunction)function).Type;
+            generalType = ((ICompiledFunctionDefinition)function).Type;
             return true;
         }
 
@@ -100,7 +100,7 @@ public static class Utils
         SinglePosition position,
         [NotNullWhen(true)] out TypeInstance? typeInstance,
         [NotNullWhen(true)] out GeneralType? generalType)
-        where TFunction : FunctionDefinition, ICompiledFunction, IInFile
+        where TFunction : FunctionDefinition, ICompiledFunctionDefinition, IInFile
     {
         foreach (TFunction function in functions)
         {
@@ -123,10 +123,10 @@ public static class Utils
         [NotNullWhen(true)] out TypeInstance? typeInstance,
         [NotNullWhen(true)] out GeneralType? generalType)
     {
-        if (GetReturnTypeAt(compilerResult.Functions, file, position, out typeInstance, out generalType))
+        if (GetReturnTypeAt(compilerResult.FunctionDefinitions, file, position, out typeInstance, out generalType))
         { return true; }
 
-        if (GetReturnTypeAt(compilerResult.Operators, file, position, out typeInstance, out generalType))
+        if (GetReturnTypeAt(compilerResult.OperatorDefinitions, file, position, out typeInstance, out generalType))
         { return true; }
 
         return false;

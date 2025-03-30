@@ -215,6 +215,10 @@ public static class Analysis
         }
         finally
         {
+            foreach (LanguageCore.Diagnostic item in _diagnostics.Diagnostics)
+            { Logger.Log(item.Message); }
+            foreach (DiagnosticWithoutContext item in _diagnostics.DiagnosticsWithoutContext)
+            { Logger.Log(item.Message); }
             diagnostics.AddDiagnostics(_diagnostics.Diagnostics, "Compiler");
         }
 
@@ -261,23 +265,16 @@ public static class Analysis
         return false;
     }
 
-    static string? GetBasePath(Uri uri)
-    {
-        return "/home/BB/Projects/BBLang/Core/StandardLibrary";
-    }
-
     public static AnalysisResult Analyze(Uri file)
     {
         AnalysisResult result = AnalysisResult.Empty;
-
-        string? basePath = GetBasePath(file);
 
         result.Diagnostics = new Dictionary<Uri, List<OmniSharpDiagnostic>>()
         {
             { file, new List<OmniSharpDiagnostic>() }
         };
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
         if (!Compile(result.Diagnostics, file.ToString(), true, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
             ExternalFunctions = externalFunctions.ToImmutableArray(),
@@ -288,10 +285,14 @@ public static class Analysis
                 {
                     ExtraDirectories = new string?[]
                     {
-                        basePath
+                        "/home/BB/Projects/BBLang/Core/StandardLibrary"
                     },
                 }
             ),
+            TokenizerSettings = new TokenizerSettings(TokenizerSettings.Default)
+            {
+                TokenizeComments = true,
+            },
         }, out CompilerResult compilerResult))
         {
             if (Tokenize(result.Diagnostics, file, true, out ImmutableArray<Token> tokens))

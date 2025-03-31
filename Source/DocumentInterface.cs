@@ -1,4 +1,5 @@
-﻿using LanguageServer.DocumentManagers;
+﻿using LanguageCore;
+using LanguageServer.DocumentManagers;
 
 namespace LanguageServer;
 
@@ -66,7 +67,7 @@ public abstract class DocumentHandler
 
     public abstract Hover? Hover(HoverParams e);
     public abstract CodeLens[] CodeLens(CodeLensParams e);
-    public abstract Location[] References(ReferenceParams e);
+    public abstract OmniSharp.Extensions.LanguageServer.Protocol.Models.Location[] References(ReferenceParams e);
     public abstract SignatureHelp? SignatureHelp(SignatureHelpParams e);
     public abstract void GetSemanticTokens(SemanticTokensBuilder builder, ITextDocumentIdentifierParams e);
     public abstract CompletionItem[] Completion(CompletionParams e);
@@ -76,7 +77,7 @@ public abstract class DocumentHandler
     public override string ToString() => $"{Path}";
 }
 
-public class Documents
+public class Documents : ISourceProviderSync, ISourceQueryProvider
 {
     readonly List<DocumentHandler> _documents;
 
@@ -88,7 +89,7 @@ public class Documents
     /// <exception cref="ServiceException"/>
     public static DocumentHandler GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface) => languageId switch
     {
-        LanguageCore.LanguageConstants.LanguageId => new DocumentBBLang(uri, content, languageId, documentInterface),
+        LanguageConstants.LanguageId => new DocumentBBLang(uri, content, languageId, documentInterface),
         _ => throw new ServiceException($"Unknown language \"{languageId}\"")
     };
 
@@ -167,5 +168,44 @@ public class Documents
         }
 
         throw new ServiceException($"Unknown document uri scheme: \"{documentId.Uri.Scheme}\"");
+    }
+
+    public IEnumerable<Uri> GetQuery(string requestedFile, Uri? currentFile)
+    {
+        if (!requestedFile.EndsWith($".{LanguageConstants.LanguageExtension}", StringComparison.Ordinal))
+        {
+            requestedFile += $".{LanguageConstants.LanguageExtension}";
+        }
+
+        if (Uri.TryCreate(currentFile, requestedFile, out Uri? uri))
+        {
+            yield return uri;
+        }
+    }
+
+    public SourceProviderResultSync TryLoad(string requestedFile, Uri? currentFile)
+    {
+        Uri? lastUri = null;
+
+        foreach (Uri query in GetQuery(requestedFile, currentFile))
+        {
+            lastUri = query;
+
+            foreach (DocumentHandler document in _documents)
+            {
+                if (document.Uri != query) continue;
+                Logger.Log($"[BBLang Compiler] Using document provided by client");
+                return SourceProviderResultSync.Success(query, document.Content);
+            }
+        }
+
+        if (lastUri is not null)
+        {
+            return SourceProviderResultSync.NotFound(lastUri!);
+        }
+        else
+        {
+            return SourceProviderResultSync.NextHandler();
+        }
     }
 }

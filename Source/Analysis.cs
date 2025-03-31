@@ -281,6 +281,7 @@ public static class Analysis
             PreprocessorVariables = PreprocessorVariables.Normal,
             AdditionalImports = AdditionalImports,
             SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                OmniSharpService.Instance!.Documents,
                 new FileSourceProvider()
                 {
                     ExtraDirectories = new string?[]
@@ -293,6 +294,7 @@ public static class Analysis
             {
                 TokenizeComments = true,
             },
+            CompileEverything = true,
         }, out CompilerResult compilerResult))
         {
             if (Tokenize(result.Diagnostics, file, true, out ImmutableArray<Token> tokens))

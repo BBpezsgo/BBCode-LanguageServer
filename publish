@@ -1,0 +1,15 @@
+#!/bin/sh
+
+rm -rf ./out
+
+dotnet publish --configuration Release --output ./out/linux-x64 -r linux-x64 -p:PublishSingleFile=true -p:DebugType=None --self-contained true
+cd ./out/linux-x64
+zip ../linux-x64.zip LanguageServer
+cd ../..
+rm -rf ./out/linux-x64
+
+dotnet publish --configuration Release --output ./out/win-x64 -r win-x64 -p:PublishSingleFile=true -p:DebugType=None --self-contained true
+cd ./out/win-x64
+zip ../win-x64.zip LanguageServer.exe
+cd ../..
+rm -rf ./out/win-x64

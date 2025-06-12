@@ -197,21 +197,15 @@ public static class Utils
             typeInstance = null;
             generalType = null;
 
-            if (statement is null) return false;
-
-            if (statement is TypeStatement typeStatement)
-            { return Handle3(typeStatement.Type, typeStatement.CompiledType, out typeInstance, out generalType); }
-
-            if (statement is BasicTypeCast basicTypeCast)
-            { return Handle3(basicTypeCast.Type, basicTypeCast.CompiledType, out typeInstance, out generalType); }
-
-            if (statement is ManagedTypeCast typeCast)
-            { return Handle3(typeCast.Type, typeCast.CompiledType, out typeInstance, out generalType); }
-
-            if (statement is VariableDeclaration variableDeclaration)
-            { return Handle3(variableDeclaration.Type, variableDeclaration.CompiledType, out typeInstance, out generalType); }
-
-            return false;
+            return statement switch
+            {
+                TypeStatement v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                BasicTypeCast v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                ManagedTypeCast v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                VariableDeclaration v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                NewInstance v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                _ => false
+            };
         }
 
         Statement? statement = ast.GetStatementAt(position);

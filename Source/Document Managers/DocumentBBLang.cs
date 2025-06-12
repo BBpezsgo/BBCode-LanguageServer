@@ -707,14 +707,7 @@ class DocumentBBLang : DocumentHandler
 
             foreach (CompiledField field in @struct.Fields)
             {
-                result.Add(new CodeLens()
-                {
-                    Range = field.Identifier.Position.Range.ToOmniSharp(),
-                    Command = new Command()
-                    {
-                        Title = $"{field.References.Count} reference",
-                    },
-                });
+
             }
         }
 
@@ -729,23 +722,30 @@ class DocumentBBLang : DocumentHandler
         {
             case TypeInstanceSimple typeInstanceSimple:
                 {
+                    if (typeInstanceSimple.TypeArguments.HasValue)
+                    {
+                        if (type2 is StructType structType &&
+                            structType.Struct.Template is not null)
+                        {
+                            for (int i = 0; i < typeInstanceSimple.TypeArguments.Value.Length; i++)
+                            {
+                                TypeInstance? item = typeInstanceSimple.TypeArguments.Value[i];
+                                GeneralType? item2 = structType.TypeArguments[structType.Struct.Template.Parameters[i].Content];
+                                if (item.Position.Range.Contains(position))
+                                {
+                                    type1 = item;
+                                    type2 = item2;
+                                    GetDeepestTypeInstance(ref type1, ref type2, position);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
                     if (typeInstanceSimple.Identifier.Position.Range.Contains(position))
                     {
                         return;
                     }
-
-                    // if (typeInstanceSimple.GenericTypes.HasValue)
-                    // {
-                    //     for (int i = 0; i < typeInstanceSimple.GenericTypes.Value.Length; i++)
-                    //     {
-                    //         TypeInstance item = typeInstanceSimple.GenericTypes.Value[i];
-                    //         GeneralType item2 = ((StructType)type2).TypeParameters[i];
-                    //         if (item.Position.Range.Contains(position))
-                    //         {
-                    //             return GetDeepestTypeInstance(item, item2, position, out result);
-                    //         }
-                    //     }
-                    // }
 
                     break;
                 }
@@ -793,6 +793,17 @@ class DocumentBBLang : DocumentHandler
                 TargetRange = identifiable1.Identifier.Position.ToOmniSharp(),
                 TargetSelectionRange = identifiable1.Identifier.Position.ToOmniSharp(),
                 TargetUri = DocumentUri.From(file),
+            };
+            return true;
+        }
+
+        if (reference is ILocated located)
+        {
+            result = new LocationLink()
+            {
+                TargetRange = located.Location.Position.ToOmniSharp(),
+                TargetSelectionRange = located.Location.Position.ToOmniSharp(),
+                TargetUri = DocumentUri.From(located.Location.File),
             };
             return true;
         }
@@ -854,12 +865,18 @@ class DocumentBBLang : DocumentHandler
                 if (origin is not null &&
                     type is not null)
                 {
+                    Position position = origin switch
+                    {
+                        TypeInstanceSimple v => v.Identifier.Position,
+                        _ => origin.Position,
+                    };
+
                     if (type.Is(out StructType? structType) &&
                         GetGotoDefinition(structType.Struct, out LocationLink? link))
                     {
                         links.Add(new LocationLink()
                         {
-                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            OriginSelectionRange = position.ToOmniSharp(),
                             TargetRange = link.TargetRange,
                             TargetSelectionRange = link.TargetSelectionRange,
                             TargetUri = link.TargetUri,
@@ -870,7 +887,7 @@ class DocumentBBLang : DocumentHandler
                     {
                         links.Add(new LocationLink()
                         {
-                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            OriginSelectionRange = position.ToOmniSharp(),
                             TargetRange = genericType.Definition.Position.Range.ToOmniSharp(),
                             TargetSelectionRange = genericType.Definition.Position.Range.ToOmniSharp(),
                             TargetUri = DocumentUri,
@@ -881,7 +898,7 @@ class DocumentBBLang : DocumentHandler
                     {
                         links.Add(new LocationLink()
                         {
-                            OriginSelectionRange = origin.Position.ToOmniSharp(),
+                            OriginSelectionRange = position.ToOmniSharp(),
                             TargetRange = aliasType.Definition.Position.Range.ToOmniSharp(),
                             TargetSelectionRange = aliasType.Definition.Position.Range.ToOmniSharp(),
                             TargetUri = aliasType.Definition.File,
@@ -1033,15 +1050,7 @@ class DocumentBBLang : DocumentHandler
 
         if (CompilerResult.GetFieldAt(Uri, e.Position.ToCool(), out CompiledField? compiledField))
         {
-            foreach (Reference<Statement> reference in compiledField.References)
-            {
-                if (reference.SourceFile == null) continue;
-                result.Add(new OmniSharpLocation()
-                {
-                    Range = reference.Source.Position.ToOmniSharp(),
-                    Uri = reference.SourceFile,
-                });
-            }
+
         }
 
         return result.ToArray();

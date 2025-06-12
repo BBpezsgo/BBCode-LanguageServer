@@ -294,7 +294,7 @@ public static class Analysis
             {
                 TokenizeComments = true,
             },
-            CompileEverything = true,
+            CompileEverything = false,
         }, out CompilerResult compilerResult))
         {
             if (Tokenize(result.Diagnostics, file, true, out ImmutableArray<Token> tokens))

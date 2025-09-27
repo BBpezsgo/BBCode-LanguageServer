@@ -274,7 +274,7 @@ public static class Analysis
             { file, new List<OmniSharpDiagnostic>() }
         };
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(VoidIO.Instance);
         if (!Compile(result.Diagnostics, file.ToString(), true, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
             ExternalFunctions = externalFunctions.ToImmutableArray(),

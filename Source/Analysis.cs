@@ -125,7 +125,7 @@ public static class Analysis
         catch (LanguageException exception)
         {
             Logger.Log($"{exception.GetType()}: {exception}");
-            AddDiagnostics(diagnostics, (LanguageCore.Diagnostic)exception, "Tokenizer");
+            AddDiagnostics(diagnostics, exception.ToDiagnostic(), "Tokenizer");
         }
         catch (Exception exception)
         {
@@ -166,7 +166,7 @@ public static class Analysis
         catch (LanguageException exception)
         {
             Logger.Log($"{exception.GetType()}: {exception}");
-            AddDiagnostics(diagnostics, (LanguageCore.Diagnostic)exception, "Parser");
+            AddDiagnostics(diagnostics, exception.ToDiagnostic(), "Parser");
         }
         catch (Exception exception)
         {
@@ -207,7 +207,7 @@ public static class Analysis
         catch (LanguageException exception)
         {
             Logger.Log($"{exception.GetType()}: {exception}");
-            AddDiagnostics(diagnostics, (LanguageCore.Diagnostic)exception, "Compiler");
+            AddDiagnostics(diagnostics, exception.ToDiagnostic(), "Compiler");
         }
         catch (Exception exception)
         {
@@ -251,7 +251,7 @@ public static class Analysis
         catch (LanguageException exception)
         {
             Logger.Log($"{exception.GetType()}: {exception}");
-            AddDiagnostics(diagnostics, (LanguageCore.Diagnostic)exception, "CodeGenerator");
+            AddDiagnostics(diagnostics, exception.ToDiagnostic(), "CodeGenerator");
         }
         catch (Exception exception)
         {

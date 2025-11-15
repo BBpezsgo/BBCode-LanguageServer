@@ -3,7 +3,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 
 namespace LanguageServer.Handlers;
 
-public class DocumentSymbolHandler : IDocumentSymbolHandler
+class DocumentSymbolHandler : IDocumentSymbolHandler
 {
     Task<SymbolInformationOrDocumentSymbolContainer?> IRequestHandler<DocumentSymbolParams, SymbolInformationOrDocumentSymbolContainer?>.Handle(DocumentSymbolParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
@@ -33,7 +33,7 @@ public class DocumentSymbolHandler : IDocumentSymbolHandler
     }
 }
 
-public class CompletionHandler : ICompletionHandler
+class CompletionHandler : ICompletionHandler
 {
     Task<CompletionList> IRequestHandler<CompletionParams, CompletionList>.Handle(CompletionParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
@@ -64,7 +64,7 @@ public class CompletionHandler : ICompletionHandler
     }
 }
 
-public class CodeLensHandler : ICodeLensHandler
+class CodeLensHandler : ICodeLensHandler
 {
     Task<CodeLensContainer?> IRequestHandler<CodeLensParams, CodeLensContainer?>.Handle(CodeLensParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
@@ -91,7 +91,7 @@ public class CodeLensHandler : ICodeLensHandler
     };
 }
 
-public class DefinitionHandler : IDefinitionHandler
+class DefinitionHandler : IDefinitionHandler
 {
     Task<LocationOrLocationLinks?> IRequestHandler<DefinitionParams, LocationOrLocationLinks?>.Handle(DefinitionParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
@@ -116,7 +116,7 @@ public class DefinitionHandler : IDefinitionHandler
     };
 }
 
-public class HoverHandler : IHoverHandler
+class HoverHandler : IHoverHandler
 {
     Task<Hover?> IRequestHandler<HoverParams, Hover?>.Handle(HoverParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
@@ -141,7 +141,7 @@ public class HoverHandler : IHoverHandler
     };
 }
 
-public class ReferencesHandler : IReferencesHandler
+class ReferencesHandler : IReferencesHandler
 {
     Task<LocationContainer?> IRequestHandler<ReferenceParams, LocationContainer?>.Handle(ReferenceParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
@@ -168,7 +168,7 @@ public class ReferencesHandler : IReferencesHandler
     };
 }
 
-public class SignatureHelpHandler : ISignatureHelpHandler
+class SignatureHelpHandler : ISignatureHelpHandler
 {
     public Task<SignatureHelp?> Handle(SignatureHelpParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
@@ -194,7 +194,7 @@ public class SignatureHelpHandler : ISignatureHelpHandler
     };
 }
 
-public class DidChangeConfigurationHandler : IDidChangeConfigurationHandler
+class DidChangeConfigurationHandler : IDidChangeConfigurationHandler
 {
     Task<Unit> IRequestHandler<DidChangeConfigurationParams, Unit>.Handle(DidChangeConfigurationParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
@@ -209,7 +209,7 @@ public class DidChangeConfigurationHandler : IDidChangeConfigurationHandler
     { }
 }
 
-public class SemanticTokensHandler : SemanticTokensHandlerBase
+class SemanticTokensHandler : SemanticTokensHandlerBase
 {
     protected override Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken) => Task.Run(() =>
     {

@@ -1,6 +1,6 @@
 ﻿namespace LanguageServer;
 
-public static class Logger
+static class Logger
 {
     public static void Error(string message) => OmniSharpService.Instance?.Server?.Window.LogError(message);
     public static void Warn(string message) => OmniSharpService.Instance?.Server?.Window.LogWarning(message);

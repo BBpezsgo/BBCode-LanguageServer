@@ -12,7 +12,7 @@ using OmniSharpDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.
 
 namespace LanguageServer;
 
-public struct AnalysisResult
+struct AnalysisResult
 {
     public Dictionary<Uri, List<OmniSharpDiagnostic>> Diagnostics;
     public ImmutableArray<Token> Tokens;
@@ -28,7 +28,7 @@ public struct AnalysisResult
     };
 }
 
-public static class Analysis
+static class Analysis
 {
     static readonly ImmutableArray<string> AdditionalImports = ImmutableArray.Create<string>
     (
@@ -38,7 +38,7 @@ public static class Analysis
     static readonly MainGeneratorSettings GeneratorSettings = new(MainGeneratorSettings.Default)
     {
         CheckNullPointers = false,
-        DontOptimize = false,
+        Optimizations = OptimizationSettings.None,
         GenerateComments = false,
     };
 
@@ -129,7 +129,7 @@ public static class Analysis
         }
         catch (Exception exception)
         {
-            Logger.Log($"{exception.GetType()}: {exception}");
+            Logger.Error($"{exception.GetType()}: {exception}");
         }
         finally
         {
@@ -170,7 +170,7 @@ public static class Analysis
         }
         catch (Exception exception)
         {
-            Logger.Log($"{exception.GetType()}: {exception}");
+            Logger.Error($"{exception.GetType()}: {exception}");
         }
         finally
         {
@@ -188,14 +188,14 @@ public static class Analysis
         CompilerSettings settings,
         [NotNullWhen(true)] out CompilerResult compilerResult)
     {
-        if (!force &&
-            OmniSharpService.Instance is not null &&
-            OmniSharpService.Instance.Documents.TryGet(file, out DocumentHandler? document) &&
-            document is DocumentBBLang documentBBLang)
-        {
-            compilerResult = documentBBLang.CompilerResult;
-            return true;
-        }
+        //if (!force &&
+        //    OmniSharpService.Instance is not null &&
+        //    OmniSharpService.Instance.Documents.TryGet(file, out DocumentHandler? document) &&
+        //    document is DocumentBBLang documentBBLang)
+        //{
+        //    compilerResult = documentBBLang.CompilerResult;
+        //    return true;
+        //}
 
         DiagnosticsCollection _diagnostics = new();
 
@@ -211,7 +211,7 @@ public static class Analysis
         }
         catch (Exception exception)
         {
-            Logger.Log($"{exception.GetType()}: {exception}");
+            Logger.Error($"{exception.GetType()}: {exception}");
         }
         finally
         {
@@ -236,7 +236,7 @@ public static class Analysis
 
         try
         {
-            CodeGeneratorForMain.Generate(
+            var generated = CodeGeneratorForMain.Generate(
                 compilerResult,
                 GeneratorSettings,
                 null,
@@ -245,7 +245,7 @@ public static class Analysis
             if (_diagnostics.HasErrors)
             { return false; }
 
-            Logger.Log($"Successfully compiled {file}");
+            Logger.Log($"Successfully compiled {file} ({generated.Code.Length} bytecodes {generated.CompiledFunctions.Length} functions)");
             return true;
         }
         catch (LanguageException exception)
@@ -286,7 +286,7 @@ public static class Analysis
                 {
                     ExtraDirectories = new string?[]
                     {
-                        "/home/BB/Projects/BBLang/Core/StandardLibrary"
+                        "/home/bb/Projects/BBLang/Core/StandardLibrary"
                     },
                 }
             ),
@@ -294,7 +294,7 @@ public static class Analysis
             {
                 TokenizeComments = true,
             },
-            CompileEverything = false,
+            CompileEverything = true,
         }, out CompilerResult compilerResult))
         {
             if (Tokenize(result.Diagnostics, file, true, out ImmutableArray<Token> tokens))

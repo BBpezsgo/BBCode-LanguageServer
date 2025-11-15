@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Text;
 using LanguageCore;
+using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
@@ -92,20 +93,69 @@ class DocumentBBLang : DocumentHandler
 
     void Validate()
     {
-        Logger.Log($"Validating: \"{Uri}\"");
+        Logger.Log("Validating");
 
-        AnalysisResult analysisResult = Analysis.Analyze(Uri);
+        DiagnosticsCollection diagnostics = new();
 
-        Tokens = analysisResult.Tokens;
-        AST = analysisResult.AST ?? ParserResult.Empty;
-        CompilerResult = analysisResult.CompilerResult ?? CompilerResult;
-
-        foreach (KeyValuePair<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> diagnostics in analysisResult.Diagnostics)
+        CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
+        try
         {
-            OmniSharpService.Instance?.Server?.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams()
+            compilerResult = StatementCompiler.CompileFiles(Documents.Select(v => v.Uri.ToString()).ToArray(), new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
             {
-                Uri = diagnostics.Key,
-                Diagnostics = diagnostics.Value,
+                DontOptimize = true,
+                CompileEverything = true,
+                SourceProviders = [
+                    Documents,
+                    FileSourceProvider.Instance,
+                ],
+            }, diagnostics);
+        }
+        catch (LanguageException languageException)
+        {
+            diagnostics.Add(languageException.ToDiagnostic());
+        }
+
+        ParsedFile raw = compilerResult.RawTokens.FirstOrDefault(v => v.File == Uri);
+        Tokens = !raw.AST.OriginalTokens.IsDefault ? raw.AST.OriginalTokens : !raw.Tokens.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
+        AST = raw.AST.IsNotEmpty ? raw.AST : AST;
+        CompilerResult = compilerResult;
+
+        //foreach (var item in compilerResult.RawTokens)
+        //{
+        //    Logger.Info($"{item.File} tokens: {(item.Tokens.Tokens.IsDefaultOrEmpty ? 0 : item.Tokens.Tokens.Length)} ast: {item.AST.IsNotEmpty}");
+        //}
+
+        Dictionary<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> yes = new();
+
+        foreach (DiagnosticWithoutContext item in diagnostics.DiagnosticsWithoutContext)
+        {
+            Logger.Error(item.ToString());
+        }
+
+        foreach (LanguageCore.Diagnostic diagnostic in diagnostics.Diagnostics)
+        {
+            if (diagnostic.File is null) continue;
+            if (!yes.TryGetValue(diagnostic.File, out var container))
+            {
+                container = yes[diagnostic.File] = new();
+            }
+            container.Add(diagnostic.ToOmniSharp());
+        }
+
+        if (!yes.TryGetValue(Uri, out var selfErrors))
+        {
+            Logger.Warn($"No diagnostics for the current document");
+        }
+
+        foreach ((Uri file, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic> items) in yes)
+        {
+            int? version = null;
+            if (Documents.TryGet(file, out DocumentHandler? document)) version = document.Version;
+            OmniSharpService.Instance?.Server?.PublishDiagnostics(new PublishDiagnosticsParams()
+            {
+                Uri = file,
+                Diagnostics = items,
+                Version = version,
             });
         }
     }
@@ -191,7 +241,7 @@ class DocumentBBLang : DocumentHandler
             if (function.Block == null) continue;
             if (function.Block.Position.Range.Contains(position))
             {
-                foreach (ParameterDefinition parameter in function.Parameters)
+                foreach (ParameterDefinition parameter in function.Parameters.Parameters)
                 {
                     result.Add(new CompletionItem()
                     {
@@ -214,15 +264,6 @@ class DocumentBBLang : DocumentHandler
     {
         StringBuilder builder = new();
 
-        if (function.Template != null)
-        {
-            builder.Append(function.Template.Keyword);
-            builder.Append('<');
-            builder.AppendJoin(", ", function.Template.Parameters);
-            builder.Append('>');
-            builder.Append(Environment.NewLine);
-        }
-
         IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(function.Modifiers);
         if (modifiers.Any())
         {
@@ -233,6 +274,13 @@ class DocumentBBLang : DocumentHandler
         builder.Append(function.Type);
         builder.Append(' ');
         builder.Append(function.Identifier.ToString());
+        if (function.Template != null)
+        {
+            builder.Append('<');
+            builder.AppendJoin(", ", function.Template.Parameters);
+            builder.Append('>');
+            builder.Append(Environment.NewLine);
+        }
         builder.Append('(');
         for (int i = 0; i < function.Parameters.Count; i++)
         {
@@ -497,14 +545,17 @@ class DocumentBBLang : DocumentHandler
 
     public override Hover? Hover(HoverParams e)
     {
-        // Logger.Log($"Hover({e.Position.ToCool().ToStringMin()})");
+        Logger.Log($"Hover({e.Position.ToCool().ToStringMin()})");
 
         SinglePosition position = e.Position.ToCool();
 
         Token? token = Tokens.GetTokenAt(position);
 
         if (token == null)
-        { return null; }
+        {
+            Logger.Warn($"No token at {e.Position.ToCool().ToStringMin()} ({Tokens.Length})");
+            return null;
+        }
 
         Range<SinglePosition> range = token.Position.Range;
 
@@ -572,7 +623,7 @@ class DocumentBBLang : DocumentHandler
         {
             foreach (UsingDefinition @using in AST.Usings)
             {
-                if (new Position(@using.Path.Or(@using.Keyword)).Range.Contains(e.Position.ToCool()))
+                if (new Position(@using.Path.DefaultIfEmpty(@using.Keyword)).Range.Contains(e.Position.ToCool()))
                 {
                     if (@using.CompiledUri != null)
                     { definitionHover = $"{@using.Keyword} \"{@using.CompiledUri.Replace('\\', '/')}\""; }
@@ -817,7 +868,7 @@ class DocumentBBLang : DocumentHandler
 
         List<LocationOrLocationLink> links = new();
 
-        foreach (UsingDefinition @using in AST.Usings)
+        foreach (UsingDefinition @using in AST.Usings.IsDefault ? ImmutableArray<UsingDefinition>.Empty : AST.Usings)
         {
             if (!@using.Position.Range.Contains(e.Position.ToCool()))
             { continue; }
@@ -827,7 +878,7 @@ class DocumentBBLang : DocumentHandler
             links.Add(new LocationOrLocationLink(new LocationLink()
             {
                 TargetUri = DocumentUri.From(@using.CompiledUri),
-                OriginSelectionRange = new Position(@using.Path.Or(@using.Keyword)).ToOmniSharp(),
+                OriginSelectionRange = new Position(@using.Path.DefaultIfEmpty(@using.Keyword)).ToOmniSharp(),
                 TargetRange = Position.Zero.ToOmniSharp(),
                 TargetSelectionRange = Position.Zero.ToOmniSharp(),
             }));
@@ -1124,8 +1175,6 @@ class DocumentBBLang : DocumentHandler
 
     public override void GetSemanticTokens(SemanticTokensBuilder builder, ITextDocumentIdentifierParams e)
     {
-        Tokens = Analysis.Analyze(Uri).Tokens;
-
         foreach (Token token in Tokens)
         {
             switch (token.AnalyzedType)

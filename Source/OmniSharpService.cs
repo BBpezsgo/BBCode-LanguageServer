@@ -5,7 +5,7 @@ using LanguageServer.Handlers;
 
 namespace LanguageServer;
 
-public class OmniSharpService
+class OmniSharpService
 {
     public static OmniSharpService? Instance { get; private set; }
 

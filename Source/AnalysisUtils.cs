@@ -8,7 +8,7 @@ using Position = LanguageCore.Position;
 
 namespace LanguageServer;
 
-public static class Utils
+static class Utils
 {
     static bool GetParameterDefinitionAt<TFunction>(
         TFunction function,
@@ -17,7 +17,7 @@ public static class Utils
         [NotNullWhen(true)] out GeneralType? parameterType)
         where TFunction : ICompiledFunctionDefinition
     {
-        for (int i = 0; i < function.ParameterTypes.Count; i++)
+        for (int i = 0; i < function.ParameterTypes.Length; i++)
         {
             parameter = function.Parameters[i];
             parameterType = function.ParameterTypes[i];

@@ -102,7 +102,7 @@ class DocumentBBLang : DocumentHandler
         {
             compilerResult = StatementCompiler.CompileFiles(Documents.Select(v => v.Uri.ToString()).ToArray(), new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
             {
-                DontOptimize = true,
+                Optimizations = OptimizationSettings.None,
                 CompileEverything = true,
                 SourceProviders = [
                     Documents,
@@ -241,7 +241,7 @@ class DocumentBBLang : DocumentHandler
             if (function.Block == null) continue;
             if (function.Block.Position.Range.Contains(position))
             {
-                foreach (ParameterDefinition parameter in function.Parameters.Parameters)
+                foreach (CompiledParameter parameter in function.Parameters)
                 {
                     result.Add(new CompletionItem()
                     {
@@ -289,7 +289,7 @@ class DocumentBBLang : DocumentHandler
             if (function.Parameters[i].Modifiers.Length > 0)
             { builder.Append(' '); }
 
-            builder.Append(function.ParameterTypes[i].ToString());
+            builder.Append(function.Parameters[i].Type.ToString());
 
             builder.Append(' ');
             builder.Append(function.Parameters[i].Identifier.ToString());
@@ -470,9 +470,6 @@ class DocumentBBLang : DocumentHandler
 
     bool HandleDefinitionHover(CompiledParameter parameter, ref string? definitionHover, ref string? docsHover)
     {
-        if (parameter.IsAnonymous)
-        { return false; }
-
         StringBuilder builder = new();
         builder.Append("(parameter) ");
         if (parameter.Modifiers.Length > 0)
@@ -1146,11 +1143,11 @@ class DocumentBBLang : DocumentHandler
                         Label = compiledFunction.Identifier.Content,
                         ActiveParameter = activeParameter,
                         Parameters = new Container<ParameterInformation>(
-                            Enumerable.Range(0, compiledFunction.Parameters.Count)
+                            Enumerable.Range(0, compiledFunction.Parameters.Length)
                             .Select(i =>
                             {
                                 string identifier = compiledFunction.Parameters[i].Identifier.Content;
-                                GeneralType type = compiledFunction.ParameterTypes[i];
+                                GeneralType type = compiledFunction.Parameters[i].Type;
                                 return new ParameterInformation()
                                 {
                                     Label = identifier,

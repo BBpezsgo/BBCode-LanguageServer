@@ -1,110 +1,262 @@
-﻿using System.IO;
+﻿using System.Collections.Immutable;
 using LanguageCore;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
-using OmniSharpPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
-using OmniSharpRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using LanguageCore.Parser.Statements;
+using LanguageCore.Tokenizing;
 using Position = LanguageCore.Position;
-using OmniSharpDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
-using System.Diagnostics;
 
 namespace LanguageServer;
 
-public class ServiceException : Exception
+static class Utils
 {
-    public ServiceException() { }
-    public ServiceException(string message) : base(message) { }
-    public ServiceException(string message, Exception inner) : base(message, inner) { }
-}
-
-public static class Extensions
-{
-    public static IEnumerable<OmniSharpDiagnostic> ToOmniSharp(this IEnumerable<LanguageCore.Diagnostic> hints, string? source = null)
+    static bool GetParameterDefinitionAt<TFunction>(
+        TFunction function,
+        SinglePosition position,
+        [NotNullWhen(true)] out ParameterDefinition? parameter,
+        [NotNullWhen(true)] out GeneralType? parameterType)
+        where TFunction : ICompiledFunctionDefinition
     {
-        foreach (LanguageCore.Diagnostic diagnostics in hints)
-        { yield return diagnostics.ToOmniSharp(source); }
-    }
-
-    public static DiagnosticSeverity ToOmniSharp(this DiagnosticsLevel level) => level switch
-    {
-        DiagnosticsLevel.Error => DiagnosticSeverity.Error,
-        DiagnosticsLevel.Warning => DiagnosticSeverity.Warning,
-        DiagnosticsLevel.Information => DiagnosticSeverity.Information,
-        DiagnosticsLevel.Hint => DiagnosticSeverity.Hint,
-        DiagnosticsLevel.OptimizationNotice => DiagnosticSeverity.Information,
-        DiagnosticsLevel.FailedOptimization => DiagnosticSeverity.Information,
-        _ => throw new UnreachableException(),
-    };
-
-    [return: NotNullIfNotNull(nameof(diagnostic))]
-    public static OmniSharpDiagnostic? ToOmniSharp(this LanguageCore.Diagnostic? diagnostic, string? source = null) => diagnostic is null ? null : new OmniSharpDiagnostic()
-    {
-        Severity = diagnostic.Level.ToOmniSharp(),
-        Range = diagnostic.Position.ToOmniSharp(),
-        Message = diagnostic.Message,
-        Source = source,
-    };
-
-    [return: NotNullIfNotNull(nameof(error))]
-    public static OmniSharpDiagnostic? ToOmniSharp(this LanguageException? error, string? source = null) => error is null ? null : new OmniSharpDiagnostic()
-    {
-        Severity = DiagnosticSeverity.Error,
-        Range = error.Position.ToOmniSharp(),
-        Message = error.Message,
-        Source = source,
-    };
-
-    public static DocumentUri? Uri(this FunctionThingDefinition function)
-        => function.File is null ? null : (DocumentUri)function.File;
-
-    public static TValue EnsureExistence<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key, TValue value) where TKey : notnull
-    {
-        if (self.TryGetValue(key, out TValue? _value))
+        for (int i = 0; i < function.Parameters.Length; i++)
         {
-            return _value;
+            parameter = function.Parameters[i];
+            parameterType = function.Parameters[i].Type;
+
+            if (parameter.Position.Range.Contains(position))
+            { return true; }
         }
-        self.Add(key, value);
-        return value;
+
+        parameter = null;
+        parameterType = null;
+        return false;
     }
 
-    public static string Extension(this DocumentUri uri)
-        => Path.GetExtension(uri.ToUri().AbsolutePath).TrimStart('.').ToLowerInvariant();
-
-    public static string Extension(this TextDocumentIdentifier uri)
-        => Path.GetExtension(uri.Uri.ToUri().AbsolutePath).TrimStart('.').ToLowerInvariant();
-
-    public static OmniSharpRange ToOmniSharp(this MutableRange<SinglePosition> self) => new()
+    static bool GetParameterDefinitionAt<TFunction>(
+        IEnumerable<TFunction> functions,
+        Uri file,
+        SinglePosition position,
+        [NotNullWhen(true)] out ParameterDefinition? parameter,
+        [NotNullWhen(true)] out GeneralType? parameterType)
+        where TFunction : ICompiledFunctionDefinition, IInFile
     {
-        Start = self.Start.ToOmniSharp(),
-        End = self.End.ToOmniSharp(),
-    };
+        foreach (TFunction function in functions)
+        {
+            if (function.File != file)
+            { continue; }
 
-    public static OmniSharpRange ToOmniSharp(this Range<SinglePosition> self) => new()
-    {
-        Start = self.Start.ToOmniSharp(),
-        End = self.End.ToOmniSharp(),
-    };
+            if (GetParameterDefinitionAt(function, position, out parameter, out parameterType))
+            { return true; }
+        }
 
-    public static OmniSharpPosition ToOmniSharp(this SinglePosition self) => new()
-    {
-        Line = self.Line,
-        Character = self.Character,
-    };
+        parameter = null;
+        parameterType = null;
+        return false;
+    }
 
-    public static OmniSharpRange ToOmniSharp(this Position self) => new()
+    public static bool GetParameterDefinitionAt(
+        this CompilerResult compilerResult,
+        Uri file,
+        SinglePosition position,
+        [NotNullWhen(true)] out ParameterDefinition? parameter,
+        [NotNullWhen(true)] out GeneralType? parameterType)
     {
-        Start = self.Range.Start.ToOmniSharp(),
-        End = self.Range.End.ToOmniSharp(),
-    };
+        if (GetParameterDefinitionAt(compilerResult.FunctionDefinitions, file, position, out parameter, out parameterType))
+        { return true; }
 
-    public static MutableRange<SinglePosition> ToCool(this OmniSharpRange self) => new()
-    {
-        Start = self.Start.ToCool(),
-        End = self.End.ToCool(),
-    };
+        if (GetParameterDefinitionAt(compilerResult.OperatorDefinitions, file, position, out parameter, out parameterType))
+        { return true; }
 
-    public static SinglePosition ToCool(this OmniSharpPosition self) => new()
+        if (GetParameterDefinitionAt(compilerResult.GeneralFunctionDefinitions, file, position, out parameter, out parameterType))
+        { return true; }
+
+        if (GetParameterDefinitionAt(compilerResult.ConstructorDefinitions, file, position, out parameter, out parameterType))
+        { return true; }
+
+        return false;
+    }
+
+    static bool GetReturnTypeAt<TFunction>(
+        TFunction function,
+        SinglePosition position,
+        [NotNullWhen(true)] out TypeInstance? typeInstance,
+        [NotNullWhen(true)] out GeneralType? generalType)
+        where TFunction : FunctionDefinition, ICompiledFunctionDefinition
     {
-        Line = self.Line,
-        Character = self.Character,
+        if (function.Type.Position.Range.Contains(position))
+        {
+            typeInstance = function.Type;
+            generalType = ((ICompiledFunctionDefinition)function).Type;
+            return true;
+        }
+
+        typeInstance = null;
+        generalType = null;
+        return false;
+    }
+
+    static bool GetReturnTypeAt<TFunction>(
+        IEnumerable<TFunction> functions,
+        Uri file,
+        SinglePosition position,
+        [NotNullWhen(true)] out TypeInstance? typeInstance,
+        [NotNullWhen(true)] out GeneralType? generalType)
+        where TFunction : FunctionDefinition, ICompiledFunctionDefinition, IInFile
+    {
+        foreach (TFunction function in functions)
+        {
+            if (function.File != file)
+            { continue; }
+
+            if (GetReturnTypeAt(function, position, out typeInstance, out generalType))
+            { return true; }
+        }
+
+        typeInstance = null;
+        generalType = null;
+        return false;
+    }
+
+    static bool GetReturnTypeAt(
+        CompilerResult compilerResult,
+        Uri file,
+        SinglePosition position,
+        [NotNullWhen(true)] out TypeInstance? typeInstance,
+        [NotNullWhen(true)] out GeneralType? generalType)
+    {
+        if (GetReturnTypeAt(compilerResult.FunctionDefinitions, file, position, out typeInstance, out generalType))
+        { return true; }
+
+        if (GetReturnTypeAt(compilerResult.OperatorDefinitions, file, position, out typeInstance, out generalType))
+        { return true; }
+
+        return false;
+    }
+
+    public static bool GetTypeInstanceAt(
+        this CompilerResult compilerResult,
+        Uri file,
+        SinglePosition position,
+        [NotNullWhen(true)] out TypeInstance? typeInstance,
+        [NotNullWhen(true)] out GeneralType? generalType)
+    {
+        if (GetParameterDefinitionAt(compilerResult, file, position, out ParameterDefinition? parameter, out GeneralType? parameterType) &&
+            parameter.Type.Position.Range.Contains(position))
+        {
+            typeInstance = parameter.Type;
+            generalType = parameterType;
+            return true;
+        }
+
+        if (GetReturnTypeAt(compilerResult, file, position, out TypeInstance? returnType, out GeneralType? returnCompiledType) &&
+            returnType.Position.Range.Contains(position))
+        {
+            typeInstance = returnType;
+            generalType = returnCompiledType;
+            return true;
+        }
+
+        foreach (CompiledStruct @struct in compilerResult.Structs)
+        {
+            foreach (CompiledField field in @struct.Fields)
+            {
+                if (((FieldDefinition)field).Type.Position.Range.Contains(position))
+                {
+                    typeInstance = ((FieldDefinition)field).Type;
+                    generalType = field.Type;
+                    return true;
+                }
+            }
+        }
+
+        typeInstance = null;
+        generalType = null;
+        return false;
+    }
+
+    public static bool GetTypeInstanceAt(
+        this ParserResult ast,
+        SinglePosition position,
+        [NotNullWhen(true)] out TypeInstance? typeInstance,
+        [NotNullWhen(true)] out GeneralType? generalType)
+    {
+        bool Handle3(TypeInstance? type1, GeneralType? type2, [NotNullWhen(true)] out TypeInstance? typeInstance, [NotNullWhen(true)] out GeneralType? generalType)
+        {
+            typeInstance = null;
+            generalType = null;
+
+            if (type1 is null || type2 is null) return false;
+            if (!type1.Position.Range.Contains(position)) return false;
+
+            typeInstance = type1;
+            generalType = type2;
+            return true;
+        }
+
+        bool Handle2(Statement? statement, [NotNullWhen(true)] out TypeInstance? typeInstance, [NotNullWhen(true)] out GeneralType? generalType)
+        {
+            typeInstance = null;
+            generalType = null;
+
+            return statement switch
+            {
+                TypeStatement v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                BasicTypeCast v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                ManagedTypeCast v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                VariableDeclaration v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                NewInstance v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                _ => false
+            };
+        }
+
+        Statement? statement = ast.GetStatementAt(position);
+        if (statement is not null)
+        {
+            foreach (Statement item in statement.GetStatementsRecursively(true))
+            {
+                if (Handle2(item, out typeInstance, out generalType))
+                { return true; }
+            }
+        }
+
+        typeInstance = null;
+        generalType = null;
+        return false;
+    }
+
+    public static bool GetTypeInstanceAt(
+        this ValueTuple<ParserResult, CompilerResult> self,
+        Uri file,
+        SinglePosition position,
+        [NotNullWhen(true)] out TypeInstance? typeInstance,
+        [NotNullWhen(true)] out GeneralType? generalType)
+    {
+        if (GetTypeInstanceAt(self.Item2, file, position, out typeInstance, out generalType))
+        { return true; }
+
+        if (GetTypeInstanceAt(self.Item1, position, out typeInstance, out generalType))
+        { return true; }
+
+        return false;
+    }
+
+    public static IEnumerable<Token> GetVisibleModifiers(IEnumerable<Token> modifiers)
+    {
+        return modifiers.Where(v => v.Content != "export");
+    }
+
+    public static Position GetInteractivePosition(Statement statement) => statement switch
+    {
+        AnyCall v => v.PrevStatement switch
+        {
+            Field v2 => v2.Identifier.Position,
+            _ => v.PrevStatement.Position,
+        },
+        BinaryOperatorCall v => v.Operator.Position,
+        UnaryOperatorCall v => v.Operator.Position,
+        VariableDeclaration v => v.Identifier.Position,
+        Field v => v.Identifier.Position,
+        ConstructorCall v => new Position([v.Keyword, v.Type]),
+        ManagedTypeCast v => new Position([v.Type, v.Brackets]),
+        _ => statement.Position,
     };
 }

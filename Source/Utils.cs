@@ -211,7 +211,7 @@ static class Utils
         Statement? statement = ast.GetStatementAt(position);
         if (statement is not null)
         {
-            foreach (Statement item in statement.GetStatementsRecursively(true))
+            foreach (Statement item in statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
             {
                 if (Handle2(item, out typeInstance, out generalType))
                 { return true; }

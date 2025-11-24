@@ -27,21 +27,18 @@ class DocumentBBLang : DocumentHandler
     public override void OnChanged(DidChangeTextDocumentParams e)
     {
         base.OnChanged(e);
-
         Validate();
     }
 
     public override void OnSaved(DidSaveTextDocumentParams e)
     {
         base.OnSaved(e);
-
         Validate();
     }
 
     public override void OnOpened(DidOpenTextDocumentParams e)
     {
         base.OnOpened(e);
-
         Validate();
     }
 
@@ -72,9 +69,9 @@ class DocumentBBLang : DocumentHandler
             {
                 StringBuilder parsedResult = new();
                 string[] lines = token.Content.Split('\n');
-                for (int i1 = 0; i1 < lines.Length; i1++)
+                for (int j = 0; j < lines.Length; j++)
                 {
-                    string line = lines[i1];
+                    string line = lines[j];
                     line = line.Trim();
                     if (line.StartsWith('*')) line = line[1..];
                     line = line.TrimStart();
@@ -82,6 +79,11 @@ class DocumentBBLang : DocumentHandler
                 }
 
                 result = parsedResult.ToString();
+                return true;
+            }
+            else if (token.TokenType == TokenType.Comment)
+            {
+                result = token.Content.Trim();
                 return true;
             }
 
@@ -93,7 +95,7 @@ class DocumentBBLang : DocumentHandler
 
     void Validate()
     {
-        Logger.Log("Validating");
+        Logger.Log("Validate()");
 
         DiagnosticsCollection diagnostics = new();
 
@@ -104,10 +106,15 @@ class DocumentBBLang : DocumentHandler
             {
                 Optimizations = OptimizationSettings.None,
                 CompileEverything = true,
+                PreprocessorVariables = PreprocessorVariables.Normal,
                 SourceProviders = [
                     Documents,
                     FileSourceProvider.Instance,
                 ],
+                TokenizerSettings = new TokenizerSettings(TokenizerSettings.Default)
+                {
+                    TokenizeComments = true,
+                },
             }, diagnostics);
         }
         catch (LanguageException languageException)
@@ -119,11 +126,6 @@ class DocumentBBLang : DocumentHandler
         Tokens = !raw.AST.OriginalTokens.IsDefault ? raw.AST.OriginalTokens : !raw.Tokens.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
         AST = raw.AST.IsNotEmpty ? raw.AST : AST;
         CompilerResult = compilerResult;
-
-        //foreach (var item in compilerResult.RawTokens)
-        //{
-        //    Logger.Info($"{item.File} tokens: {(item.Tokens.Tokens.IsDefaultOrEmpty ? 0 : item.Tokens.Tokens.Length)} ast: {item.AST.IsNotEmpty}");
-        //}
 
         Dictionary<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> yes = new();
 
@@ -162,8 +164,6 @@ class DocumentBBLang : DocumentHandler
 
     public override CompletionItem[] Completion(CompletionParams e)
     {
-        // Logger.Log($"Completion({e})");
-
         List<CompletionItem> result = new();
 
         Dictionary<string, int> functionOverloads = new();
@@ -371,7 +371,9 @@ class DocumentBBLang : DocumentHandler
         CompiledFunctionDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledGeneralFunctionDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         // CompiledVariable v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledVariableConstant v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         VariableDeclaration v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledVariableDeclaration v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledParameter v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         ParameterDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledField v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
@@ -468,6 +470,40 @@ class DocumentBBLang : DocumentHandler
         return true;
     }
 
+    bool HandleDefinitionHover(CompiledVariableDeclaration variable, ref string? definitionHover, ref string? docsHover)
+    {
+        StringBuilder builder = new();
+
+        builder.Append("(variable) ");
+
+        builder.Append(variable.Type.ToString());
+        builder.Append(' ');
+        builder.Append(variable.Identifier);
+        definitionHover = builder.ToString();
+
+        GetCommentDocumentation(variable, out docsHover);
+        return true;
+    }
+
+    bool HandleDefinitionHover(CompiledVariableConstant variable, ref string? definitionHover, ref string? docsHover)
+    {
+        StringBuilder builder = new();
+
+        builder.Append("(constant) ");
+
+        builder.Append(variable.Type.ToString());
+        builder.Append(' ');
+        builder.Append(variable.Identifier);
+
+        builder.Append(" = ");
+        builder.Append(variable.Value.ToString());
+
+        definitionHover = builder.ToString();
+
+        GetCommentDocumentation(variable, out docsHover);
+        return true;
+    }
+
     bool HandleDefinitionHover(CompiledParameter parameter, ref string? definitionHover, ref string? docsHover)
     {
         StringBuilder builder = new();
@@ -542,8 +578,6 @@ class DocumentBBLang : DocumentHandler
 
     public override Hover? Hover(HoverParams e)
     {
-        Logger.Log($"Hover({e.Position.ToCool().ToStringMin()})");
-
         SinglePosition position = e.Position.ToCool();
 
         Token? token = Tokens.GetTokenAt(position);
@@ -560,6 +594,7 @@ class DocumentBBLang : DocumentHandler
         string? valueHover = null;
         string? definitionHover = null;
         string? docsHover = null;
+        Statement? statement = null;
 
         if (CompilerResult.GetFunctionAt(Uri, position, out CompiledFunctionDefinition? function))
         {
@@ -594,9 +629,27 @@ class DocumentBBLang : DocumentHandler
         {
             HandleDefinitionHover(parameter, ref definitionHover, ref docsHover);
         }
-        else if (AST.GetStatementAt(position, out Statement? statement))
+        else if (AST.GetStatementAt(position, out statement))
         {
-            foreach (Statement item in statement.GetStatementsRecursively(true))
+            if (statement is VariableDeclaration variableDeclaration)
+            {
+                HandleDefinitionHover(variableDeclaration, ref definitionHover, ref docsHover);
+            }
+
+            if (statement is IReferenceableTo referenceableTo)
+            {
+                switch (referenceableTo.Reference)
+                {
+                    case CompiledVariableDeclaration v:
+                        HandleDefinitionHover(v, ref definitionHover, ref docsHover);
+                        break;
+                    case CompiledVariableConstant v:
+                        HandleDefinitionHover(v, ref definitionHover, ref docsHover);
+                        break;
+                }
+            }
+
+            foreach (Statement item in statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
             {
                 if (!item.Position.Range.Contains(e.Position.ToCool()))
                 { continue; }
@@ -638,6 +691,24 @@ class DocumentBBLang : DocumentHandler
 
         StringBuilder contents = new();
 
+        if (statement is not null)
+        {
+            //if (contents.Length > 0) contents.AppendLine("---");
+            //contents.AppendLine("**Statement:**");
+            //contents.AppendLine($"```");
+            //contents.AppendLine(statement.GetType().Name);
+            //contents.AppendLine("```");
+
+            //if (statement is IReferenceableTo referenceableTo)
+            //{
+            //    if (contents.Length > 0) contents.AppendLine("---");
+            //    contents.AppendLine("**Ref:**");
+            //    contents.AppendLine($"```");
+            //    contents.AppendLine(referenceableTo.Reference?.GetType().Name ?? "null");
+            //    contents.AppendLine("```");
+            //}
+        }
+
         if (definitionHover is not null)
         {
             if (contents.Length > 0) contents.AppendLine("---");
@@ -648,6 +719,7 @@ class DocumentBBLang : DocumentHandler
         else if (typeHover is not null)
         {
             if (contents.Length > 0) contents.AppendLine("---");
+            contents.AppendLine("**Type:**");
             contents.AppendLine($"```{LanguageConstants.LanguageId}");
             contents.AppendLine(typeHover);
             contents.AppendLine("```");
@@ -656,6 +728,7 @@ class DocumentBBLang : DocumentHandler
         if (valueHover is not null)
         {
             if (contents.Length > 0) contents.AppendLine("---");
+            contents.AppendLine("**Value:**");
             contents.AppendLine($"```{LanguageConstants.LanguageId}");
             contents.AppendLine(valueHover);
             contents.AppendLine("```");
@@ -861,8 +934,6 @@ class DocumentBBLang : DocumentHandler
 
     public override LocationOrLocationLinks? GotoDefinition(DefinitionParams e)
     {
-        // Logger.Log($"GotoDefinition({e.Position.ToCool().ToStringMin()})");
-
         List<LocationOrLocationLink> links = new();
 
         foreach (UsingDefinition @using in AST.Usings.IsDefault ? ImmutableArray<UsingDefinition>.Empty : AST.Usings)
@@ -884,7 +955,7 @@ class DocumentBBLang : DocumentHandler
 
         if (AST.GetStatementAt(e.Position.ToCool(), out Statement? statement))
         {
-            foreach (Statement item in statement.GetStatementsRecursively(true))
+            foreach (Statement item in statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
             {
                 Position from = Utils.GetInteractivePosition(item);
 
@@ -961,8 +1032,6 @@ class DocumentBBLang : DocumentHandler
 
     public override SymbolInformationOrDocumentSymbol[] Symbols(DocumentSymbolParams e)
     {
-        // Logger.Log($"Symbols()");
-
         List<SymbolInformationOrDocumentSymbol> result = new();
 
         foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
@@ -1038,8 +1107,6 @@ class DocumentBBLang : DocumentHandler
 
     public override OmniSharpLocation[] References(ReferenceParams e)
     {
-        // Logger.Log($"References({e.Position.ToCool().ToStringMin()})");
-
         List<OmniSharpLocation> result = new();
 
         if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunctionDefinition? function))
@@ -1110,18 +1177,37 @@ class DocumentBBLang : DocumentHandler
 
         AnyCall? call = null;
 
-        foreach (IEnumerable<Statement>? items in CompilerResult.StatementsIn(e.TextDocument.Uri.ToUri()).Select(statement => statement.GetStatementsRecursively(true)))
+        foreach (IEnumerable<Statement>? items in CompilerResult.StatementsIn(e.TextDocument.Uri.ToUri()).Select(statement => statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis)))
         {
-            foreach (Statement? item in items)
+            foreach (Statement item in items)
             {
-                if (item is not AnyCall anyCall) continue;
-                if (!new Position(anyCall.Brackets).Range.Contains(position)) continue;
-                call = anyCall;
+                if (item is AnyCall anyCall)
+                {
+                    if (!new Position(anyCall.Brackets).Range.Contains(position)) continue;
+                    call = anyCall;
+                    Logger.Warn($"Call found");
+                }
+                else if (item is VariableDeclaration variableDeclaration)
+                {
+                    if (variableDeclaration.Type is TypeInstanceFunction functionType
+                        && functionType.FunctionReturnType is TypeInstanceSimple typeInstanceSimple
+                        && !typeInstanceSimple.TypeArguments.HasValue)
+                    {
+                        if (!new Position(functionType.Brackets).Range.Contains(position)) continue;
+                        call = new AnyCall(
+                            new Identifier(typeInstanceSimple.Identifier, typeInstanceSimple.File),
+                            ImmutableArray<StatementWithValue>.Empty,
+                            ImmutableArray<Token>.Empty,
+                            functionType.Brackets,
+                            functionType.File
+                        );
+                        Logger.Warn($"Converting {functionType} to {call}");
+                    }
+                }
             }
         }
 
-        if (call is not null &&
-            call.Reference is CompiledFunctionDefinition compiledFunction)
+        if (call is not null && call.ToFunctionCall(out FunctionCall? functionCall))
         {
             int? activeParameter = null;
             for (int i = 0; i < call.Commas.Length; i++)
@@ -1133,36 +1219,45 @@ class DocumentBBLang : DocumentHandler
                 }
             }
 
+            ImmutableArray<CompiledFunctionDefinition> candidates = CompilerResult.FunctionDefinitions.Where(v => v.Identifier.Content == functionCall.Identifier.Content).ToImmutableArray();
+
+            int? activeSignature = null;
+            if (call.Reference is not null)
+            {
+                for (int i = 0; i < candidates.Length; i++)
+                {
+                    if (candidates[i] == call.Reference)
+                    {
+                        activeSignature = i;
+                        break;
+                    }
+                }
+            }
+
             return new SignatureHelp()
             {
-                ActiveSignature = 0,
+                ActiveSignature = activeSignature,
                 ActiveParameter = activeParameter,
                 Signatures = new Container<SignatureInformation>(
-                    new SignatureInformation()
+                    candidates.Select(v => new SignatureInformation()
                     {
-                        Label = compiledFunction.Identifier.Content,
-                        ActiveParameter = activeParameter,
+                        Label = v.Identifier.Content,
+                        ActiveParameter = activeParameter.HasValue && activeParameter.Value < v.Parameters.Length ? activeParameter.Value : null,
                         Parameters = new Container<ParameterInformation>(
-                            Enumerable.Range(0, compiledFunction.Parameters.Length)
-                            .Select(i =>
+                            v.Parameters.Select(p => new ParameterInformation()
                             {
-                                string identifier = compiledFunction.Parameters[i].Identifier.Content;
-                                GeneralType type = compiledFunction.Parameters[i].Type;
-                                return new ParameterInformation()
-                                {
-                                    Label = identifier,
-                                };
+                                Label = p.Identifier.Content,
                             })
                         ),
                         Documentation =
-                            GetCommentDocumentation(compiledFunction, compiledFunction.File, out string? docs)
+                            GetCommentDocumentation(v, v.File, out string? docs)
                             ? new StringOrMarkupContent(new MarkupContent()
                             {
                                 Kind = MarkupKind.Markdown,
                                 Value = docs,
                             })
                             : null,
-                    }
+                    })
                 ),
             };
         }
@@ -1177,32 +1272,34 @@ class DocumentBBLang : DocumentHandler
             switch (token.AnalyzedType)
             {
                 case TokenAnalyzedType.Attribute:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Type, Array.Empty<SemanticTokenModifier>());
+                    break;
                 case TokenAnalyzedType.Type:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Type, SemanticTokenModifier.Defaults);
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Type, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.Struct:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Struct, SemanticTokenModifier.Defaults);
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Struct, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.FunctionName:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Function, SemanticTokenModifier.Defaults);
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Function, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.VariableName:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Variable, SemanticTokenModifier.Defaults);
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Variable, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.ConstantName:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Variable, SemanticTokenModifier.Readonly);
                     break;
                 case TokenAnalyzedType.ParameterName:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Parameter, SemanticTokenModifier.Defaults);
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Parameter, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.TypeParameter:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.TypeParameter, SemanticTokenModifier.Defaults);
-                    break;
-                case TokenAnalyzedType.None:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.TypeParameter, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.Keyword:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Keyword, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.FieldName:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Property, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.CompileTag:
                     break;
@@ -1211,22 +1308,31 @@ class DocumentBBLang : DocumentHandler
                 case TokenAnalyzedType.Statement:
                     break;
                 case TokenAnalyzedType.BuiltinType:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Keyword, Array.Empty<SemanticTokenModifier>());
                     break;
+                case TokenAnalyzedType.MathOperator:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Operator, Array.Empty<SemanticTokenModifier>());
+                    break;
+                case TokenAnalyzedType.OtherOperator:
+                    break;
+                case TokenAnalyzedType.TypeModifier:
+                    break;
+                case TokenAnalyzedType.None:
                 default:
                     switch (token.TokenType)
                     {
                         // case TokenType.LiteralString:
                         // case TokenType.LiteralCharacter:
-                        //     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.String, SemanticTokenModifier.Defaults);
+                        //     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.String, Array.Empty<SemanticTokenModifier>());
                         //     break;
                         case TokenType.LiteralNumber:
                         case TokenType.LiteralHex:
                         case TokenType.LiteralBinary:
                         case TokenType.LiteralFloat:
-                            builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Number, SemanticTokenModifier.Defaults);
+                            builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Number, Array.Empty<SemanticTokenModifier>());
                             break;
                         case TokenType.PreprocessSkipped:
-                            builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Comment, SemanticTokenModifier.Defaults);
+                            builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Comment, Array.Empty<SemanticTokenModifier>());
                             break;
                     }
                     break;

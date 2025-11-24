@@ -20,8 +20,8 @@ class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
         SyncKind = TextDocumentSyncKind.Full,
     };
 
-    public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri document)
-        => new(document, document.Extension());
+    public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri)
+        => new(uri, uri.Extension());
 
     public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {

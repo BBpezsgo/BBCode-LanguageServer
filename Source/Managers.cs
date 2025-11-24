@@ -7,7 +7,7 @@ class DocumentSymbolHandler : IDocumentSymbolHandler
 {
     Task<SymbolInformationOrDocumentSymbolContainer?> IRequestHandler<DocumentSymbolParams, SymbolInformationOrDocumentSymbolContainer?>.Handle(DocumentSymbolParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Handle Symbol request ...");
+        Logger.Log($"DocumentSymbolHandler.Handle({e})");
 
         if (OmniSharpService.Instance?.Server == null) return null;
 
@@ -37,7 +37,7 @@ class CompletionHandler : ICompletionHandler
 {
     Task<CompletionList> IRequestHandler<CompletionParams, CompletionList>.Handle(CompletionParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Handle Completion request ...");
+        Logger.Log($"CompletionHandler.Handle({e})");
 
         if (OmniSharpService.Instance?.Server == null) return new CompletionList();
 
@@ -68,7 +68,7 @@ class CodeLensHandler : ICodeLensHandler
 {
     Task<CodeLensContainer?> IRequestHandler<CodeLensParams, CodeLensContainer?>.Handle(CodeLensParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Handle CodeLens request ...");
+        Logger.Log($"CodeLensHandler.Handle({e})");
 
         if (OmniSharpService.Instance?.Server == null) return null;
 
@@ -95,7 +95,7 @@ class DefinitionHandler : IDefinitionHandler
 {
     Task<LocationOrLocationLinks?> IRequestHandler<DefinitionParams, LocationOrLocationLinks?>.Handle(DefinitionParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Handle Definition request ...");
+        Logger.Log($"DefinitionHandler.Handle({e})");
 
         if (OmniSharpService.Instance?.Server == null) return null;
 
@@ -120,7 +120,7 @@ class HoverHandler : IHoverHandler
 {
     Task<Hover?> IRequestHandler<HoverParams, Hover?>.Handle(HoverParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Handle Hover request ...");
+        Logger.Log($"HoverHandler.Handle({e})");
 
         if (OmniSharpService.Instance?.Server == null) return null;
 
@@ -145,7 +145,7 @@ class ReferencesHandler : IReferencesHandler
 {
     Task<LocationContainer?> IRequestHandler<ReferenceParams, LocationContainer?>.Handle(ReferenceParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Handle References request ...");
+        Logger.Log($"ReferencesHandler.Handle({e})");
 
         if (OmniSharpService.Instance?.Server == null) return null;
 
@@ -172,7 +172,7 @@ class SignatureHelpHandler : ISignatureHelpHandler
 {
     public Task<SignatureHelp?> Handle(SignatureHelpParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Handle SignatureHelp request ...");
+        Logger.Log($"SignatureHelpHandler.Handle({e})");
 
         if (OmniSharpService.Instance?.Server == null) return null;
 
@@ -198,7 +198,7 @@ class DidChangeConfigurationHandler : IDidChangeConfigurationHandler
 {
     Task<Unit> IRequestHandler<DidChangeConfigurationParams, Unit>.Handle(DidChangeConfigurationParams e, CancellationToken cancellationToken) => Task.Run(() =>
     {
-        Logger.Log($"Handle ConfigurationChange request ...");
+        Logger.Log($"DidChangeConfigurationHandler.Handle({e})");
 
         OmniSharpService.Instance?.OnConfigChanged(e);
 
@@ -211,11 +211,14 @@ class DidChangeConfigurationHandler : IDidChangeConfigurationHandler
 
 class SemanticTokensHandler : SemanticTokensHandlerBase
 {
-    protected override Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken) => Task.Run(() =>
+    protected override Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken)
     {
-        Logger.Log($"Tokenize");
+        Logger.Log($"SemanticTokensHandler.Tokenize({identifier})");
+
         OmniSharpService.Instance?.Documents.Get(identifier.TextDocument)?.GetSemanticTokens(builder, identifier);
-    }, cancellationToken);
+
+        return Task.CompletedTask;
+    }
 
     protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams @params, CancellationToken cancellationToken)
         => Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
@@ -223,12 +226,15 @@ class SemanticTokensHandler : SemanticTokensHandlerBase
     protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities) => new()
     {
         DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
-        Legend = new SemanticTokensLegend
+        Legend = new SemanticTokensLegend()
         {
             TokenModifiers = capability.TokenModifiers,
             TokenTypes = capability.TokenTypes,
         },
-        Full = true,
+        Full = new SemanticTokensCapabilityRequestFull()
+        {
+            Delta = false,
+        },
         Range = false,
     };
 }

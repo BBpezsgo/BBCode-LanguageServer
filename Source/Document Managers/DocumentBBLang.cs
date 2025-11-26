@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.IO;
 using System.Text;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
@@ -97,6 +98,59 @@ class DocumentBBLang : DocumentHandler
     {
         Logger.Log("Validate()");
 
+        Logger.Log("Search for configuration file ...");
+        Uri currentUri = Uri;
+        string? configuration = null;
+        while (currentUri.LocalPath != "/")
+        {
+            Uri uri = new(currentUri, "./bbl.conf");
+            Logger.Log($"  Try {uri}");
+            if (Documents.TryGet(uri, out DocumentHandler? document))
+            {
+                configuration = document.Content;
+                break;
+            }
+            else if (File.Exists(uri.LocalPath))
+            {
+                configuration = File.ReadAllText(uri.LocalPath);
+                break;
+            }
+            else
+            {
+                currentUri = new Uri(currentUri, "..");
+            }
+        }
+
+        List<string> extraDirectories = new();
+        List<string> additionalImports = new();
+
+        if (configuration is not null)
+        {
+            string[] values = configuration.Split('\n');
+            for (int line = 0; line < values.Length; line++)
+            {
+                ReadOnlySpan<char> decl = values[line];
+                int i = decl.IndexOf('#');
+                if (i != -1) decl = decl[..i];
+                i = decl.IndexOf('=');
+                if (i == -1) continue;
+                ReadOnlySpan<char> key = decl[..i].Trim();
+                ReadOnlySpan<char> value = decl[(i + 1)..].Trim();
+
+                if (key.Equals("searchin", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    extraDirectories.Add(value.ToString());
+                }
+                else if (key.Equals("include", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    additionalImports.Add(value.ToString());
+                }
+            }
+
+            Logger.Log($"Extra directories: \n{string.Join('\n', extraDirectories)}");
+            Logger.Log($"Additional imports: \n{string.Join('\n', additionalImports)}");
+        }
+
         DiagnosticsCollection diagnostics = new();
 
         CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
@@ -109,8 +163,12 @@ class DocumentBBLang : DocumentHandler
                 PreprocessorVariables = PreprocessorVariables.Normal,
                 SourceProviders = [
                     Documents,
-                    FileSourceProvider.Instance,
+                    new FileSourceProvider()
+                    {
+                        ExtraDirectories = extraDirectories,
+                    },
                 ],
+                AdditionalImports = additionalImports.ToImmutableArray(),
                 TokenizerSettings = new TokenizerSettings(TokenizerSettings.Default)
                 {
                     TokenizeComments = true,

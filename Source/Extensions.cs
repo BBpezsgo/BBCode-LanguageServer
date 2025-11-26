@@ -1,6 +1,5 @@
 using System.IO;
 using LanguageCore;
-using LanguageCore.Parser;
 using OmniSharpPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using OmniSharpRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 using Position = LanguageCore.Position;
@@ -23,11 +22,23 @@ static class Extensions
     };
 
     [return: NotNullIfNotNull(nameof(diagnostic))]
+    static string? GetFullMessage(LanguageCore.Diagnostic? diagnostic, int indent)
+    {
+        if (diagnostic is null)return null;
+        string result = $"{diagnostic.Message}";
+        foreach (LanguageCore.Diagnostic item in diagnostic.SubErrors)
+        {
+            result += $"\n{new string(' ', indent)} -> {GetFullMessage(item, indent + 2)}";
+        }
+        return result;
+    }
+
+    [return: NotNullIfNotNull(nameof(diagnostic))]
     public static OmniSharpDiagnostic? ToOmniSharp(this LanguageCore.Diagnostic? diagnostic, string? source = null) => diagnostic is null ? null : new OmniSharpDiagnostic()
     {
         Severity = diagnostic.Level.ToOmniSharp(),
         Range = diagnostic.Position.ToOmniSharp(),
-        Message = diagnostic.Message,
+        Message = GetFullMessage(diagnostic, 0),
         Source = source,
     };
 

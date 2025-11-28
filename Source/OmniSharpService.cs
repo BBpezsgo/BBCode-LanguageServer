@@ -91,7 +91,7 @@ class OmniSharpService
 
         options.OnInitialized((server, e, result, cancellationToken) =>
         {
-            server.Window.Log($"[LanguageServer]: Initialized");
+            server.Window.Log($"Initialized");
             return Task.CompletedTask;
         });
 

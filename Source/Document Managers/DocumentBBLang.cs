@@ -96,60 +96,9 @@ class DocumentBBLang : DocumentHandler
 
     void Validate()
     {
-        Logger.Log("Validate()");
+        Logger.Log($"Validate()\n {string.Join("\n ", Documents.Select(v => v.Uri))}");
 
-        Logger.Log("Search for configuration file ...");
-        Uri currentUri = Uri;
-        string? configuration = null;
-        while (currentUri.LocalPath != "/")
-        {
-            Uri uri = new(currentUri, "./bbl.conf");
-            Logger.Log($"  Try {uri}");
-            if (Documents.TryGet(uri, out DocumentHandler? document))
-            {
-                configuration = document.Content;
-                break;
-            }
-            else if (File.Exists(uri.LocalPath))
-            {
-                configuration = File.ReadAllText(uri.LocalPath);
-                break;
-            }
-            else
-            {
-                currentUri = new Uri(currentUri, "..");
-            }
-        }
-
-        List<string> extraDirectories = new();
-        List<string> additionalImports = new();
-
-        if (configuration is not null)
-        {
-            string[] values = configuration.Split('\n');
-            for (int line = 0; line < values.Length; line++)
-            {
-                ReadOnlySpan<char> decl = values[line];
-                int i = decl.IndexOf('#');
-                if (i != -1) decl = decl[..i];
-                i = decl.IndexOf('=');
-                if (i == -1) continue;
-                ReadOnlySpan<char> key = decl[..i].Trim();
-                ReadOnlySpan<char> value = decl[(i + 1)..].Trim();
-
-                if (key.Equals("searchin", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    extraDirectories.Add(value.ToString());
-                }
-                else if (key.Equals("include", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    additionalImports.Add(value.ToString());
-                }
-            }
-
-            Logger.Log($"Extra directories: \n{string.Join('\n', extraDirectories)}");
-            Logger.Log($"Additional imports: \n{string.Join('\n', additionalImports)}");
-        }
+        Configuration config = ConfigurationManager.Parse(ConfigurationManager.Search(Uri, Documents));
 
         DiagnosticsCollection diagnostics = new();
 
@@ -165,10 +114,16 @@ class DocumentBBLang : DocumentHandler
                     Documents,
                     new FileSourceProvider()
                     {
-                        ExtraDirectories = extraDirectories,
+                        ExtraDirectories = config.ExtraDirectories,
                     },
                 ],
-                AdditionalImports = additionalImports.ToImmutableArray(),
+                AdditionalImports = config.AdditionalImports.ToImmutableArray(),
+                ExternalFunctions = [
+                    ..config.ExternalFunctions
+                ],
+                ExternalConstants = [
+                    ..config.ExternalConstants
+                ],
                 TokenizerSettings = new TokenizerSettings(TokenizerSettings.Default)
                 {
                     TokenizeComments = true,
@@ -185,36 +140,36 @@ class DocumentBBLang : DocumentHandler
         AST = raw.AST.IsNotEmpty ? raw.AST : AST;
         CompilerResult = compilerResult;
 
-        Dictionary<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> yes = new();
-
         foreach (DiagnosticWithoutContext item in diagnostics.DiagnosticsWithoutContext)
         {
             Logger.Error(item.ToString());
         }
 
+        Dictionary<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> diagnosticsPerFile = new();
+
         foreach (LanguageCore.Diagnostic diagnostic in diagnostics.Diagnostics)
         {
             if (diagnostic.File is null) continue;
-            if (!yes.TryGetValue(diagnostic.File, out var container))
+            if (!diagnosticsPerFile.TryGetValue(diagnostic.File, out var container))
             {
-                container = yes[diagnostic.File] = new();
+                container = diagnosticsPerFile[diagnostic.File] = new();
             }
             container.Add(diagnostic.ToOmniSharp());
         }
 
-        if (!yes.TryGetValue(Uri, out var selfErrors))
+        foreach (ParsedFile item in compilerResult.RawTokens)
         {
-            Logger.Warn($"No diagnostics for the current document");
-        }
+            if (!diagnosticsPerFile.TryGetValue(item.File, out List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>? fileDiagnostics))
+            {
+                fileDiagnostics = new();
+            }
 
-        foreach ((Uri file, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic> items) in yes)
-        {
             int? version = null;
-            if (Documents.TryGet(file, out DocumentHandler? document)) version = document.Version;
+            if (Documents.TryGet(item.File, out DocumentHandler? document)) version = document.Version;
             OmniSharpService.Instance?.Server?.PublishDiagnostics(new PublishDiagnosticsParams()
             {
-                Uri = file,
-                Diagnostics = items,
+                Uri = item.File,
+                Diagnostics = fileDiagnostics,
                 Version = version,
             });
         }
@@ -576,7 +531,7 @@ class DocumentBBLang : DocumentHandler
         builder.Append(parameter.Identifier);
         definitionHover = builder.ToString();
 
-        GetCommentDocumentation(parameter, parameter.Context.File, out docsHover);
+        GetCommentDocumentation(parameter, parameter.File, out docsHover);
         return true;
     }
 
@@ -594,7 +549,7 @@ class DocumentBBLang : DocumentHandler
         builder.Append(parameter.Identifier);
         definitionHover = builder.ToString();
 
-        GetCommentDocumentation(parameter, parameter.Context.File, out docsHover);
+        GetCommentDocumentation(parameter, parameter.File, out docsHover);
         return true;
     }
 
@@ -689,24 +644,6 @@ class DocumentBBLang : DocumentHandler
         }
         else if (AST.GetStatementAt(position, out statement))
         {
-            if (statement is VariableDeclaration variableDeclaration)
-            {
-                HandleDefinitionHover(variableDeclaration, ref definitionHover, ref docsHover);
-            }
-
-            if (statement is IReferenceableTo referenceableTo)
-            {
-                switch (referenceableTo.Reference)
-                {
-                    case CompiledVariableDeclaration v:
-                        HandleDefinitionHover(v, ref definitionHover, ref docsHover);
-                        break;
-                    case CompiledVariableConstant v:
-                        HandleDefinitionHover(v, ref definitionHover, ref docsHover);
-                        break;
-                }
-            }
-
             foreach (Statement item in statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
             {
                 if (!item.Position.Range.Contains(e.Position.ToCool()))
@@ -722,6 +659,7 @@ class DocumentBBLang : DocumentHandler
 
                 range = checkPosition.Range;
 
+                HandleDefinitionHover(item, ref definitionHover, ref docsHover);
                 HandleTypeHovering(item, ref typeHover);
                 HandleReferenceHovering(item, ref definitionHover, ref docsHover);
                 HandleValueHovering(item, ref valueHover);
@@ -734,7 +672,7 @@ class DocumentBBLang : DocumentHandler
                 if (new Position(@using.Path.DefaultIfEmpty(@using.Keyword)).Range.Contains(e.Position.ToCool()))
                 {
                     if (@using.CompiledUri != null)
-                    { definitionHover = $"{@using.Keyword} \"{@using.CompiledUri.Replace('\\', '/')}\""; }
+                    { definitionHover = $"{@using.Keyword} \"{@using.CompiledUri}\""; }
                     break;
                 }
             }
@@ -743,6 +681,8 @@ class DocumentBBLang : DocumentHandler
         if (typeHover is null &&
             (AST, CompilerResult).GetTypeInstanceAt(Uri, e.Position.ToCool(), out TypeInstance? typeInstance, out GeneralType? generalType))
         {
+            GetDeepestTypeInstance(ref typeInstance, ref generalType, e.Position.ToCool());
+
             range = typeInstance.Position.Range;
             typeHover = GetTypeHover(generalType);
         }
@@ -893,10 +833,8 @@ class DocumentBBLang : DocumentHandler
         return result.ToArray();
     }
 
-    static void GetDeepestTypeInstance(ref TypeInstance? type1, ref GeneralType? type2, SinglePosition position)
+    static void GetDeepestTypeInstance(ref TypeInstance type1, ref GeneralType type2, SinglePosition position)
     {
-        if (type1 is null || type2 is null) return;
-
         switch (type1)
         {
             case TypeInstanceSimple typeInstanceSimple:
@@ -945,9 +883,6 @@ class DocumentBBLang : DocumentHandler
                     break;
                 }
         }
-
-        type1 = null;
-        type2 = null;
     }
 
     bool GetGotoDefinition(object? reference, [NotNullWhen(true)] out LocationLink? result)

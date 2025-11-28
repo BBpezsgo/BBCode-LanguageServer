@@ -121,7 +121,7 @@ class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<Documen
             foreach (DocumentHandler document in _documents)
             {
                 if (document.Uri != query) continue;
-                Logger.Log($"[BBLang Compiler] Using document provided by client (size: {document.Content.Length})");
+                Logger.Log($"[BBLang Compiler] Document provided by client (size: {document.Content.Length} bytes) ({document.DocumentUri})");
                 return SourceProviderResultSync.Success(query, document.Content);
             }
         }

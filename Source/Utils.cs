@@ -199,11 +199,10 @@ static class Utils
 
             return statement switch
             {
-                TypeStatement v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
-                BasicTypeCast v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
-                ManagedTypeCast v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
-                VariableDeclaration v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
-                NewInstance v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                ReinterpretExpression v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                ManagedTypeCastExpression v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                VariableDefinition v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
+                NewInstanceExpression v => Handle3(v.Type, v.CompiledType, out typeInstance, out generalType),
                 _ => false
             };
         }
@@ -246,17 +245,17 @@ static class Utils
 
     public static Position GetInteractivePosition(Statement statement) => statement switch
     {
-        AnyCall v => v.PrevStatement switch
+        AnyCallExpression v => v.Expression switch
         {
-            Field v2 => v2.Identifier.Position,
-            _ => v.PrevStatement.Position,
+            FieldExpression v2 => v2.Identifier.Position,
+            _ => v.Expression.Position,
         },
-        BinaryOperatorCall v => v.Operator.Position,
-        UnaryOperatorCall v => v.Operator.Position,
-        VariableDeclaration v => v.Identifier.Position,
-        Field v => v.Identifier.Position,
-        ConstructorCall v => new Position([v.Keyword, v.Type]),
-        ManagedTypeCast v => new Position([v.Type, v.Brackets]),
+        BinaryOperatorCallExpression v => v.Operator.Position,
+        UnaryOperatorCallExpression v => v.Operator.Position,
+        VariableDefinition v => v.Identifier.Position,
+        FieldExpression v => v.Identifier.Position,
+        ConstructorCallExpression v => new Position([v.Keyword, v.Type]),
+        ManagedTypeCastExpression v => new Position([v.Type, v.Brackets]),
         _ => statement.Position,
     };
 }

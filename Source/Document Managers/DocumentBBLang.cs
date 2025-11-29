@@ -221,7 +221,7 @@ class DocumentBBLang : DocumentHandler
 
         foreach ((ImmutableArray<Statement> statements, _) in CompilerResult.RawStatements)
         {
-            foreach (VariableDeclaration statement in statements.OfType<VariableDeclaration>())
+            foreach (VariableDefinition statement in statements.OfType<VariableDefinition>())
             {
                 if (!statement.CanUse(e.TextDocument.Uri.ToUri()))
                 { continue; }
@@ -366,14 +366,14 @@ class DocumentBBLang : DocumentHandler
 
     static void HandleTypeHovering(Statement statement, ref string? typeHover)
     {
-        if (statement is StatementWithValue statementWithValue &&
+        if (statement is Expression statementWithValue &&
             statementWithValue.CompiledType is not null)
         { typeHover = GetTypeHover(statementWithValue.CompiledType); }
     }
 
     static void HandleValueHovering(Statement statement, ref string? valueHover)
     {
-        if (statement is StatementWithValue statementWithValue &&
+        if (statement is Expression statementWithValue &&
             statementWithValue.PredictedValue.HasValue)
         { valueHover = GetValueHover(statementWithValue.PredictedValue.Value); }
     }
@@ -385,7 +385,7 @@ class DocumentBBLang : DocumentHandler
         CompiledGeneralFunctionDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         // CompiledVariable v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledVariableConstant v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
-        VariableDeclaration v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        VariableDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledVariableDeclaration v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledParameter v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         ParameterDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
@@ -457,7 +457,7 @@ class DocumentBBLang : DocumentHandler
     }
     */
 
-    bool HandleDefinitionHover(VariableDeclaration variable, ref string? definitionHover, ref string? docsHover)
+    bool HandleDefinitionHover(VariableDefinition variable, ref string? definitionHover, ref string? docsHover)
     {
         if (variable.File is null)
         { return false; }
@@ -583,7 +583,7 @@ class DocumentBBLang : DocumentHandler
             HandleDefinitionHover(_ref1.Reference, ref definitionHover, ref docsHover))
         { return true; }
 
-        if (statement is VariableDeclaration variableDeclaration)
+        if (statement is VariableDefinition variableDeclaration)
         { return HandleDefinitionHover(variableDeclaration, ref definitionHover, ref docsHover); }
 
         return false;
@@ -651,7 +651,7 @@ class DocumentBBLang : DocumentHandler
 
                 Position checkPosition = Utils.GetInteractivePosition(item);
 
-                if (item is BinaryOperatorCall)
+                if (item is BinaryOperatorCallExpression)
                 { checkPosition = item.Position; }
 
                 if (!checkPosition.Range.Contains(e.Position.ToCool()))
@@ -1104,7 +1104,7 @@ class DocumentBBLang : DocumentHandler
 
         if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunctionDefinition? function))
         {
-            foreach (Reference<StatementWithValue?> reference in function.References)
+            foreach (Reference<Expression?> reference in function.References)
             {
                 if (reference.SourceFile == null) continue;
                 if (reference.Source == null) continue;
@@ -1132,7 +1132,7 @@ class DocumentBBLang : DocumentHandler
 
         if (CompilerResult.GetOperatorAt(Uri, e.Position.ToCool(), out CompiledOperatorDefinition? @operator))
         {
-            foreach (Reference<StatementWithValue> reference in @operator.References)
+            foreach (Reference<Expression> reference in @operator.References)
             {
                 if (reference.SourceFile == null) continue;
                 result.Add(new OmniSharpLocation()
@@ -1168,28 +1168,28 @@ class DocumentBBLang : DocumentHandler
     {
         SinglePosition position = e.Position.ToCool();
 
-        AnyCall? call = null;
+        AnyCallExpression? call = null;
 
         foreach (IEnumerable<Statement>? items in CompilerResult.StatementsIn(e.TextDocument.Uri.ToUri()).Select(statement => statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis)))
         {
             foreach (Statement item in items)
             {
-                if (item is AnyCall anyCall)
+                if (item is AnyCallExpression anyCall)
                 {
                     if (!new Position(anyCall.Brackets).Range.Contains(position)) continue;
                     call = anyCall;
                     Logger.Warn($"Call found");
                 }
-                else if (item is VariableDeclaration variableDeclaration)
+                else if (item is VariableDefinition variableDeclaration)
                 {
                     if (variableDeclaration.Type is TypeInstanceFunction functionType
                         && functionType.FunctionReturnType is TypeInstanceSimple typeInstanceSimple
                         && !typeInstanceSimple.TypeArguments.HasValue)
                     {
                         if (!new Position(functionType.Brackets).Range.Contains(position)) continue;
-                        call = new AnyCall(
-                            new Identifier(typeInstanceSimple.Identifier, typeInstanceSimple.File),
-                            ImmutableArray<StatementWithValue>.Empty,
+                        call = new AnyCallExpression(
+                            new IdentifierExpression(typeInstanceSimple.Identifier, typeInstanceSimple.File),
+                            ImmutableArray<ArgumentExpression>.Empty,
                             ImmutableArray<Token>.Empty,
                             functionType.Brackets,
                             functionType.File
@@ -1200,7 +1200,7 @@ class DocumentBBLang : DocumentHandler
             }
         }
 
-        if (call is not null && call.ToFunctionCall(out FunctionCall? functionCall))
+        if (call is not null && call.ToFunctionCall(out FunctionCallExpression? functionCall))
         {
             int? activeParameter = null;
             for (int i = 0; i < call.Commas.Length; i++)

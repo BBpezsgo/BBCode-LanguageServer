@@ -2,7 +2,7 @@
 
 namespace LanguageServer.Handlers;
 
-class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
+sealed class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
     [SuppressMessage("CodeQuality", "IDE0052")]
     readonly ILanguageServerFacade Router;

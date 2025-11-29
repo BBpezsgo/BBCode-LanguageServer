@@ -4,23 +4,23 @@ using LanguageServer.DocumentManagers;
 
 namespace LanguageServer;
 
-class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<DocumentHandler>
+sealed class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<DocumentBase>
 {
-    readonly List<DocumentHandler> _documents;
+    readonly List<DocumentBase> _documents;
 
     public Documents()
     {
-        _documents = new List<DocumentHandler>();
+        _documents = new List<DocumentBase>();
     }
 
     /// <exception cref="ServiceException"/>
-    public static DocumentHandler GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface) => languageId switch
+    public static DocumentBase GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface) => languageId switch
     {
         LanguageConstants.LanguageId => new DocumentBBLang(uri, content, languageId, documentInterface),
         _ => throw new ServiceException($"Unknown language \"{languageId}\"")
     };
 
-    public bool TryGet(DocumentUri uri, [NotNullWhen(true)] out DocumentHandler? document)
+    public bool TryGet(DocumentUri uri, [NotNullWhen(true)] out DocumentBase? document)
     {
         for (int i = 0; i < _documents.Count; i++)
         {
@@ -62,15 +62,15 @@ class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<Documen
         }
     }
 
-    public DocumentHandler? Get(TextDocumentIdentifier documentId)
-        => TryGet(documentId.Uri, out DocumentHandler? document) ? document : null;
+    public DocumentBase? Get(TextDocumentIdentifier documentId)
+        => TryGet(documentId.Uri, out DocumentBase? document) ? document : null;
 
     /// <exception cref="ServiceException"/>
-    public DocumentHandler GetOrCreate(TextDocumentIdentifier documentId, string? content = null)
+    public DocumentBase GetOrCreate(TextDocumentIdentifier documentId, string? content = null)
     {
         RemoveDuplicates();
 
-        if (TryGet(documentId.Uri, out DocumentHandler? document))
+        if (TryGet(documentId.Uri, out DocumentBase? document))
         { return document; }
 
         Logger.Log($"Register document: \"{documentId.Uri}\"");
@@ -118,7 +118,7 @@ class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<Documen
         {
             lastUri = query;
 
-            foreach (DocumentHandler document in _documents)
+            foreach (DocumentBase document in _documents)
             {
                 if (document.Uri != query) continue;
                 Logger.Log($"[BBLang Compiler] Document provided by client (size: {document.Content.Length} bytes) ({document.DocumentUri})");
@@ -136,6 +136,6 @@ class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<Documen
         }
     }
 
-    public IEnumerator<DocumentHandler> GetEnumerator() => _documents.GetEnumerator();
+    public IEnumerator<DocumentBase> GetEnumerator() => _documents.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => _documents.GetEnumerator();
 }

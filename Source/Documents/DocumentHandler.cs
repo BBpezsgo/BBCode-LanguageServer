@@ -1,6 +1,6 @@
 namespace LanguageServer;
 
-abstract class DocumentHandler
+abstract class DocumentBase
 {
     public Uri Uri => DocumentUri.ToUri();
     public DocumentUri DocumentUri { get; private set; }
@@ -19,7 +19,7 @@ abstract class DocumentHandler
     }
     protected Documents Documents { get; }
 
-    protected DocumentHandler(DocumentUri uri, string content, string languageId, Documents app)
+    protected DocumentBase(DocumentUri uri, string content, string languageId, Documents app)
     {
         DocumentUri = uri;
         Content = content;
@@ -39,7 +39,7 @@ abstract class DocumentHandler
 
     public virtual void OnChanged(DidChangeTextDocumentParams e)
     {
-        foreach (var change in e.ContentChanges)
+        foreach (TextDocumentContentChangeEvent change in e.ContentChanges)
         {
             if (change.Range is not null)
             {

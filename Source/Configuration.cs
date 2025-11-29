@@ -5,7 +5,7 @@ using LanguageCore.Runtime;
 
 namespace LanguageServer;
 
-class Configuration
+sealed class Configuration
 {
     public required IReadOnlyList<string> ExtraDirectories { get; init; }
     public required IReadOnlyList<string> AdditionalImports { get; init; }
@@ -29,7 +29,7 @@ static class ConfigurationManager
             if (endlessCheck.Step()) break;
             Uri uri = new(currentUri, $"./{FileName}");
             Logger.Log($"  Try {uri}");
-            if (documents.TryGet(uri, out DocumentHandler? document))
+            if (documents.TryGet(uri, out DocumentBase? document))
             {
                 result.Add((uri, document.Content));
                 Logger.Log($"  document");

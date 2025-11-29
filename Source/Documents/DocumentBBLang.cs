@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.IO;
 using System.Text;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
@@ -12,7 +11,7 @@ using Position = LanguageCore.Position;
 
 namespace LanguageServer.DocumentManagers;
 
-class DocumentBBLang : DocumentHandler
+sealed class DocumentBBLang : DocumentBase
 {
     public ImmutableArray<Token> Tokens { get; set; }
     public ParserResult AST { get; set; }
@@ -57,7 +56,7 @@ class DocumentBBLang : DocumentHandler
         if (file is null)
         { return false; }
 
-        if (!Documents.TryGet(file, out DocumentHandler? document) ||
+        if (!Documents.TryGet(file, out DocumentBase? document) ||
             document is not DocumentBBLang documentBBLang)
         { return false; }
 
@@ -129,9 +128,14 @@ class DocumentBBLang : DocumentHandler
                     TokenizeComments = true,
                 },
             }, diagnostics);
+            if (!diagnostics.HasErrors)
+            {
+                Logger.Error($"Validation successful");
+            }
         }
         catch (LanguageException languageException)
         {
+            Logger.Error($"Exception !!!");
             diagnostics.Add(languageException.ToDiagnostic());
         }
 
@@ -150,7 +154,7 @@ class DocumentBBLang : DocumentHandler
         foreach (LanguageCore.Diagnostic diagnostic in diagnostics.Diagnostics)
         {
             if (diagnostic.File is null) continue;
-            if (!diagnosticsPerFile.TryGetValue(diagnostic.File, out var container))
+            if (!diagnosticsPerFile.TryGetValue(diagnostic.File, out List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>? container))
             {
                 container = diagnosticsPerFile[diagnostic.File] = new();
             }
@@ -165,7 +169,7 @@ class DocumentBBLang : DocumentHandler
             }
 
             int? version = null;
-            if (Documents.TryGet(item.File, out DocumentHandler? document)) version = document.Version;
+            if (Documents.TryGet(item.File, out DocumentBase? document)) version = document.Version;
             OmniSharpService.Instance?.Server?.PublishDiagnostics(new PublishDiagnosticsParams()
             {
                 Uri = item.File,
@@ -823,11 +827,6 @@ class DocumentBBLang : DocumentHandler
                     Title = $"{@struct.References.Count} reference",
                 },
             });
-
-            foreach (CompiledField field in @struct.Fields)
-            {
-
-            }
         }
 
         return result.ToArray();
@@ -882,6 +881,9 @@ class DocumentBBLang : DocumentHandler
 
                     break;
                 }
+
+            default:
+                break;
         }
     }
 
@@ -1156,11 +1158,6 @@ class DocumentBBLang : DocumentHandler
             }
         }
 
-        if (CompilerResult.GetFieldAt(Uri, e.Position.ToCool(), out CompiledField? compiledField))
-        {
-
-        }
-
         return result.ToArray();
     }
 
@@ -1310,14 +1307,12 @@ class DocumentBBLang : DocumentHandler
                     break;
                 case TokenAnalyzedType.TypeModifier:
                     break;
+                case TokenAnalyzedType.InstructionLabel:
+                    break;
                 case TokenAnalyzedType.None:
                 default:
                     switch (token.TokenType)
                     {
-                        // case TokenType.LiteralString:
-                        // case TokenType.LiteralCharacter:
-                        //     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.String, Array.Empty<SemanticTokenModifier>());
-                        //     break;
                         case TokenType.LiteralNumber:
                         case TokenType.LiteralHex:
                         case TokenType.LiteralBinary:

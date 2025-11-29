@@ -5,7 +5,7 @@ using LanguageServer.Handlers;
 
 namespace LanguageServer;
 
-class OmniSharpService
+sealed class OmniSharpService
 {
     public static OmniSharpService? Instance { get; private set; }
 
@@ -22,11 +22,11 @@ class OmniSharpService
 
     public async Task CreateAsync()
     {
-        this.Server = await OmniSharp.Extensions.LanguageServer.Server.LanguageServer.From(Configure).ConfigureAwait(false);
+        Server = await OmniSharp.Extensions.LanguageServer.Server.LanguageServer.From(Configure).ConfigureAwait(false);
 
         Logger.Log("Server is created, logger is active");
 
-        await this.Server.WaitForExit.ConfigureAwait(false);
+        await Server.WaitForExit.ConfigureAwait(false);
     }
 
     void ConfigureServices(IServiceCollection services)
@@ -52,7 +52,7 @@ class OmniSharpService
 
         options
            .WithServices(x => x.AddLogging(b => b.SetMinimumLevel(LogLevel.Trace)))
-           .WithServices(this.ConfigureServices);
+           .WithServices(ConfigureServices);
 
         options
            .WithHandler<TextDocumentSyncHandler>()
@@ -85,7 +85,7 @@ class OmniSharpService
                     ServerCancelSupport = false,
                 };
             }
-            this.ServiceProvider = (server as OmniSharp.Extensions.LanguageServer.Server.LanguageServer)?.Services;
+            ServiceProvider = (server as OmniSharp.Extensions.LanguageServer.Server.LanguageServer)?.Services;
             return Task.CompletedTask;
         });
 

@@ -4,22 +4,25 @@ static class Program
 {
     static async Task<int> Main()
     {
-        Console.OutputEncoding = System.Text.Encoding.UTF8; // UTF8N for non-Windows platform
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
 
         try
         {
             OmniSharpService service = new();
-            await service.CreateAsync();
+            await service.CreateAsync().ConfigureAwait(false);
             return 0;
         }
         catch (AggregateException ex)
         {
-            await Console.Error.WriteLineAsync(ex.InnerExceptions[0].ToString());
+            foreach (Exception item in ex.Flatten().InnerExceptions)
+            {
+                await Console.Error.WriteLineAsync(item.ToString()).ConfigureAwait(false);
+            }
             return -1;
         }
         catch (Exception ex)
         {
-            await Console.Error.WriteLineAsync(ex.ToString());
+            await Console.Error.WriteLineAsync(ex.ToString()).ConfigureAwait(false);
             return -1;
         }
     }

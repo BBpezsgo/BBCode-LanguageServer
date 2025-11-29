@@ -390,7 +390,7 @@ sealed class DocumentBBLang : DocumentBase
         // CompiledVariable v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledVariableConstant v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         VariableDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
-        CompiledVariableDeclaration v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
+        CompiledVariableDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledParameter v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         ParameterDefinition v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
         CompiledField v => HandleDefinitionHover(v, ref definitionHover, ref docsHover),
@@ -487,7 +487,7 @@ sealed class DocumentBBLang : DocumentBase
         return true;
     }
 
-    bool HandleDefinitionHover(CompiledVariableDeclaration variable, ref string? definitionHover, ref string? docsHover)
+    bool HandleDefinitionHover(CompiledVariableDefinition variable, ref string? definitionHover, ref string? docsHover)
     {
         StringBuilder builder = new();
 

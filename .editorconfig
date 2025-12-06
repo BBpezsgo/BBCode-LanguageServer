@@ -46,3 +46,6 @@ dotnet_diagnostic.IDE0046.severity = silent
 
 # IDE0130: Namespace does not match folder structure
 dotnet_style_namespace_match_folder = false
+
+# CA1812
+dotnet_diagnostic.CA1812.severity = silent

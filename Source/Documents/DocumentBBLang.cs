@@ -97,7 +97,9 @@ sealed class DocumentBBLang : DocumentBase
     {
         Logger.Log($"Validate()\n {string.Join("\n ", Documents.Select(v => v.Uri))}");
 
-        Configuration config = ConfigurationManager.Parse(ConfigurationManager.Search(Uri, Documents));
+        Configuration config = ConfigurationManager.Parse([
+            ..Documents.SelectMany(v => ConfigurationManager.Search(v.Uri, Documents)).DistinctBy(v => v.Uri)
+        ]);
 
         DiagnosticsCollection diagnostics = new();
 
@@ -130,12 +132,11 @@ sealed class DocumentBBLang : DocumentBase
             }, diagnostics);
             if (!diagnostics.HasErrors)
             {
-                Logger.Error($"Validation successful");
+                Logger.Info($"Validation successful");
             }
         }
         catch (LanguageException languageException)
         {
-            Logger.Error($"Exception !!!");
             diagnostics.Add(languageException.ToDiagnostic());
         }
 
@@ -1120,7 +1121,7 @@ sealed class DocumentBBLang : DocumentBase
 
         if (CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool(), out CompiledGeneralFunctionDefinition? generalFunction))
         {
-            foreach (Reference<Statement?> reference in generalFunction.References)
+            foreach (Reference<Expression?> reference in generalFunction.References)
             {
                 if (reference.SourceFile == null) continue;
                 if (reference.Source == null) continue;

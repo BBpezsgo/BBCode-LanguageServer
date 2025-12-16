@@ -6,6 +6,7 @@ using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
 using LanguageCore.Tokenizing;
+using LanguageCore.Workspaces;
 using OmniSharpLocation = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using Position = LanguageCore.Position;
 
@@ -97,11 +98,13 @@ sealed class DocumentBBLang : DocumentBase
     {
         Logger.Log($"Validate()\n {string.Join("\n ", Documents.Select(v => v.Uri))}");
 
-        Configuration config = ConfigurationManager.Parse([
-            ..Documents.SelectMany(v => ConfigurationManager.Search(v.Uri, Documents)).DistinctBy(v => v.Uri)
-        ]);
-
         DiagnosticsCollection diagnostics = new();
+
+        Configuration config = Configuration.Parse([
+            ..Documents.SelectMany(v => ConfigurationManager.Search(v.Uri, Documents)).DistinctBy(v => v.Uri)
+        ], diagnostics);
+
+        diagnostics.Clear();
 
         CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
         try

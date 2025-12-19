@@ -144,7 +144,7 @@ sealed class DocumentBBLang : DocumentBase
         }
 
         ParsedFile raw = compilerResult.RawTokens.FirstOrDefault(v => v.File == Uri);
-        Tokens = !raw.AST.OriginalTokens.IsDefault ? raw.AST.OriginalTokens : !raw.Tokens.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
+        Tokens = !raw.AST.Tokens.IsDefault ? raw.AST.Tokens : !raw.Tokens.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
         AST = raw.AST.IsNotEmpty ? raw.AST : AST;
         CompilerResult = compilerResult;
 
@@ -840,16 +840,16 @@ sealed class DocumentBBLang : DocumentBase
     {
         switch (type1)
         {
-            case TypeInstanceSimple typeInstanceSimple:
+            case TypeInstanceSimple simpleType:
                 {
-                    if (typeInstanceSimple.TypeArguments.HasValue)
+                    if (simpleType.TypeArguments.HasValue)
                     {
-                        if (type2 is StructType structType &&
+                        if (type2.Is(out StructType? structType) &&
                             structType.Struct.Template is not null)
                         {
-                            for (int i = 0; i < typeInstanceSimple.TypeArguments.Value.Length; i++)
+                            for (int i = 0; i < simpleType.TypeArguments.Value.Length; i++)
                             {
-                                TypeInstance? item = typeInstanceSimple.TypeArguments.Value[i];
+                                TypeInstance? item = simpleType.TypeArguments.Value[i];
                                 GeneralType? item2 = structType.TypeArguments[structType.Struct.Template.Parameters[i].Content];
                                 if (item.Position.Range.Contains(position))
                                 {
@@ -862,30 +862,62 @@ sealed class DocumentBBLang : DocumentBase
                         }
                     }
 
-                    if (typeInstanceSimple.Identifier.Position.Range.Contains(position))
-                    {
-                        return;
-                    }
-
                     break;
                 }
-
-            case TypeInstancePointer typeInstancePointer:
+            case TypeInstancePointer pointerType:
                 {
-                    if (!type2.Is(out PointerType? pointerType))
-                    { return; }
+                    if (!type2.Is(out PointerType? pointerType2)) return;
 
-                    if (typeInstancePointer.To.Position.Range.Contains(position))
+                    if (pointerType.To.Position.Range.Contains(position))
                     {
-                        type1 = typeInstancePointer.To;
-                        type2 = pointerType.To;
+                        type1 = pointerType.To;
+                        type2 = pointerType2.To;
                         GetDeepestTypeInstance(ref type1, ref type2, position);
                         return;
                     }
 
                     break;
                 }
+            case TypeInstanceStackArray arrayType:
+                {
+                    if (!type2.Is(out ArrayType? arrayType2)) return;
 
+                    if (arrayType.StackArrayOf.Position.Range.Contains(position))
+                    {
+                        type1 = arrayType.StackArrayOf;
+                        type2 = arrayType2.Of;
+                        GetDeepestTypeInstance(ref type1, ref type2, position);
+                        return;
+                    }
+
+                    break;
+                }
+            case TypeInstanceFunction functionType:
+                {
+                    if (!type2.Is(out FunctionType? functionType2)) return;
+                    if (functionType2.Parameters.Length != functionType.FunctionParameterTypes.Length) return;
+
+                    if (functionType.FunctionReturnType.Position.Range.Contains(position))
+                    {
+                        type1 = functionType.FunctionReturnType;
+                        type2 = functionType2.ReturnType;
+                        GetDeepestTypeInstance(ref type1, ref type2, position);
+                        return;
+                    }
+
+                    for (int i = 0; i < functionType.FunctionParameterTypes.Length; i++)
+                    {
+                        if (functionType.FunctionParameterTypes[i].Position.Range.Contains(position))
+                        {
+                            type1 = functionType.FunctionParameterTypes[i];
+                            type2 = functionType2.Parameters[i];
+                            GetDeepestTypeInstance(ref type1, ref type2, position);
+                            return;
+                        }
+                    }
+
+                    break;
+                }
             default:
                 break;
         }
@@ -975,53 +1007,51 @@ sealed class DocumentBBLang : DocumentBase
             }
         }
 
+        if ((AST, CompilerResult).GetTypeInstanceAt(Uri, e.Position.ToCool(), out TypeInstance? origin, out GeneralType? type))
         {
-            if ((AST, CompilerResult).GetTypeInstanceAt(Uri, e.Position.ToCool(), out TypeInstance? origin, out GeneralType? type))
+            GetDeepestTypeInstance(ref origin, ref type, e.Position.ToCool());
+
+            if (origin is not null &&
+                type is not null)
             {
-                GetDeepestTypeInstance(ref origin, ref type, e.Position.ToCool());
-
-                if (origin is not null &&
-                    type is not null)
+                Position position = origin switch
                 {
-                    Position position = origin switch
-                    {
-                        TypeInstanceSimple v => v.Identifier.Position,
-                        _ => origin.Position,
-                    };
+                    TypeInstanceSimple v => v.Identifier.Position,
+                    _ => origin.Position,
+                };
 
-                    if (type.Is(out StructType? structType) &&
-                        GetGotoDefinition(structType.Struct, out LocationLink? link))
+                if (type.Is(out StructType? structType) &&
+                    GetGotoDefinition(structType.Struct, out LocationLink? link))
+                {
+                    links.Add(new LocationLink()
                     {
-                        links.Add(new LocationLink()
-                        {
-                            OriginSelectionRange = position.ToOmniSharp(),
-                            TargetRange = link.TargetRange,
-                            TargetSelectionRange = link.TargetSelectionRange,
-                            TargetUri = link.TargetUri,
-                        });
-                    }
-                    else if (type.Is(out GenericType? genericType) &&
-                             genericType.Definition != null)
+                        OriginSelectionRange = position.ToOmniSharp(),
+                        TargetRange = link.TargetRange,
+                        TargetSelectionRange = link.TargetSelectionRange,
+                        TargetUri = link.TargetUri,
+                    });
+                }
+                else if (type.Is(out GenericType? genericType) &&
+                            genericType.Definition != null)
+                {
+                    links.Add(new LocationLink()
                     {
-                        links.Add(new LocationLink()
-                        {
-                            OriginSelectionRange = position.ToOmniSharp(),
-                            TargetRange = genericType.Definition.Position.Range.ToOmniSharp(),
-                            TargetSelectionRange = genericType.Definition.Position.Range.ToOmniSharp(),
-                            TargetUri = DocumentUri,
-                        });
-                    }
-                    else if (type is AliasType aliasType &&
-                             aliasType.Definition != null)
+                        OriginSelectionRange = position.ToOmniSharp(),
+                        TargetRange = genericType.Definition.Position.Range.ToOmniSharp(),
+                        TargetSelectionRange = genericType.Definition.Position.Range.ToOmniSharp(),
+                        TargetUri = DocumentUri,
+                    });
+                }
+                else if (type is AliasType aliasType &&
+                            aliasType.Definition != null)
+                {
+                    links.Add(new LocationLink()
                     {
-                        links.Add(new LocationLink()
-                        {
-                            OriginSelectionRange = position.ToOmniSharp(),
-                            TargetRange = aliasType.Definition.Position.Range.ToOmniSharp(),
-                            TargetSelectionRange = aliasType.Definition.Position.Range.ToOmniSharp(),
-                            TargetUri = aliasType.Definition.File,
-                        });
-                    }
+                        OriginSelectionRange = position.ToOmniSharp(),
+                        TargetRange = aliasType.Definition.Position.Range.ToOmniSharp(),
+                        TargetSelectionRange = aliasType.Definition.Position.Range.ToOmniSharp(),
+                        TargetUri = aliasType.Definition.File,
+                    });
                 }
             }
         }
@@ -1269,6 +1299,9 @@ sealed class DocumentBBLang : DocumentBase
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Type, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.Type:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Type, Array.Empty<SemanticTokenModifier>());
+                    break;
+                case TokenAnalyzedType.TypeAlias:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Type, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.Struct:

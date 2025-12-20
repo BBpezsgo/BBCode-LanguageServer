@@ -207,10 +207,10 @@ static class Utils
             };
         }
 
-        Statement? statement = ast.GetStatementAt(position);
+        Statement? statement = ast.EnumerateStatements().LastOrDefault(statement => statement.Position.Range.Contains(position));
         if (statement is not null)
         {
-            foreach (Statement item in statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
+            foreach (Statement item in StatementWalker.Visit(statement))
             {
                 if (Handle2(item, out typeInstance, out generalType))
                 { return true; }

@@ -597,6 +597,26 @@ sealed class DocumentBBLang : DocumentBase
         return false;
     }
 
+    public bool GetFieldAt(Uri file, SinglePosition position, [NotNullWhen(true)] out FieldDefinition? result)
+    {
+        foreach (StructDefinition @struct in AST.Structs.IsDefault ? ImmutableArray<StructDefinition>.Empty : AST.Structs)
+        {
+            if (@struct.File != file) continue;
+
+            foreach (FieldDefinition field in @struct.Fields)
+            {
+                if (field.Identifier.Position.Range.Contains(position))
+                {
+                    result = field;
+                    return true;
+                }
+            }
+        }
+
+        result = null;
+        return false;
+    }
+
     public override Hover? Hover(HoverParams e)
     {
         SinglePosition position = e.Position.ToCool();
@@ -633,7 +653,7 @@ sealed class DocumentBBLang : DocumentBase
         {
             HandleDefinitionHover(@struct, ref definitionHover, ref docsHover);
         }
-        else if (CompilerResult.GetThingAt<StructDefinition, Token>(AST.Structs, Uri, position, out StructDefinition? @struct2))
+        else if (StatementExtensions.GetThingAt<StructDefinition, Token>(AST.Structs, Uri, position, out StructDefinition? @struct2))
         {
             HandleDefinitionHover(@struct2, ref definitionHover, ref docsHover);
         }
@@ -641,7 +661,7 @@ sealed class DocumentBBLang : DocumentBase
         {
             HandleDefinitionHover(field, ref definitionHover, ref docsHover);
         }
-        else if (AST.GetFieldAt(Uri, position, out FieldDefinition? field2))
+        else if (GetFieldAt(Uri, position, out FieldDefinition? field2))
         {
             HandleDefinitionHover(field2, ref definitionHover, ref docsHover);
         }
@@ -652,7 +672,7 @@ sealed class DocumentBBLang : DocumentBase
         }
         else if (AST.GetStatementAt(position, out statement))
         {
-            foreach (Statement item in statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
+            foreach (Statement item in StatementWalker.Visit(statement))
             {
                 if (!item.Position.Range.Contains(e.Position.ToCool()))
                 { continue; }
@@ -986,7 +1006,7 @@ sealed class DocumentBBLang : DocumentBase
 
         if (AST.GetStatementAt(e.Position.ToCool(), out Statement? statement))
         {
-            foreach (Statement item in statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
+            foreach (Statement item in StatementWalker.Visit(statement))
             {
                 Position from = Utils.GetInteractivePosition(item);
 
@@ -1201,32 +1221,29 @@ sealed class DocumentBBLang : DocumentBase
 
         AnyCallExpression? call = null;
 
-        foreach (IEnumerable<Statement>? items in CompilerResult.StatementsIn(e.TextDocument.Uri.ToUri()).Select(statement => statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis)))
+        foreach (Statement item in CompilerResult.StatementsIn(e.TextDocument.Uri.ToUri()).SelectMany(StatementWalker.Visit))
         {
-            foreach (Statement item in items)
+            if (item is AnyCallExpression anyCall)
             {
-                if (item is AnyCallExpression anyCall)
+                if (!new Position(anyCall.Brackets).Range.Contains(position)) continue;
+                call = anyCall;
+                Logger.Warn($"Call found");
+            }
+            else if (item is VariableDefinition variableDeclaration)
+            {
+                if (variableDeclaration.Type is TypeInstanceFunction functionType
+                    && functionType.FunctionReturnType is TypeInstanceSimple typeInstanceSimple
+                    && !typeInstanceSimple.TypeArguments.HasValue)
                 {
-                    if (!new Position(anyCall.Brackets).Range.Contains(position)) continue;
-                    call = anyCall;
-                    Logger.Warn($"Call found");
-                }
-                else if (item is VariableDefinition variableDeclaration)
-                {
-                    if (variableDeclaration.Type is TypeInstanceFunction functionType
-                        && functionType.FunctionReturnType is TypeInstanceSimple typeInstanceSimple
-                        && !typeInstanceSimple.TypeArguments.HasValue)
-                    {
-                        if (!new Position(functionType.Brackets).Range.Contains(position)) continue;
-                        call = new AnyCallExpression(
-                            new IdentifierExpression(typeInstanceSimple.Identifier, typeInstanceSimple.File),
-                            ImmutableArray<ArgumentExpression>.Empty,
-                            ImmutableArray<Token>.Empty,
-                            functionType.Brackets,
-                            functionType.File
-                        );
-                        Logger.Warn($"Converting {functionType} to {call}");
-                    }
+                    if (!new Position(functionType.Brackets).Range.Contains(position)) continue;
+                    call = new AnyCallExpression(
+                        new IdentifierExpression(typeInstanceSimple.Identifier, typeInstanceSimple.File),
+                        ImmutableArray<ArgumentExpression>.Empty,
+                        ImmutableArray<Token>.Empty,
+                        functionType.Brackets,
+                        functionType.File
+                    );
+                    Logger.Warn($"Converting {functionType} to {call}");
                 }
             }
         }

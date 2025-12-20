@@ -17,9 +17,10 @@ static class ConfigurationManager
             Uri uri = new(currentUri, $"./{Configuration.FileName}");
             if (documents.TryGet(uri, out DocumentBase? document))
             {
+                if (document.Content is null) continue;
                 result.Add((uri, document.Content));
             }
-            else if (File.Exists(uri.LocalPath))
+            else if (uri.Scheme == "file" && File.Exists(uri.LocalPath))
             {
                 result.Add((uri, File.ReadAllText(uri.LocalPath)));
             }

@@ -4,7 +4,7 @@ abstract class DocumentBase
 {
     public Uri Uri => DocumentUri.ToUri();
     public DocumentUri DocumentUri { get; private set; }
-    public string Content { get; private set; }
+    public string? Content { get; private set; }
     public string LanguageId { get; private set; }
     public int? Version { get; private set; }
     public string Path
@@ -19,7 +19,7 @@ abstract class DocumentBase
     }
     protected Documents Documents { get; }
 
-    protected DocumentBase(DocumentUri uri, string content, string languageId, Documents app)
+    protected DocumentBase(DocumentUri uri, string? content, string languageId, Documents app)
     {
         DocumentUri = uri;
         Content = content;

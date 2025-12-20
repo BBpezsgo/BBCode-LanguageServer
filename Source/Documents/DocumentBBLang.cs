@@ -18,7 +18,7 @@ sealed class DocumentBBLang : DocumentBase
     public ParserResult AST { get; set; }
     public CompilerResult CompilerResult { get; set; }
 
-    public DocumentBBLang(DocumentUri uri, string content, string languageId, Documents app) : base(uri, content, languageId, app)
+    public DocumentBBLang(DocumentUri uri, string? content, string languageId, Documents app) : base(uri, content, languageId, app)
     {
         Tokens = ImmutableArray<Token>.Empty;
         AST = ParserResult.Empty;
@@ -106,47 +106,76 @@ sealed class DocumentBBLang : DocumentBase
 
         diagnostics.Clear();
 
-        CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
-        try
-        {
-            compilerResult = StatementCompiler.CompileFiles(Documents.Select(v => v.Uri.ToString()).ToArray(), new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
-            {
-                Optimizations = OptimizationSettings.None,
-                CompileEverything = true,
-                PreprocessorVariables = PreprocessorVariables.Normal,
-                SourceProviders = [
-                    Documents,
-                    new FileSourceProvider()
-                    {
-                        ExtraDirectories = config.ExtraDirectories,
-                    },
-                ],
-                AdditionalImports = config.AdditionalImports.ToImmutableArray(),
-                ExternalFunctions = [
-                    ..config.ExternalFunctions
-                ],
-                ExternalConstants = [
-                    ..config.ExternalConstants
-                ],
-                TokenizerSettings = new TokenizerSettings(TokenizerSettings.Default)
+        var compilerSettings=new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
-                    TokenizeComments = true,
-                },
-            }, diagnostics);
+                    Optimizations = OptimizationSettings.None,
+                    CompileEverything = true,
+                    PreprocessorVariables = PreprocessorVariables.Normal,
+                    SourceProviders = [
+                        Documents,
+                        new FileSourceProvider()
+                        {
+                            ExtraDirectories = config.ExtraDirectories,
+                        },
+                    ],
+                    AdditionalImports = config.AdditionalImports.ToImmutableArray(),
+                    ExternalFunctions = [
+                        ..config.ExternalFunctions
+                    ],
+                    ExternalConstants = [
+                        ..config.ExternalConstants
+                    ],
+                    TokenizerSettings = new TokenizerSettings(TokenizerSettings.Default)
+                    {
+                        TokenizeComments = true,
+                    },
+                };
+        HashSet<Uri> compiledFiles;
+        if (DocumentUri.Scheme == "file")
+        {
+            CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
+            try
+            {
+                compilerResult = StatementCompiler.CompileFiles(Documents.Select(v => v.Uri.ToString()).ToArray(), compilerSettings, diagnostics);
+                if (!diagnostics.HasErrors)
+                {
+                    Logger.Info($"Validation successful");
+                }
+            }
+            catch (LanguageException languageException)
+            {
+                diagnostics.Add(languageException.ToDiagnostic());
+            }
+
+            ParsedFile raw = compilerResult.RawTokens.FirstOrDefault(v => v.File == Uri);
+            Tokens = !raw.AST.Tokens.IsDefault ? raw.AST.Tokens : !raw.Tokens.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
+            AST = raw.AST.IsNotEmpty ? raw.AST : AST;
+            CompilerResult = compilerResult;
+
+            compiledFiles = new(compilerResult.RawTokens.Select(v => v.File));
+        }
+        else if (Content is not null)
+        {
+            TokenizerResult tokens = Tokenizer.Tokenize(Content, diagnostics, compilerSettings.PreprocessorVariables, Uri, compilerSettings.TokenizerSettings);
             if (!diagnostics.HasErrors)
             {
-                Logger.Info($"Validation successful");
+                try
+                {
+                    ParserResult ast = Parser.Parse(tokens.Tokens, Uri, diagnostics);
+                    Tokens = !ast.Tokens.IsDefault ? ast.Tokens : !ast.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
+                    AST = ast.IsNotEmpty ? ast : AST;
+                }
+                catch (SyntaxException ex)
+                {
+                    diagnostics.Add(ex.ToDiagnostic());
+                }
             }
+            compiledFiles = new() { Uri };
         }
-        catch (LanguageException languageException)
+        else
         {
-            diagnostics.Add(languageException.ToDiagnostic());
+            compiledFiles = new();
         }
-
-        ParsedFile raw = compilerResult.RawTokens.FirstOrDefault(v => v.File == Uri);
-        Tokens = !raw.AST.Tokens.IsDefault ? raw.AST.Tokens : !raw.Tokens.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
-        AST = raw.AST.IsNotEmpty ? raw.AST : AST;
-        CompilerResult = compilerResult;
 
         foreach (DiagnosticWithoutContext item in diagnostics.DiagnosticsWithoutContext)
         {
@@ -165,18 +194,18 @@ sealed class DocumentBBLang : DocumentBase
             container.Add(diagnostic.ToOmniSharp());
         }
 
-        foreach (ParsedFile item in compilerResult.RawTokens)
+        foreach (var file in compiledFiles)
         {
-            if (!diagnosticsPerFile.TryGetValue(item.File, out List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>? fileDiagnostics))
+            if (!diagnosticsPerFile.TryGetValue(file, out List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>? fileDiagnostics))
             {
                 fileDiagnostics = new();
             }
 
             int? version = null;
-            if (Documents.TryGet(item.File, out DocumentBase? document)) version = document.Version;
+            if (Documents.TryGet(file, out DocumentBase? document)) version = document.Version;
             OmniSharpService.Instance?.Server?.PublishDiagnostics(new PublishDiagnosticsParams()
             {
-                Uri = item.File,
+                Uri = file,
                 Diagnostics = fileDiagnostics,
                 Version = version,
             });

@@ -14,7 +14,7 @@ sealed class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<
     }
 
     /// <exception cref="ServiceException"/>
-    public static DocumentBase GenerateDocument(DocumentUri uri, string content, string languageId, Documents documentInterface) => languageId switch
+    public static DocumentBase GenerateDocument(DocumentUri uri, string? content, string languageId, Documents documentInterface) => languageId switch
     {
         LanguageConstants.LanguageId => new DocumentBBLang(uri, content, languageId, documentInterface),
         _ => throw new ServiceException($"Unknown language \"{languageId}\"")
@@ -93,8 +93,16 @@ sealed class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<
 
             return document;
         }
+        else
+        {
+            string extension = documentId.Extension();
 
-        throw new ServiceException($"Unknown document uri scheme: \"{documentId.Uri.Scheme}\"");
+            Logger.Log($"Document registered: \"{documentId.Uri}\"");
+            document = GenerateDocument(documentId.Uri, content, extension, this);
+            _documents.Add(document);
+
+            return document;
+        }
     }
 
     public IEnumerable<Uri> GetQuery(string requestedFile, Uri? currentFile)
@@ -121,8 +129,16 @@ sealed class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<
             foreach (DocumentBase document in _documents)
             {
                 if (document.Uri != query) continue;
-                Logger.Log($"[BBLang Compiler] Document provided by client (size: {document.Content.Length} bytes) ({document.DocumentUri})");
-                return SourceProviderResultSync.Success(query, document.Content);
+                if (document.Content is null)
+                {
+                    Logger.Log($"[BBLang Compiler] Document provided by client (no content) ({document.DocumentUri})");
+                    return SourceProviderResultSync.Error(query, "Document not loaded");
+                }
+                else
+                {
+                    Logger.Log($"[BBLang Compiler] Document provided by client (size: {document.Content.Length} bytes) ({document.DocumentUri})");
+                    return SourceProviderResultSync.Success(query, document.Content);
+                }
             }
         }
 

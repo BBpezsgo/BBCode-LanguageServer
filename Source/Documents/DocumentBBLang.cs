@@ -94,6 +94,8 @@ sealed class DocumentBBLang : DocumentBase
         return false;
     }
 
+    static readonly Dictionary<Uri, CacheItem> Cache = new();
+
     void Validate()
     {
         Logger.Log($"Validate()\n {string.Join("\n ", Documents.Select(v => v.Uri))}");
@@ -106,30 +108,27 @@ sealed class DocumentBBLang : DocumentBase
 
         diagnostics.Clear();
 
-        var compilerSettings=new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+        CompilerSettings compilerSettings = new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+        {
+            Optimizations = OptimizationSettings.None,
+            CompileEverything = true,
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            SourceProviders = [
+                Documents,
+                new FileSourceProvider()
                 {
-                    Optimizations = OptimizationSettings.None,
-                    CompileEverything = true,
-                    PreprocessorVariables = PreprocessorVariables.Normal,
-                    SourceProviders = [
-                        Documents,
-                        new FileSourceProvider()
-                        {
-                            ExtraDirectories = config.ExtraDirectories,
-                        },
-                    ],
-                    AdditionalImports = config.AdditionalImports.ToImmutableArray(),
-                    ExternalFunctions = [
-                        ..config.ExternalFunctions
-                    ],
-                    ExternalConstants = [
-                        ..config.ExternalConstants
-                    ],
-                    TokenizerSettings = new TokenizerSettings(TokenizerSettings.Default)
-                    {
-                        TokenizeComments = true,
-                    },
-                };
+                    ExtraDirectories = config.ExtraDirectories,
+                },
+            ],
+            AdditionalImports = config.AdditionalImports,
+            ExternalFunctions = config.ExternalFunctions.As<LanguageCore.Runtime.IExternalFunction>(),
+            ExternalConstants = config.ExternalConstants,
+            TokenizerSettings = new TokenizerSettings(TokenizerSettings.Default)
+            {
+                TokenizeComments = true,
+            },
+            Cache = Cache,
+        };
         HashSet<Uri> compiledFiles;
         if (DocumentUri.Scheme == "file")
         {
@@ -821,7 +820,7 @@ sealed class DocumentBBLang : DocumentBase
                 Range = function.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.Count} reference",
+                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
                 }
             });
         }
@@ -835,7 +834,7 @@ sealed class DocumentBBLang : DocumentBase
                 Range = function.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.Count} reference",
+                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
                 },
             });
         }
@@ -849,7 +848,7 @@ sealed class DocumentBBLang : DocumentBase
                 Range = function.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.Count} reference",
+                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
                 },
             });
         }
@@ -863,7 +862,7 @@ sealed class DocumentBBLang : DocumentBase
                 Range = (function as ConstructorDefinition).Type.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.Count} reference",
+                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
                 },
             });
         }
@@ -877,7 +876,7 @@ sealed class DocumentBBLang : DocumentBase
                 Range = @struct.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{@struct.References.Count} reference",
+                    Title = $"{@struct.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
                 },
             });
         }
@@ -1189,7 +1188,7 @@ sealed class DocumentBBLang : DocumentBase
 
         if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunctionDefinition? function))
         {
-            foreach (Reference<Expression?> reference in function.References)
+            foreach (Reference<Expression?> reference in function.References.DistinctBy(v => v.Source))
             {
                 if (reference.SourceFile == null) continue;
                 if (reference.Source == null) continue;
@@ -1203,7 +1202,7 @@ sealed class DocumentBBLang : DocumentBase
 
         if (CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool(), out CompiledGeneralFunctionDefinition? generalFunction))
         {
-            foreach (Reference<Expression?> reference in generalFunction.References)
+            foreach (Reference<Expression?> reference in generalFunction.References.DistinctBy(v => v.Source))
             {
                 if (reference.SourceFile == null) continue;
                 if (reference.Source == null) continue;
@@ -1217,7 +1216,7 @@ sealed class DocumentBBLang : DocumentBase
 
         if (CompilerResult.GetOperatorAt(Uri, e.Position.ToCool(), out CompiledOperatorDefinition? @operator))
         {
-            foreach (Reference<Expression> reference in @operator.References)
+            foreach (Reference<Expression> reference in @operator.References.DistinctBy(v => v.Source))
             {
                 if (reference.SourceFile == null) continue;
                 result.Add(new OmniSharpLocation()
@@ -1230,7 +1229,7 @@ sealed class DocumentBBLang : DocumentBase
 
         if (CompilerResult.GetStructAt(Uri, e.Position.ToCool(), out CompiledStruct? @struct))
         {
-            foreach (Reference<TypeInstance> reference in @struct.References)
+            foreach (Reference<TypeInstance> reference in @struct.References.DistinctBy(v => v.Source))
             {
                 if (reference.SourceFile == null) continue;
                 result.Add(new OmniSharpLocation()

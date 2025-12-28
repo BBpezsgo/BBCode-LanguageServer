@@ -4,7 +4,7 @@ using LanguageServer.DocumentManagers;
 
 namespace LanguageServer;
 
-sealed class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<DocumentBase>
+sealed class Documents : ISourceProviderSync, ISourceQueryProvider, IVersionProvider, IEnumerable<DocumentBase>
 {
     readonly List<DocumentBase> _documents;
 
@@ -150,6 +150,20 @@ sealed class Documents : ISourceProviderSync, ISourceQueryProvider, IEnumerable<
         {
             return SourceProviderResultSync.NextHandler();
         }
+    }
+
+    public bool TryGetVersion(Uri uri, out ulong version)
+    {
+        version = default;
+
+        foreach (DocumentBase document in _documents)
+        {
+            if (document.Uri != uri) continue;
+            if (document.Content is null || !document.Version.HasValue) return false;
+            version = (ulong)document.Version.Value;
+        }
+
+        return false;
     }
 
     public IEnumerator<DocumentBase> GetEnumerator() => _documents.GetEnumerator();

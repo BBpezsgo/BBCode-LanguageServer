@@ -69,8 +69,8 @@ sealed partial class DocumentBBLang
         IEnumerable<CompiledFunctionDefinition> candidatesBuilder = CompilerResult.FunctionDefinitions
             .Where(v =>
             {
-                if (v.Identifier.Content != functionCall.Identifier.Content) return false;
-                if (!v.CanUse(Uri)) return false;
+                if (v.Identifier != functionCall.Identifier.Content) return false;
+                if (!v.Definition.CanUse(Uri)) return false;
                 if (methodArgumentTypes.Length > v.Parameters.Length) return false;
                 return true;
             });
@@ -79,7 +79,7 @@ sealed partial class DocumentBBLang
         {
             Logger.Info($"Filtering extension functions ...");
 
-            candidatesBuilder = candidatesBuilder.Where(v => v.IsExtension);
+            candidatesBuilder = candidatesBuilder.Where(v => v.Definition.IsExtension);
 
             if (functionCall.Object is null)
             {
@@ -140,18 +140,18 @@ sealed partial class DocumentBBLang
                     label.Append(v.Type.ToString());
                     label.Append(' ');
 
-                    if (v.IsExtension)
+                    if (v.Definition.IsExtension)
                     {
                         label.Append(v.Parameters[0].Type.ToString());
                         label.Append('.');
                     }
 
-                    label.Append(v.Identifier.Content);
+                    label.Append(v.Identifier);
 
-                    if (v.Template is not null)
+                    if (v.Definition.Template is not null)
                     {
                         label.Append('<');
-                        label.AppendJoin(", ", v.Template.Parameters.Select(v => v.Content));
+                        label.AppendJoin(", ", v.Definition.Template.Parameters.Select(v => v.Content));
                         label.Append('>');
                     }
 
@@ -159,17 +159,17 @@ sealed partial class DocumentBBLang
                     bool addComma = false;
                     for (int i = 0; i < v.Parameters.Length; i++)
                     {
-                        if (v.Parameters[i].IsThis) continue;
+                        if (v.Parameters[i].Definition.IsThis) continue;
                         if (addComma) label.Append(", ");
                         addComma = true;
 
-                        if (v.Parameters[i].IsRef) label.Append("ref ");
+                        if (v.Parameters[i].Definition.IsRef) label.Append("ref ");
 
                         CompiledParameter p = v.Parameters[i];
                         label.Append(p.Type);
                         label.Append(' ');
-                        parameters.Add((label.Length, label.Length + p.Identifier.Content.Length));
-                        label.Append(p.Identifier.Content);
+                        parameters.Add((label.Length, label.Length + p.Identifier.Length));
+                        label.Append(p.Identifier);
                     }
                     label.Append(')');
                     return new SignatureInformation()
@@ -178,7 +178,7 @@ sealed partial class DocumentBBLang
                         ActiveParameter = activeArgument < v.Parameters.Length ? activeArgument : null,
                         Parameters = new Container<ParameterInformation>(parameters.Select(p => new ParameterInformation() { Label = new ParameterInformationLabel(p), })),
                         Documentation =
-                            GetCommentDocumentation(v, out string? docs)
+                            GetCommentDocumentation(v.Definition, out string? docs)
                             ? new StringOrMarkupContent(new MarkupContent()
                             {
                                 Kind = MarkupKind.Markdown,

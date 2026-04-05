@@ -17,7 +17,7 @@ sealed partial class DocumentBBLang
 
             result.Add(new CodeLens()
             {
-                Range = function.Identifier.Position.Range.ToOmniSharp(),
+                Range = function.Definition.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
                     Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
@@ -31,7 +31,7 @@ sealed partial class DocumentBBLang
 
             result.Add(new CodeLens()
             {
-                Range = function.Identifier.Position.Range.ToOmniSharp(),
+                Range = function.Definition.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
                     Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
@@ -45,7 +45,7 @@ sealed partial class DocumentBBLang
 
             result.Add(new CodeLens()
             {
-                Range = function.Identifier.Position.Range.ToOmniSharp(),
+                Range = function.Definition.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
                     Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
@@ -59,7 +59,7 @@ sealed partial class DocumentBBLang
 
             result.Add(new CodeLens()
             {
-                Range = (function as ConstructorDefinition).Type.Position.Range.ToOmniSharp(),
+                Range = function.Definition.Type.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
                     Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
@@ -69,11 +69,11 @@ sealed partial class DocumentBBLang
 
         foreach (CompiledStruct @struct in CompilerResult.Structs)
         {
-            if (@struct.File != Uri) continue;
+            if (@struct.Definition.File != Uri) continue;
 
             result.Add(new CodeLens()
             {
-                Range = @struct.Identifier.Position.Range.ToOmniSharp(),
+                Range = @struct.Definition.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
                     Title = $"{@struct.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",

@@ -19,24 +19,24 @@ sealed partial class DocumentBBLang
         {
             foreach (CompiledStruct @struct in CompilerResult.Structs)
             {
-                if (!@struct.CanUse(Uri))
+                if (!@struct.Definition.CanUse(Uri))
                 { continue; }
 
                 result.Add(new CompletionItem()
                 {
                     Kind = CompletionItemKind.Struct,
-                    Label = @struct.Identifier.Content,
+                    Label = @struct.Identifier,
                 });
             }
 
             foreach (CompiledAlias alias in CompilerResult.Aliases)
             {
-                if (!alias.CanUse(Uri)) continue;
+                if (!alias.Definition.CanUse(Uri)) continue;
 
                 result.Add(new CompletionItem()
                 {
                     Kind = CompletionItemKind.Class,
-                    Label = alias.Identifier.Content,
+                    Label = alias.Identifier,
                     LabelDetails = new CompletionItemLabelDetails()
                     {
                         Detail = $" = {alias.Value}",
@@ -54,10 +54,10 @@ sealed partial class DocumentBBLang
 
                 foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
                 {
-                    if (!function.CanUse(Uri)) continue;
+                    if (!function.Definition.CanUse(Uri)) continue;
 
-                    if (!functionOverloads.TryGetValue(function.Identifier.Content, out var overloads))
-                    { overloads = functionOverloads[function.Identifier.Content] = new(); }
+                    if (!functionOverloads.TryGetValue(function.Identifier, out var overloads))
+                    { overloads = functionOverloads[function.Identifier] = new(); }
                     overloads.Add(function);
                 }
 
@@ -120,15 +120,15 @@ sealed partial class DocumentBBLang
                 if (function.File != e.TextDocument.Uri.ToUri())
                 { continue; }
 
-                if (function.Block == null) continue;
-                if (function.Block.Position.Range.Contains(position))
+                if (function.Definition.Block == null) continue;
+                if (function.Definition.Block.Position.Range.Contains(position))
                 {
                     foreach (CompiledParameter parameter in function.Parameters)
                     {
                         result.Add(new CompletionItem()
                         {
                             Kind = CompletionItemKind.Variable,
-                            Label = parameter.Identifier.Content,
+                            Label = parameter.Identifier,
                             LabelDetails = new CompletionItemLabelDetails()
                             {
                                 Description = parameter.Type.ToString(),
@@ -322,7 +322,7 @@ sealed partial class DocumentBBLang
                                 result.Add(new CompletionItem()
                                 {
                                     Kind = CompletionItemKind.Field,
-                                    Label = field.Identifier.Content,
+                                    Label = field.Identifier,
                                     LabelDetails = new CompletionItemLabelDetails()
                                     {
                                         Description = GeneralType.TryInsertTypeParameters(field.Type, structType.TypeArguments).ToString(),
@@ -333,13 +333,13 @@ sealed partial class DocumentBBLang
 
                         foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
                         {
-                            if (!function.CanUse(Uri)) continue;
+                            if (!function.Definition.CanUse(Uri)) continue;
                             if (function.Parameters.Length <= 0) continue;
-                            if (!function.Parameters[0].IsThis) continue;
+                            if (!function.Parameters[0].Definition.IsThis) continue;
                             if (!function.Parameters[0].Type.SameAs(prevType)) continue;
 
-                            if (!functionOverloads.TryGetValue(function.Identifier.Content, out var overloads))
-                            { overloads = functionOverloads[function.Identifier.Content] = new(); }
+                            if (!functionOverloads.TryGetValue(function.Identifier, out var overloads))
+                            { overloads = functionOverloads[function.Identifier] = new(); }
                             overloads.Add((function, (prevType.Is(out StructType? w) && function.Context == w.Struct) ? w.TypeArguments : null));
                         }
                     }

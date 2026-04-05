@@ -40,17 +40,12 @@ static class StatementExtensions
         return false;
     }
 
-    static bool GetThingAt<TThing, TIdentifier>(IEnumerable<TThing> things, Uri file, SinglePosition position, [NotNullWhen(true)] out TThing? result)
-        where TThing : IInFile, IIdentifiable<TIdentifier>
-        where TIdentifier : IPositioned
+    public static bool GetFunctionAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledFunctionDefinition? result)
     {
-        foreach (TThing? thing in things)
+        foreach (CompiledFunctionDefinition thing in compilerResult.FunctionDefinitions)
         {
-            if (thing.File != file)
-            { continue; }
-
-            if (!thing.Identifier.Position.Range.Contains(position))
-            { continue; }
+            if (thing.File != file) continue;
+            if (!thing.Definition.Identifier.Position.Range.Contains(position)) continue;
 
             result = thing;
             return true;
@@ -60,27 +55,60 @@ static class StatementExtensions
         return false;
     }
 
-    public static bool GetFunctionAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledFunctionDefinition? result)
-        => GetThingAt<CompiledFunctionDefinition, Token>(compilerResult.FunctionDefinitions, file, position, out result);
-
     public static bool GetGeneralFunctionAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledGeneralFunctionDefinition? result)
-        => GetThingAt<CompiledGeneralFunctionDefinition, Token>(compilerResult.GeneralFunctionDefinitions, file, position, out result);
+    {
+        foreach (CompiledGeneralFunctionDefinition thing in compilerResult.GeneralFunctionDefinitions)
+        {
+            if (thing.File != file) continue;
+            if (!thing.Definition.Identifier.Position.Range.Contains(position)) continue;
+
+            result = thing;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
 
     public static bool GetOperatorAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledOperatorDefinition? result)
-        => GetThingAt<CompiledOperatorDefinition, Token>(compilerResult.OperatorDefinitions, file, position, out result);
+    {
+        foreach (CompiledOperatorDefinition thing in compilerResult.OperatorDefinitions)
+        {
+            if (thing.File != file) continue;
+            if (!thing.Definition.Identifier.Position.Range.Contains(position)) continue;
+
+            result = thing;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
 
     public static bool GetStructAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledStruct? result)
-        => GetThingAt<CompiledStruct, Token>(compilerResult.Structs, file, position, out result);
+    {
+        foreach (var thing in compilerResult.Structs)
+        {
+            if (thing.File != file) continue;
+            if (!thing.Definition.Identifier.Position.Range.Contains(position)) continue;
+
+            result = thing;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
 
     public static bool GetFieldAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledField? result)
     {
         foreach (CompiledStruct @struct in compilerResult.Structs)
         {
-            if (@struct.File != file) continue;
+            if (@struct.Definition.File != file) continue;
 
             foreach (CompiledField field in @struct.Fields)
             {
-                if (field.Identifier.Position.Range.Contains(position))
+                if (field.Definition.Identifier.Position.Range.Contains(position))
                 {
                     result = field;
                     return true;

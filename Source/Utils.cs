@@ -19,7 +19,7 @@ static class Utils
     {
         for (int i = 0; i < function.Parameters.Length; i++)
         {
-            parameter = function.Parameters[i];
+            parameter = function.Parameters[i].Definition;
             parameterType = function.Parameters[i].Type;
 
             if (parameter.Position.Range.Contains(position))
@@ -79,12 +79,12 @@ static class Utils
         SinglePosition position,
         [NotNullWhen(true)] out TypeInstance? typeInstance,
         [NotNullWhen(true)] out GeneralType? generalType)
-        where TFunction : FunctionDefinition, ICompiledFunctionDefinition
+        where TFunction : IHaveCompiledType, ICompiledDefinition<FunctionDefinition>
     {
-        if (function.Type.Position.Range.Contains(position))
+        if (function.Definition.Type.Position.Range.Contains(position))
         {
-            typeInstance = function.Type;
-            generalType = ((ICompiledFunctionDefinition)function).Type;
+            typeInstance = function.Definition.Type;
+            generalType = function.Type;
             return true;
         }
 
@@ -99,7 +99,7 @@ static class Utils
         SinglePosition position,
         [NotNullWhen(true)] out TypeInstance? typeInstance,
         [NotNullWhen(true)] out GeneralType? generalType)
-        where TFunction : FunctionDefinition, ICompiledFunctionDefinition, IInFile
+        where TFunction : ICompiledFunctionDefinition, IInFile, ICompiledDefinition<FunctionDefinition>
     {
         foreach (TFunction function in functions)
         {
@@ -155,13 +155,13 @@ static class Utils
 
         foreach (CompiledStruct @struct in compilerResult.Structs)
         {
-            if (@struct.File != file) continue;
+            if (@struct.Definition.File != file) continue;
 
             foreach (CompiledField field in @struct.Fields)
             {
-                if (((FieldDefinition)field).Type.Position.Range.Contains(position))
+                if (field.Definition.Type.Position.Range.Contains(position))
                 {
-                    typeInstance = ((FieldDefinition)field).Type;
+                    typeInstance = field.Definition.Type;
                     generalType = field.Type;
                     return true;
                 }

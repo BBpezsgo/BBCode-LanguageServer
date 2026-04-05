@@ -53,9 +53,9 @@ sealed partial class DocumentBBLang
                     links.Add(new LocationLink()
                     {
                         OriginSelectionRange = position.ToOmniSharp(),
-                        TargetRange = aliasType.Definition.Position.Range.ToOmniSharp(),
-                        TargetSelectionRange = aliasType.Definition.Position.Range.ToOmniSharp(),
-                        TargetUri = aliasType.Definition.File,
+                        TargetRange = aliasType.Definition.Definition.Position.Range.ToOmniSharp(),
+                        TargetSelectionRange = aliasType.Definition.Definition.Position.Range.ToOmniSharp(),
+                        TargetUri = aliasType.Definition.Definition.File,
                     });
                 }
             }

@@ -12,11 +12,11 @@ namespace LanguageServer.DocumentManagers;
 sealed partial class DocumentBBLang
 {
     static string GetFunctionHover<TFunction>(TFunction function, ImmutableDictionary<string, GeneralType>? typeArguments)
-        where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition
+        where TFunction : ICompiledFunctionDefinition, ICompiledDefinition<FunctionThingDefinition>
     {
         StringBuilder builder = new();
 
-        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(function.Modifiers);
+        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(function.Definition.Modifiers);
         if (modifiers.Any())
         {
             builder.AppendJoin(' ', modifiers);
@@ -25,22 +25,22 @@ sealed partial class DocumentBBLang
 
         builder.Append(GeneralType.TryInsertTypeParameters(function.Type, typeArguments) ?? function.Type);
         builder.Append(' ');
-        builder.Append(function.Identifier.ToString());
-        if (function.Template != null)
+        builder.Append(function.Definition.Identifier.ToString());
+        if (function.Definition.Template != null)
         {
             builder.Append('<');
-            builder.AppendJoin(", ", typeArguments is not null ? function.Template.Parameters.Select(v => typeArguments[v.Content].ToString()) : function.Template.Parameters.Select(v => v.Content));
+            builder.AppendJoin(", ", typeArguments is not null ? function.Definition.Template.Parameters.Select(v => typeArguments[v.Content].ToString()) : function.Definition.Template.Parameters.Select(v => v.Content));
             builder.Append('>');
         }
         builder.Append('(');
-        for (int i = 0; i < function.Parameters.Count; i++)
+        for (int i = 0; i < function.Definition.Parameters.Length; i++)
         {
             if (i > 0) builder.Append(", ");
-            builder.AppendJoin(' ', function.Parameters[i].Modifiers);
-            if (function.Parameters[i].Modifiers.Length > 0)
+            builder.AppendJoin(' ', function.Definition.Parameters[i].Modifiers);
+            if (function.Definition.Parameters[i].Modifiers.Length > 0)
             { builder.Append(' '); }
 
-            builder.Append(GeneralType.TryInsertTypeParameters((function as ICompiledFunctionDefinition).Parameters[i].Type, typeArguments).ToString());
+            builder.Append(GeneralType.TryInsertTypeParameters(function.Parameters[i].Type, typeArguments).ToString());
 
             builder.Append(' ');
             builder.Append(function.Parameters[i].Identifier.ToString());
@@ -52,7 +52,7 @@ sealed partial class DocumentBBLang
     static string GetStructHover(CompiledStruct @struct)
     {
         StringBuilder builder = new();
-        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(@struct.Modifiers);
+        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(@struct.Definition.Modifiers);
         if (modifiers.Any())
         {
             builder.AppendJoin(' ', modifiers);
@@ -84,7 +84,7 @@ sealed partial class DocumentBBLang
     static string GetAliasHover(CompiledAlias alias)
     {
         StringBuilder builder = new();
-        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(alias.Modifiers);
+        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(alias.Definition.Modifiers);
         if (modifiers.Any())
         {
             builder.AppendJoin(' ', modifiers);
@@ -211,9 +211,9 @@ sealed partial class DocumentBBLang
     {
         StringBuilder builder = new();
         builder.Append("(parameter) ");
-        if (parameter.Modifiers.Length > 0)
+        if (parameter.Definition.Modifiers.Length > 0)
         {
-            builder.AppendJoin(' ', parameter.Modifiers);
+            builder.AppendJoin(' ', parameter.Definition.Modifiers);
             builder.Append(' ');
         }
         builder.Append(parameter.Type);
@@ -308,27 +308,27 @@ sealed partial class DocumentBBLang
         if (CompilerResult.GetFunctionAt(Uri, position, out CompiledFunctionDefinition? function))
         {
             definitionHover = GetFunctionHover(function, null);
-            docsHover = GetCommentDocumentation(function);
+            docsHover = GetCommentDocumentation(function.Definition);
         }
         else if (CompilerResult.GetGeneralFunctionAt(Uri, position, out CompiledGeneralFunctionDefinition? generalFunction))
         {
             definitionHover = GetFunctionHover(generalFunction, null);
-            docsHover = GetCommentDocumentation(generalFunction);
+            docsHover = GetCommentDocumentation(generalFunction.Definition);
         }
         else if (CompilerResult.GetOperatorAt(Uri, position, out CompiledOperatorDefinition? @operator))
         {
             definitionHover = GetFunctionHover(@operator, null);
-            docsHover = GetCommentDocumentation(@operator);
+            docsHover = GetCommentDocumentation(@operator.Definition);
         }
         else if (CompilerResult.GetStructAt(Uri, position, out CompiledStruct? @struct))
         {
             definitionHover = GetStructHover(@struct);
-            docsHover = GetCommentDocumentation(@struct);
+            docsHover = GetCommentDocumentation(@struct.Definition);
         }
         else if (CompilerResult.GetFieldAt(Uri, position, out CompiledField? field))
         {
             definitionHover = GetFieldHover(field);
-            docsHover = GetCommentDocumentation(field);
+            docsHover = GetCommentDocumentation(field.Definition);
         }
         else if (CompilerResult.GetParameterDefinitionAt(Uri, position, out ParameterDefinition? parameter, out _) &&
                  parameter.Identifier.Position.Range.Contains(position))

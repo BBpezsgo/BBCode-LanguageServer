@@ -94,8 +94,8 @@ sealed partial class DocumentBBLang
                     StatementCompiler.InlineContext inlineContext = new()
                     {
                         Arguments = f.Function.Parameters
-                            .Select((value, i) => (value.Identifier.Content, compiledFunctionCall.Arguments[i]))
-                            .ToImmutableDictionary(v => v.Content, v => v.Item2),
+                            .Select((value, i) => (value.Identifier, compiledFunctionCall.Arguments[i]))
+                            .ToImmutableDictionary(v => v.Identifier, v => v.Item2),
                     };
 
                     if (StatementCompiler.InlineFunction(f.Body, inlineContext, out CompiledStatement? inlined1, out DiagnosticAt? inlineError))

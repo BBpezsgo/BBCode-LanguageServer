@@ -89,12 +89,12 @@ sealed partial class DocumentBBLang
                     if (simpleType.TypeArguments.HasValue)
                     {
                         if (type2.Is(out StructType? structType) &&
-                            structType.Struct.Template is not null)
+                            structType.Struct.Definition.Template is not null)
                         {
                             for (int i = 0; i < simpleType.TypeArguments.Value.Length; i++)
                             {
                                 TypeInstance? item = simpleType.TypeArguments.Value[i];
-                                GeneralType? item2 = structType.TypeArguments[structType.Struct.Template.Parameters[i].Content];
+                                GeneralType? item2 = structType.TypeArguments[structType.Struct.Definition.Template.Parameters[i].Content];
                                 if (item.Position.Range.Contains(position))
                                 {
                                     type1 = item;

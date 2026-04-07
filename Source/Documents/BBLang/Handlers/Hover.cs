@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Text;
 using LanguageCore;
 using LanguageCore.Compiler;
@@ -11,6 +12,23 @@ namespace LanguageServer.DocumentManagers;
 
 sealed partial class DocumentBBLang
 {
+    static string? GetTypeHover(GeneralType type) => type switch
+    {
+        AliasType v => GetAliasHover(v.Definition),
+        BuiltinType v => $"{v}",
+        GenericType v => $"(generic) {v.Identifier}",
+        StructType v => GetStructHover(v.Struct),
+        _ => type.ToString()
+    };
+    static string? GetTypeHover(TypeInstance v) => v switch
+    {
+        TypeInstanceFunction w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
+        TypeInstancePointer w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
+        TypeInstanceReference w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
+        TypeInstanceSimple w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
+        TypeInstanceStackArray w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
+        _ => throw new UnreachableException(v.GetType().Name),
+    };
     static string GetFunctionHover<TFunction>(TFunction function, ImmutableDictionary<string, GeneralType>? typeArguments)
         where TFunction : ICompiledFunctionDefinition, ICompiledDefinition<FunctionThingDefinition>
     {
@@ -48,205 +66,37 @@ sealed partial class DocumentBBLang
         builder.Append(')');
         return builder.ToString();
     }
+    static string GetStructHover(CompiledStruct @struct) => $"{string.Join(null, Utils.GetVisibleModifiers(@struct.Definition.Modifiers).Select(v => ' '))}{DeclarationKeywords.Struct} {@struct.Identifier}";
+    static string GetStructHover(StructDefinition @struct) => $"{string.Join(null, Utils.GetVisibleModifiers(@struct.Modifiers).Select(v => ' '))}{DeclarationKeywords.Struct} {@struct.Identifier}";
+    static string GetAliasHover(CompiledAlias alias) => $"{string.Join(null, Utils.GetVisibleModifiers(alias.Definition.Modifiers).Select(v => ' '))}{DeclarationKeywords.Alias} {alias.Identifier} = {alias.Value}";
+    static string GetVariableHover(CompiledVariableDefinition variable) => $"(variable) {variable.Type} {variable.Identifier}";
+    static string GetConstantHover(CompiledVariableConstant variable) => $"(constant) {variable.Type} {variable.Identifier}{(variable.Value.IsNull ? "" : $" = {variable.Value.ToStringValue()}")}";
+    static string GetParameterHover(CompiledParameter parameter) => $"(parameter){string.Join(null, parameter.Definition.Modifiers.Select(v => ' '))}{parameter.Type} {parameter.Identifier}";
+    static string GetParameterHover(ParameterDefinition parameter) => $"(parameter){string.Join(null, parameter.Modifiers.Select(v => ' '))}{parameter.Type} {parameter.Identifier}";
+    static string GetFieldHover(CompiledField field) => $"(field) {field.Type} {field.Identifier}";
+    static string GetFieldHover(FieldDefinition field) => $"(field) {field.Type} {field.Identifier}";
 
-    static string GetStructHover(CompiledStruct @struct)
+    static string? GetDefinitionHover(object? definition)
     {
-        StringBuilder builder = new();
-        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(@struct.Definition.Modifiers);
-        if (modifiers.Any())
+        switch (definition)
         {
-            builder.AppendJoin(' ', modifiers);
-            builder.Append(' ');
+            case null: return null;
+            case CompiledOperatorDefinition v: return GetFunctionHover(v, null);
+            case CompiledFunctionDefinition v: return GetFunctionHover(v, null);
+            case CompiledGeneralFunctionDefinition v: return GetFunctionHover(v, null);
+            case CompiledVariableConstant v: return GetConstantHover(v);
+            case CompiledVariableDefinition v: return GetVariableHover(v);
+            case CompiledParameter v: return GetParameterHover(v);
+            case CompiledField v: return GetFieldHover(v);
+            case CompiledStruct v: return GetStructHover(v);
+            case StatementCompiler.FunctionQueryResult<CompiledFunctionDefinition> v: return GetFunctionHover(v.Function, v.TypeArguments);
+            case ParameterDefinition v: return GetParameterHover(v);
+            case FieldDefinition v: return GetFieldHover(v);
+            case StructDefinition v: return GetStructHover(v);
+            default:
+                Logger.Warn($"Invalid definition {definition.GetType().Name}");
+                return null;
         }
-
-        builder.Append(DeclarationKeywords.Struct);
-        builder.Append(' ');
-        builder.Append(@struct.Identifier);
-        return builder.ToString();
-    }
-
-    static string GetStructHover(StructDefinition @struct)
-    {
-        StringBuilder builder = new();
-        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(@struct.Modifiers);
-        if (modifiers.Any())
-        {
-            builder.AppendJoin(' ', modifiers);
-            builder.Append(' ');
-        }
-
-        builder.Append(DeclarationKeywords.Struct);
-        builder.Append(' ');
-        builder.Append(@struct.Identifier);
-        return builder.ToString();
-    }
-
-    static string GetAliasHover(CompiledAlias alias)
-    {
-        StringBuilder builder = new();
-        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(alias.Definition.Modifiers);
-        if (modifiers.Any())
-        {
-            builder.AppendJoin(' ', modifiers);
-            builder.Append(' ');
-        }
-
-        builder.Append(DeclarationKeywords.Alias);
-        builder.Append(' ');
-        builder.Append(alias.Identifier);
-        builder.Append(" = ");
-        builder.Append(alias.Value.ToString());
-        return builder.ToString();
-    }
-
-    static string GetAliasHover(AliasDefinition alias)
-    {
-        StringBuilder builder = new();
-        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(alias.Modifiers);
-        if (modifiers.Any())
-        {
-            builder.AppendJoin(' ', modifiers);
-            builder.Append(' ');
-        }
-
-        builder.Append(DeclarationKeywords.Alias);
-        builder.Append(' ');
-        builder.Append(alias.Identifier);
-        builder.Append(" = ");
-        builder.Append(alias.Value.ToString());
-        return builder.ToString();
-    }
-
-    static string? GetTypeHover(GeneralType type) => type switch
-    {
-        AliasType v => GetAliasHover(v.Definition),
-        BuiltinType v => $"{v}",
-        GenericType v => $"(generic) {v.Identifier}",
-        StructType v => GetStructHover(v.Struct),
-        _ => type.ToString()
-    };
-
-    static string? GetTypeHover(TypeInstance v) => v switch
-    {
-        TypeInstanceFunction w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        TypeInstancePointer w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        TypeInstanceReference w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        TypeInstanceSimple w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        TypeInstanceStackArray w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        _ => null,
-    };
-
-    static string? GetDefinitionHover(object? definition) => definition switch
-    {
-        CompiledOperatorDefinition v => GetFunctionHover(v, null),
-        CompiledFunctionDefinition v => GetFunctionHover(v, null),
-        CompiledGeneralFunctionDefinition v => GetFunctionHover(v, null),
-        CompiledVariableConstant v => GetVariableHover(v),
-        CompiledVariableDefinition v => GetVariableHover(v),
-        CompiledParameter v => GetParameterHover(v),
-        CompiledField v => GetFieldHover(v),
-        CompiledStruct v => GetStructHover(v),
-
-        StatementCompiler.FunctionQueryResult<CompiledFunctionDefinition> v => GetFunctionHover(v.Function, v.TypeArguments),
-
-        VariableDefinition v => GetVariableHover(v),
-        ParameterDefinition v => GetParameterHover(v),
-        FieldDefinition v => GetFieldHover(v),
-        StructDefinition v => GetStructHover(v),
-
-        _ => null,
-    };
-
-    static string GetVariableHover(VariableDefinition variable)
-    {
-        StringBuilder builder = new();
-
-        if (variable.Modifiers.Contains(ModifierKeywords.Const))
-        { builder.Append("(constant) "); }
-        else
-        { builder.Append("(variable) "); }
-
-        if (variable.Modifiers.Length > 0)
-        {
-            builder.AppendJoin(' ', variable.Modifiers);
-            builder.Append(' ');
-        }
-        builder.Append(variable.CompiledType?.ToString() ?? variable.Type.ToString());
-        builder.Append(' ');
-        builder.Append(variable.Identifier);
-
-        return builder.ToString();
-    }
-
-    static string GetVariableHover(CompiledVariableDefinition variable)
-    {
-        StringBuilder builder = new();
-
-        builder.Append("(variable) ");
-
-        builder.Append(variable.Type.ToString());
-        builder.Append(' ');
-        builder.Append(variable.Identifier);
-
-        return builder.ToString();
-    }
-
-    static string GetVariableHover(CompiledVariableConstant variable)
-    {
-        StringBuilder builder = new();
-
-        builder.Append("(constant) ");
-
-        builder.Append(variable.Type.ToString());
-        builder.Append(' ');
-        builder.Append(variable.Identifier);
-
-        builder.Append(" = ");
-        builder.Append(variable.Value.ToStringValue());
-
-        return builder.ToString();
-    }
-
-    static string GetParameterHover(CompiledParameter parameter)
-    {
-        StringBuilder builder = new();
-        builder.Append("(parameter) ");
-        if (parameter.Definition.Modifiers.Length > 0)
-        {
-            builder.AppendJoin(' ', parameter.Definition.Modifiers);
-            builder.Append(' ');
-        }
-        builder.Append(parameter.Type);
-        builder.Append(' ');
-        builder.Append(parameter.Identifier);
-
-        return builder.ToString();
-    }
-
-    static string GetParameterHover(ParameterDefinition parameter)
-    {
-        StringBuilder builder = new();
-        builder.Append("(parameter) ");
-        if (parameter.Modifiers.Length > 0)
-        {
-            builder.AppendJoin(' ', parameter.Modifiers);
-            builder.Append(' ');
-        }
-        builder.Append(parameter.Type);
-        builder.Append(' ');
-        builder.Append(parameter.Identifier);
-
-        return builder.ToString();
-    }
-
-    static string GetFieldHover(CompiledField field)
-    {
-        return $"(field) {field.Type} {field.Identifier}";
-    }
-
-    static string GetFieldHover(FieldDefinition field)
-    {
-        return $"(field) {field.Type} {field.Identifier}";
     }
 
     public override async Task<Hover?> Hover(HoverParams e, CancellationToken cancellationToken)
@@ -446,13 +296,7 @@ sealed partial class DocumentBBLang
                     typeHover = statementWithValue.CompiledType.ToString();
                 }
 
-                string? _definitionHover = GetDefinitionHover(item);
-                if (_definitionHover is not null)
-                {
-                    definitionHover = _definitionHover;
-                    docsHover = GetCommentDocumentation(item);
-                }
-                else if (item is IReferenceableTo referenceableTo)
+                if (item is IReferenceableTo referenceableTo)
                 {
                     Logger.Trace($"{referenceableTo.Reference?.GetType().Name ?? "null"} {referenceableTo.Reference}");
                     definitionHover = GetDefinitionHover(referenceableTo.Reference);

@@ -54,9 +54,8 @@ partial class DocumentBBLang
     Task AwaitForCompilation(DocumentVersion version, CancellationToken cancellationToken)
     {
         RequestCompilation(version);
-#pragma warning disable VSTHRD110 // Observe result of async calls
-        return CompilationTask?.WaitAsync(cancellationToken) ?? Task.CompletedTask;
-#pragma warning restore VSTHRD110 // Observe result of async calls
+        if (CompilationTask is null) return Task.CompletedTask;
+        return CompilationTask.WaitAsync(cancellationToken);
     }
 
     async Task CompileAsync()
@@ -152,7 +151,7 @@ partial class DocumentBBLang
 
             CompilerSettings compilerSettings = CompilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
             {
-                Optimizations = OptimizationSettings.All,
+                Optimizations = OptimizationSettings.None,
                 CompileEverything = true,
                 PreprocessorVariables = PreprocessorVariables.Normal,
                 SourceProviders = [

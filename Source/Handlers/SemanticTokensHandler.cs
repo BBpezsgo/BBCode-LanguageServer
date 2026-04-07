@@ -28,8 +28,8 @@ sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         },
         Full = new SemanticTokensCapabilityRequestFull()
         {
-            Delta = false,
+            Delta = true,
         },
-        Range = false,
+        Range = true,
     };
 }

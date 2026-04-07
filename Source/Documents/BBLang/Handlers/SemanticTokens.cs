@@ -82,5 +82,7 @@ sealed partial class DocumentBBLang
                     break;
             }
         }
+    
+        builder.Commit();
     }
 }

@@ -3,7 +3,6 @@ using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
-using LanguageCore.Tokenizing;
 
 namespace LanguageServer;
 
@@ -88,6 +87,21 @@ static class StatementExtensions
     public static bool GetStructAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledStruct? result)
     {
         foreach (var thing in compilerResult.Structs)
+        {
+            if (thing.File != file) continue;
+            if (!thing.Definition.Identifier.Position.Range.Contains(position)) continue;
+
+            result = thing;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    public static bool GetAliasAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledAlias? result)
+    {
+        foreach (var thing in compilerResult.Aliases)
         {
             if (thing.File != file) continue;
             if (!thing.Definition.Identifier.Position.Range.Contains(position)) continue;

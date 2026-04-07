@@ -1,3 +1,4 @@
+using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
@@ -11,59 +12,77 @@ sealed partial class DocumentBBLang
     {
         await AwaitForCompilation(Version, cancellationToken).ConfigureAwait(false);
 
+        SinglePosition p = e.Position.ToCool();
         List<OmniSharpLocation> result = new();
 
-        if (CompilerResult.GetFunctionAt(Uri, e.Position.ToCool(), out CompiledFunctionDefinition? function))
+        void AddReferences<T>(IReferenceable<T?> definition)
+            where T : IPositioned
         {
-            foreach (Reference<Expression?> reference in function.References.DistinctBy(v => v.Source))
+            foreach (Reference<T?> reference in definition.References.DistinctBy(v => v.SourceLocation))
             {
-                if (reference.SourceFile == null) continue;
-                if (reference.Source == null) continue;
-                result.Add(new OmniSharpLocation()
-                {
-                    Range = reference.Source.Position.ToOmniSharp(),
-                    Uri = reference.SourceFile,
-                });
+                result.Add(reference.SourceLocation.ToOmniSharp());
             }
         }
 
-        if (CompilerResult.GetGeneralFunctionAt(Uri, e.Position.ToCool(), out CompiledGeneralFunctionDefinition? generalFunction))
+        if (CompilerResult.GetFunctionAt(Uri, p, out CompiledFunctionDefinition? function))
         {
-            foreach (Reference<Expression?> reference in generalFunction.References.DistinctBy(v => v.Source))
+            AddReferences(function);
+        }
+        else if (CompilerResult.GetGeneralFunctionAt(Uri, p, out CompiledGeneralFunctionDefinition? generalFunction))
+        {
+            AddReferences(generalFunction);
+        }
+        else if (CompilerResult.GetOperatorAt(Uri, p, out CompiledOperatorDefinition? @operator))
+        {
+            AddReferences(@operator!);
+        }
+        else if (CompilerResult.GetStructAt(Uri, p, out CompiledStruct? @struct))
+        {
+            AddReferences(@struct!);
+        }
+        else if (CompilerResult.GetAliasAt(Uri, p, out var alias))
+        {
+            AddReferences(alias!);
+        }
+        else if (CompilerResult.GetFieldAt(Uri, p, out var field))
+        {
+            AddReferences(field!);
+        }
+        else if (AST.GetTypeInstanceAt(p, out var typeInstance, out var compiledType))
+        {
+            GetDeepestTypeInstance(ref typeInstance, ref compiledType, p);
+            Logger.Info(typeInstance);
+            Logger.Info(compiledType);
+            if (compiledType is AliasType aliasType)
             {
-                if (reference.SourceFile == null) continue;
-                if (reference.Source == null) continue;
-                result.Add(new OmniSharpLocation()
-                {
-                    Range = reference.Source.Position.ToOmniSharp(),
-                    Uri = reference.SourceFile,
-                });
+                AddReferences(aliasType.Definition!);
+            }
+            else if (compiledType is StructType structType)
+            {
+                AddReferences(structType.Struct!);
             }
         }
-
-        if (CompilerResult.GetOperatorAt(Uri, e.Position.ToCool(), out CompiledOperatorDefinition? @operator))
+        else if (AST.GetStatementAt(p, out var statement))
         {
-            foreach (Reference<Expression> reference in @operator.References.DistinctBy(v => v.Source))
+            Logger.Info(statement);
+            if (statement is IReferenceableTo referenceableTo)
             {
-                if (reference.SourceFile == null) continue;
-                result.Add(new OmniSharpLocation()
+                Logger.Info(statement);
+                Logger.Info(referenceableTo.Reference);
+                switch (referenceableTo.Reference)
                 {
-                    Range = reference.Source.Position.ToOmniSharp(),
-                    Uri = reference.SourceFile,
-                });
-            }
-        }
-
-        if (CompilerResult.GetStructAt(Uri, e.Position.ToCool(), out CompiledStruct? @struct))
-        {
-            foreach (Reference<TypeInstance> reference in @struct.References.DistinctBy(v => v.Source))
-            {
-                if (reference.SourceFile == null) continue;
-                result.Add(new OmniSharpLocation()
-                {
-                    Range = reference.Source.Position.ToOmniSharp(),
-                    Uri = reference.SourceFile,
-                });
+                    case CompiledConstructorDefinition referenceable:
+                        AddReferences(referenceable!);
+                        break;
+                    case StatementCompiler.FunctionQueryResult<CompiledFunctionDefinition> referenceable:
+                        AddReferences(referenceable.Function);
+                        break;
+                    case null:
+                        break;
+                    default:
+                        Logger.Warn($"Not implemented: `{referenceableTo.Reference?.GetType()}`");
+                        break;
+                }
             }
         }
 

@@ -20,7 +20,7 @@ sealed partial class DocumentBBLang
                 Range = function.Definition.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
+                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => !v.SourceLocation.IsDefault)} reference",
                 },
             });
         }
@@ -34,7 +34,7 @@ sealed partial class DocumentBBLang
                 Range = function.Definition.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
+                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => !v.SourceLocation.IsDefault)} reference",
                 },
             });
         }
@@ -48,7 +48,7 @@ sealed partial class DocumentBBLang
                 Range = function.Definition.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
+                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => !v.SourceLocation.IsDefault)} reference",
                 },
             });
         }
@@ -62,7 +62,7 @@ sealed partial class DocumentBBLang
                 Range = function.Definition.Type.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
+                    Title = $"{function.References.DistinctBy(v => v.Source).Count(v => !v.SourceLocation.IsDefault)} reference",
                 },
             });
         }
@@ -76,7 +76,7 @@ sealed partial class DocumentBBLang
                 Range = @struct.Definition.Identifier.Position.Range.ToOmniSharp(),
                 Command = new Command()
                 {
-                    Title = $"{@struct.References.DistinctBy(v => v.Source).Count(v => v.SourceFile != null)} reference",
+                    Title = $"{@struct.References.DistinctBy(v => v.Source).Count(v => !v.SourceLocation.IsDefault)} reference",
                 },
             });
         }

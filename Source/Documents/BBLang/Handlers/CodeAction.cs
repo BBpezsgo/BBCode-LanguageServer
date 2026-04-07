@@ -123,6 +123,10 @@ sealed partial class DocumentBBLang
                             }
                         });
                     }
+                    else
+                    {
+                        Logger.Trace($"Failed to inline {f.ToReadable()}: {inlineError}");
+                    }
                 }
             }
             return true;

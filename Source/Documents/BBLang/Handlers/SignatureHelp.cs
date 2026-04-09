@@ -163,8 +163,6 @@ sealed partial class DocumentBBLang
                         if (addComma) label.Append(", ");
                         addComma = true;
 
-                        if (v.Parameters[i].Definition.IsRef) label.Append("ref ");
-
                         CompiledParameter p = v.Parameters[i];
                         label.Append(p.Type);
                         label.Append(' ');

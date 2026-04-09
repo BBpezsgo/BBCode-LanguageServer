@@ -108,7 +108,7 @@ partial class DocumentBBLang
                         }
                     }
 
-            Logger.Debug($"  4");
+                    Logger.Debug($"  4");
 
                     foreach (DocumentBase item in Documents.OpenedDocuments)
                     {
@@ -117,14 +117,14 @@ partial class DocumentBBLang
                             project.Files.Add(item.Uri);
                         }
                     }
-            Logger.Debug($"  5");
+                    Logger.Debug($"  5");
 
                 }
             }
 
             if (project is not null)
             {
-            Logger.Debug($"  6a");
+                Logger.Debug($"  6a");
 
                 OmniSharpService.Instance?.Server?.SendNotification<ProjectStatusNotificationArgs>("bblang/project/status", new()
                 {
@@ -136,7 +136,7 @@ partial class DocumentBBLang
             }
             else
             {
-            Logger.Debug($"  6b");
+                Logger.Debug($"  6b");
 
                 OmniSharpService.Instance?.Server?.SendNotification<ProjectStatusNotificationArgs>("bblang/project/status", new()
                 {
@@ -174,7 +174,7 @@ partial class DocumentBBLang
             HashSet<Uri> compiledFiles;
             if (DocumentUri.Scheme == "file")
             {
-            Logger.Debug($"  8");
+                Logger.Debug($"  8");
 
                 CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
                 try

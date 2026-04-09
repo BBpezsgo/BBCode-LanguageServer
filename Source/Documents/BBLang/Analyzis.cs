@@ -93,42 +93,37 @@ partial class DocumentBBLang
                 }
                 else
                 {
-                    Logger.Debug($"  3");
-
                     BBLangProject.Projects[configurationPath] = project = new BBLangProject()
                     {
                         Configuration = config,
                     };
 
-                    if (configurationPath.IsFile)
+                    if (config.IsProject)
                     {
-                        foreach (string item in System.IO.Directory.EnumerateFiles(projectRoot.LocalPath, "*.bbc"))
+                        if (configurationPath.IsFile)
                         {
-                            project.Files.Add(new Uri(item, UriKind.Absolute));
+                            foreach (string item in System.IO.Directory.EnumerateFiles(projectRoot.LocalPath, "*.bbc"))
+                            {
+                                project.Files.Add(new Uri(item, UriKind.Absolute));
+                            }
+                        }
+
+                        foreach (DocumentBase item in Documents.OpenedDocuments)
+                        {
+                            if (projectRoot.IsBaseOf(item.Uri))
+                            {
+                                project.Files.Add(item.Uri);
+                            }
                         }
                     }
-
-                    Logger.Debug($"  4");
-
-                    foreach (DocumentBase item in Documents.OpenedDocuments)
-                    {
-                        if (projectRoot.IsBaseOf(item.Uri))
-                        {
-                            project.Files.Add(item.Uri);
-                        }
-                    }
-                    Logger.Debug($"  5");
-
                 }
             }
 
             if (project is not null)
             {
-                Logger.Debug($"  6a");
-
                 OmniSharpService.Instance?.Server?.SendNotification<ProjectStatusNotificationArgs>("bblang/project/status", new()
                 {
-                    IsProject = true,
+                    ProjectType = project.Configuration.IsProject ? "project" : "file",
                     ContextFile = Uri.ToString(),
                     IndexedFiles = project.Files.Count,
                     Root = projectRoot!.ToString(),
@@ -136,16 +131,12 @@ partial class DocumentBBLang
             }
             else
             {
-                Logger.Debug($"  6b");
-
                 OmniSharpService.Instance?.Server?.SendNotification<ProjectStatusNotificationArgs>("bblang/project/status", new()
                 {
-                    IsProject = false,
+                    ProjectType = null,
                     ContextFile = Uri.ToString(),
                 });
             }
-
-            Logger.Debug($"  7");
 
             diagnostics.Clear();
 
@@ -174,12 +165,23 @@ partial class DocumentBBLang
             HashSet<Uri> compiledFiles;
             if (DocumentUri.Scheme == "file")
             {
-                Logger.Debug($"  8");
-
                 CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
                 try
                 {
-                    var files = (project is null ? Documents.OpenedDocuments.Select(v => v.Uri.ToString()) : project.Files.Select(v => v.ToString())).ToArray();
+                    string[] files;
+                    if (project is null)
+                    {
+                        files = [.. Documents.OpenedDocuments.Select(v => v.Uri.ToString())];
+                    }
+                    else if (project.Configuration.IsProject)
+                    {
+                        files = [.. project.Files.Select(v => v.ToString())];
+                    }
+                    else
+                    {
+                        files = [Uri.ToString()];
+                    }
+
                     Logger.Debug($"  Compiling {string.Join(", ", files)}");
                     compilerResult = StatementCompiler.CompileFiles(files, compilerSettings, diagnostics);
                     Logger.Debug($"  Compiled");

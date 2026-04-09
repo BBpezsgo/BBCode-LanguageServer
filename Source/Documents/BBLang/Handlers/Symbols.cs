@@ -128,6 +128,32 @@ sealed partial class DocumentBBLang
             });
         }
 
+        foreach (EnumDefinition @enum in AST.EnumDefinitions)
+        {
+            if (@enum.File != e.TextDocument.Uri) continue;
+
+            List<DocumentSymbol> children = new();
+
+            foreach (EnumMemberDefinition member in @enum.Members)
+            {
+                children.Add(new DocumentSymbol()
+                {
+                    Kind = SymbolKind.EnumMember,
+                    Name = member.Identifier.Content,
+                    Range = member.Position.Range.ToOmniSharp(),
+                    SelectionRange = member.Identifier.Position.Range.ToOmniSharp(),
+                });
+            }
+
+            result.Add(new DocumentSymbol()
+            {
+                Kind = SymbolKind.Enum,
+                Name = @enum.Identifier.Content,
+                Range = @enum.Position.Range.ToOmniSharp(),
+                SelectionRange = @enum.Identifier.Position.Range.ToOmniSharp(),
+            });
+        }
+
         foreach (VariableDefinition variable in AST.TopLevelStatements.OfType<VariableDefinition>())
         {
             if (variable.File != e.TextDocument.Uri) continue;

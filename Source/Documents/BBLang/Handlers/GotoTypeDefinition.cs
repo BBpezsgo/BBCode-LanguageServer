@@ -58,6 +58,17 @@ sealed partial class DocumentBBLang
                         TargetUri = aliasType.Definition.Definition.File,
                     });
                 }
+                else if (type is EnumType enumType &&
+                            enumType.Definition != null)
+                {
+                    links.Add(new LocationLink()
+                    {
+                        OriginSelectionRange = position.ToOmniSharp(),
+                        TargetRange = enumType.Definition.Definition.Position.Range.ToOmniSharp(),
+                        TargetSelectionRange = enumType.Definition.Definition.Position.Range.ToOmniSharp(),
+                        TargetUri = enumType.Definition.Definition.File,
+                    });
+                }
             }
         }
 

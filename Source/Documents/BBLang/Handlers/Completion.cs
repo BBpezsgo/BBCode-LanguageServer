@@ -44,6 +44,17 @@ sealed partial class DocumentBBLang
                 });
             }
 
+            foreach (CompiledEnum @enum in CompilerResult.Enums)
+            {
+                if (!@enum.Definition.CanUse(Uri)) continue;
+
+                result.Add(new CompletionItem()
+                {
+                    Kind = CompletionItemKind.Enum,
+                    Label = @enum.Identifier,
+                });
+            }
+
             result.AddRange(TypeKeywords.List.Select(v => new CompletionItem() { Kind = CompletionItemKind.Keyword, Label = v }));
         }
 
@@ -150,6 +161,7 @@ sealed partial class DocumentBBLang
             .Append(AST.Structs)
             .Append(AST.Functions)
             .Append(AST.Operators)
+            .Append(AST.EnumDefinitions)
             .Append(AST.EnumerateStatements().OfType<IHaveAttributes>())
             .SelectMany(v => v.Attributes)
         )

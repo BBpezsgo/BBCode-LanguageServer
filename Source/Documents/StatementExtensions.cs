@@ -39,6 +39,37 @@ static class StatementExtensions
         return false;
     }
 
+    public static bool GetEnumAt(this ParserResult parserResult, SinglePosition position, [NotNullWhen(true)] out EnumDefinition? result)
+    {
+        foreach (EnumDefinition @enum in parserResult.EnumDefinitions.IsDefault ? ImmutableArray<EnumDefinition>.Empty : parserResult.EnumDefinitions)
+        {
+            if (!@enum.Identifier.Position.Range.Contains(position)) continue;
+
+            result = @enum;
+            return true;
+        }
+
+        result = null;
+        return false;
+    }
+
+    public static bool GetEnumMemberAt(this ParserResult parserResult, SinglePosition position, [NotNullWhen(true)] out EnumMemberDefinition? result)
+    {
+        foreach (EnumDefinition @enum in parserResult.EnumDefinitions.IsDefault ? ImmutableArray<EnumDefinition>.Empty : parserResult.EnumDefinitions)
+        {
+            foreach (EnumMemberDefinition member in @enum.Members)
+            {
+                if (!member.Identifier.Position.Range.Contains(position)) continue;
+
+                result = member;
+                return true;
+            }
+        }
+
+        result = null;
+        return false;
+    }
+
     public static bool GetFunctionAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledFunctionDefinition? result)
     {
         foreach (CompiledFunctionDefinition thing in compilerResult.FunctionDefinitions)
@@ -108,6 +139,40 @@ static class StatementExtensions
 
             result = thing;
             return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    public static bool GetEnumAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledEnum? result)
+    {
+        foreach (var thing in compilerResult.Enums)
+        {
+            if (thing.File != file) continue;
+            if (!thing.Definition.Identifier.Position.Range.Contains(position)) continue;
+
+            result = thing;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    public static bool GetEnumMemberAt(this CompilerResult compilerResult, Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledEnumMember? result)
+    {
+        foreach (var thing in compilerResult.Enums)
+        {
+            if (thing.File != file) continue;
+
+            foreach (var member in thing.Members)
+            {
+                if (!member.Definition.Identifier.Position.Range.Contains(position)) continue;
+
+                result = member;
+                return true;
+            }
         }
 
         result = default;

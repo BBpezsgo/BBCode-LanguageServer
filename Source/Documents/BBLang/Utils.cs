@@ -305,7 +305,10 @@ sealed partial class DocumentBBLang
             )
 
             // Aliases
-            .Append(AST.AliasDefinitions.Select(v => v.Value)))
+            .Append(AST.AliasDefinitions.Select(v => v.Value))
+
+            // Enums
+            .Append(AST.EnumDefinitions.Where(v => v.Type is not null).Select(v => v.Type!)))
         {
             if (!type.Position.Range.Contains(position)) continue;
             result = GetDeepestTypeInstance(type, position);

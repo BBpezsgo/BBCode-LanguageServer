@@ -24,7 +24,7 @@ sealed partial class DocumentBBLang
                 {
                     if (variableDefinition.InitialValue?.CompiledType is not null)
                     {
-                        if (variableDefinition.Type is TypeInstanceSimple simpleType && simpleType.Identifier.Content == "var")
+                        if (variableDefinition.Type is TypeInstanceSimple simpleType && simpleType.Identifier.Content == StatementKeywords.Var)
                         {
                             result.Add(new CodeAction()
                             {
@@ -66,7 +66,7 @@ sealed partial class DocumentBBLang
                                                 new()
                                                 {
                                                     Range = variableDefinition.Type.Position.Range.ToOmniSharp(),
-                                                    NewText = "var",
+                                                    NewText = StatementKeywords.Var,
                                                 }
                                             }
                                         }

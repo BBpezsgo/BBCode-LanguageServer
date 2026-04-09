@@ -44,6 +44,14 @@ sealed partial class DocumentBBLang
         {
             AddReferences(alias!);
         }
+        else if (CompilerResult.GetEnumAt(Uri, p, out var @enum))
+        {
+            AddReferences(@enum!);
+        }
+        else if (CompilerResult.GetEnumMemberAt(Uri, p, out var enumMember))
+        {
+            AddReferences(enumMember!);
+        }
         else if (CompilerResult.GetFieldAt(Uri, p, out var field))
         {
             AddReferences(field!);
@@ -56,6 +64,10 @@ sealed partial class DocumentBBLang
             if (compiledType is AliasType aliasType)
             {
                 AddReferences(aliasType.Definition!);
+            }
+            else if (compiledType is EnumType enumType)
+            {
+                AddReferences(enumType.Definition!);
             }
             else if (compiledType is StructType structType)
             {

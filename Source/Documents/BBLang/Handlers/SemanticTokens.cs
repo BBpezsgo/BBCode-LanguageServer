@@ -65,6 +65,12 @@ sealed partial class DocumentBBLang
                     break;
                 case TokenAnalyzedType.InstructionLabel:
                     break;
+                case TokenAnalyzedType.Enum:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Enum, Array.Empty<SemanticTokenModifier>());
+                    break;
+                case TokenAnalyzedType.EnumMember:
+                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.EnumMember, Array.Empty<SemanticTokenModifier>());
+                    break;
                 case TokenAnalyzedType.None:
                 default:
                     switch (token.TokenType)
@@ -82,7 +88,7 @@ sealed partial class DocumentBBLang
                     break;
             }
         }
-    
+
         builder.Commit();
     }
 }

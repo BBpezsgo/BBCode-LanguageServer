@@ -15,6 +15,7 @@ sealed partial class DocumentBBLang
     static string? GetTypeHover(GeneralType type) => type switch
     {
         AliasType v => GetAliasHover(v.Definition),
+        EnumType v => GetEnumHover(v.Definition),
         BuiltinType v => $"{v}",
         GenericType v => $"(generic) {v.Identifier}",
         StructType v => GetStructHover(v.Struct),
@@ -66,13 +67,17 @@ sealed partial class DocumentBBLang
         builder.Append(')');
         return builder.ToString();
     }
-    static string GetStructHover(CompiledStruct @struct) => $"{string.Join(null, Utils.GetVisibleModifiers(@struct.Definition.Modifiers).Select(v => ' '))}{DeclarationKeywords.Struct} {@struct.Identifier}";
-    static string GetStructHover(StructDefinition @struct) => $"{string.Join(null, Utils.GetVisibleModifiers(@struct.Modifiers).Select(v => ' '))}{DeclarationKeywords.Struct} {@struct.Identifier}";
-    static string GetAliasHover(CompiledAlias alias) => $"{string.Join(null, Utils.GetVisibleModifiers(alias.Definition.Modifiers).Select(v => ' '))}{DeclarationKeywords.Alias} {alias.Identifier} = {alias.Value}";
+    static string GetStructHover(CompiledStruct @struct) => $"{string.Join(null, Utils.GetVisibleModifiers(@struct.Definition.Modifiers).Select(v => $"{v} "))}{DeclarationKeywords.Struct} {@struct.Identifier}";
+    static string GetStructHover(StructDefinition @struct) => $"{string.Join(null, Utils.GetVisibleModifiers(@struct.Modifiers).Select(v => $"{v} "))}{DeclarationKeywords.Struct} {@struct.Identifier}";
+    static string GetAliasHover(CompiledAlias alias) => $"{string.Join(null, Utils.GetVisibleModifiers(alias.Definition.Modifiers).Select(v => $"{v} "))}{DeclarationKeywords.Alias} {alias.Identifier} = {alias.Value}";
+    static string GetEnumHover(CompiledEnum @enum) => $"{string.Join(null, Utils.GetVisibleModifiers(@enum.Definition.Modifiers).Select(v => $"{v} "))}{DeclarationKeywords.Enum} {@enum.Identifier} : {@enum.Type}";
+    static string GetEnumHover(EnumDefinition @enum) => $"{string.Join(null, Utils.GetVisibleModifiers(@enum.Modifiers).Select(v => $"{v} "))}{DeclarationKeywords.Enum} {@enum.Identifier}{(@enum.Type is null ? null : $" : {@enum.Type}")}";
+    static string GetEnumMemberHover(CompiledEnumMember enumMember) => $"{enumMember.Enum.Type} {enumMember.Identifier} = {enumMember.Value}";
+    static string GetEnumMemberHover(EnumMemberDefinition enumMember) => $"{enumMember.Identifier} = {enumMember.Value}";
     static string GetVariableHover(CompiledVariableDefinition variable) => $"(variable) {variable.Type} {variable.Identifier}";
     static string GetConstantHover(CompiledVariableConstant variable) => $"(constant) {variable.Type} {variable.Identifier}{(variable.Value.IsNull ? "" : $" = {variable.Value.ToStringValue()}")}";
-    static string GetParameterHover(CompiledParameter parameter) => $"(parameter){string.Join(null, parameter.Definition.Modifiers.Select(v => ' '))}{parameter.Type} {parameter.Identifier}";
-    static string GetParameterHover(ParameterDefinition parameter) => $"(parameter){string.Join(null, parameter.Modifiers.Select(v => ' '))}{parameter.Type} {parameter.Identifier}";
+    static string GetParameterHover(CompiledParameter parameter) => $"(parameter){string.Join(null, parameter.Definition.Modifiers.Select(v => $"{v} "))}{parameter.Type} {parameter.Identifier}";
+    static string GetParameterHover(ParameterDefinition parameter) => $"(parameter){string.Join(null, parameter.Modifiers.Select(v => $"{v} "))}{parameter.Type} {parameter.Identifier}";
     static string GetFieldHover(CompiledField field) => $"(field) {field.Type} {field.Identifier}";
     static string GetFieldHover(FieldDefinition field) => $"(field) {field.Type} {field.Identifier}";
 
@@ -89,6 +94,8 @@ sealed partial class DocumentBBLang
             case CompiledParameter v: return GetParameterHover(v);
             case CompiledField v: return GetFieldHover(v);
             case CompiledStruct v: return GetStructHover(v);
+            case CompiledEnum v: return GetEnumHover(v);
+            case CompiledEnumMember v: return GetEnumMemberHover(v);
             case StatementCompiler.FunctionQueryResult<CompiledFunctionDefinition> v: return GetFunctionHover(v.Function, v.TypeArguments);
             case ParameterDefinition v: return GetParameterHover(v);
             case FieldDefinition v: return GetFieldHover(v);
@@ -118,7 +125,8 @@ sealed partial class DocumentBBLang
                 AST.Functions.Append(AST.Operators)
                 .Append(AST.Structs.SelectMany(v => v.Functions.CastArray<IHaveAttributes>().Append(v.GeneralFunctions).Append(v.Operators).Append(v.Constructors)))
                 .Append(AST.Structs)
-                .Append(AST.AliasDefinitions))
+                .Append(AST.AliasDefinitions)
+                .Append(AST.EnumDefinitions))
             {
                 foreach (AttributeUsage attribute in function1.Attributes)
                 {
@@ -175,6 +183,16 @@ sealed partial class DocumentBBLang
             definitionHover = GetStructHover(@struct);
             docsHover = GetCommentDocumentation(@struct.Definition);
         }
+        else if (CompilerResult.GetEnumAt(Uri, position, out var @enum))
+        {
+            definitionHover = GetEnumHover(@enum);
+            docsHover = GetCommentDocumentation(@enum.Definition);
+        }
+        else if (CompilerResult.GetEnumMemberAt(Uri, position, out var enumMember))
+        {
+            definitionHover = GetEnumMemberHover(enumMember);
+            docsHover = GetCommentDocumentation(enumMember.Definition);
+        }
         else if (CompilerResult.GetFieldAt(Uri, position, out CompiledField? field))
         {
             definitionHover = GetFieldHover(field);
@@ -191,6 +209,16 @@ sealed partial class DocumentBBLang
         {
             definitionHover = GetStructHover(@struct2);
             docsHover = GetCommentDocumentation(@struct2);
+        }
+        else if (AST.GetEnumAt(position, out var @enum2))
+        {
+            definitionHover = GetEnumHover(@enum2);
+            docsHover = GetCommentDocumentation(@enum2);
+        }
+        else if (AST.GetEnumMemberAt(position, out var enumMember1))
+        {
+            definitionHover = GetEnumMemberHover(enumMember1);
+            docsHover = GetCommentDocumentation(@enumMember1);
         }
         else if (AST.GetFieldAt(position, out FieldDefinition? field2))
         {

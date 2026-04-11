@@ -21,15 +21,6 @@ sealed partial class DocumentBBLang
         StructType v => GetStructHover(v.Struct),
         _ => type.ToString()
     };
-    static string? GetTypeHover(TypeInstance v) => v switch
-    {
-        TypeInstanceFunction w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        TypeInstancePointer w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        TypeInstanceReference w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        TypeInstanceSimple w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        TypeInstanceStackArray w => w.CompiledType is not null ? GetTypeHover(w.CompiledType) : null,
-        _ => throw new UnreachableException(v.GetType().Name),
-    };
     static string GetFunctionHover<TFunction>(TFunction function, ImmutableDictionary<string, GeneralType>? typeArguments)
         where TFunction : ICompiledFunctionDefinition, ICompiledDefinition<FunctionThingDefinition>
     {
@@ -67,6 +58,34 @@ sealed partial class DocumentBBLang
         builder.Append(')');
         return builder.ToString();
     }
+    static string GetFunctionHover(CompiledConstructorDefinition function, ImmutableDictionary<string, GeneralType>? typeArguments)
+    {
+        StringBuilder builder = new();
+
+        IEnumerable<Token> modifiers = Utils.GetVisibleModifiers(function.Definition.Modifiers);
+        if (modifiers.Any())
+        {
+            builder.AppendJoin(' ', modifiers);
+            builder.Append(' ');
+        }
+
+        builder.Append(GeneralType.TryInsertTypeParameters(function.Type, typeArguments) ?? function.Type);
+        builder.Append('(');
+        for (int i = 0; i < function.Definition.Parameters.Length; i++)
+        {
+            if (i > 0) builder.Append(", ");
+            builder.AppendJoin(' ', function.Definition.Parameters[i].Modifiers);
+            if (function.Definition.Parameters[i].Modifiers.Length > 0)
+            { builder.Append(' '); }
+
+            builder.Append(GeneralType.TryInsertTypeParameters(function.Parameters[i].Type, typeArguments).ToString());
+
+            builder.Append(' ');
+            builder.Append(function.Parameters[i].Identifier);
+        }
+        builder.Append(')');
+        return builder.ToString();
+    }
     static string GetStructHover(CompiledStruct @struct) => $"{string.Join(null, Utils.GetVisibleModifiers(@struct.Definition.Modifiers).Select(v => $"{v} "))}{DeclarationKeywords.Struct} {@struct.Identifier}";
     static string GetStructHover(StructDefinition @struct) => $"{string.Join(null, Utils.GetVisibleModifiers(@struct.Modifiers).Select(v => $"{v} "))}{DeclarationKeywords.Struct} {@struct.Identifier}";
     static string GetAliasHover(CompiledAlias alias) => $"{string.Join(null, Utils.GetVisibleModifiers(alias.Definition.Modifiers).Select(v => $"{v} "))}{DeclarationKeywords.Alias} {alias.Identifier} = {alias.Value}";
@@ -76,8 +95,8 @@ sealed partial class DocumentBBLang
     static string GetEnumMemberHover(EnumMemberDefinition enumMember) => $"{enumMember.Identifier} = {enumMember.Value}";
     static string GetVariableHover(CompiledVariableDefinition variable) => $"(variable) {variable.Type} {variable.Identifier}";
     static string GetConstantHover(CompiledVariableConstant variable) => $"(constant) {variable.Type} {variable.Identifier}{(variable.Value.IsNull ? "" : $" = {variable.Value.ToStringValue()}")}";
-    static string GetParameterHover(CompiledParameter parameter) => $"(parameter){string.Join(null, parameter.Definition.Modifiers.Select(v => $"{v} "))}{parameter.Type} {parameter.Identifier}";
-    static string GetParameterHover(ParameterDefinition parameter) => $"(parameter){string.Join(null, parameter.Modifiers.Select(v => $"{v} "))}{parameter.Type} {parameter.Identifier}";
+    static string GetParameterHover(CompiledParameter parameter) => $"(parameter) {string.Join(null, parameter.Definition.Modifiers.Select(v => $"{v} "))}{parameter.Type} {parameter.Identifier}";
+    static string GetParameterHover(ParameterDefinition parameter) => $"(parameter) {string.Join(null, parameter.Modifiers.Select(v => $"{v} "))}{parameter.Type} {parameter.Identifier}";
     static string GetFieldHover(CompiledField field) => $"(field) {field.Type} {field.Identifier}";
     static string GetFieldHover(FieldDefinition field) => $"(field) {field.Type} {field.Identifier}";
 
@@ -89,6 +108,7 @@ sealed partial class DocumentBBLang
             case CompiledOperatorDefinition v: return GetFunctionHover(v, null);
             case CompiledFunctionDefinition v: return GetFunctionHover(v, null);
             case CompiledGeneralFunctionDefinition v: return GetFunctionHover(v, null);
+            case CompiledConstructorDefinition v: return GetFunctionHover(v, null);
             case CompiledVariableConstant v: return GetConstantHover(v);
             case CompiledVariableDefinition v: return GetVariableHover(v);
             case CompiledParameter v: return GetParameterHover(v);
@@ -355,8 +375,14 @@ sealed partial class DocumentBBLang
         if (typeHover is null
             && GetTypeInstanceAt(e.Position.ToCool(), true, out TypeInstance? typeInstance))
         {
-            range = typeInstance.Position.Range;
-            typeHover = GetTypeHover(typeInstance);
+            if (typeInstance is TypeInstanceSimple typeInstanceSimple)
+            {
+                if (typeInstanceSimple.CompiledType is not null)
+                {
+                    range = typeInstanceSimple.Position.Range;
+                    typeHover = GetTypeHover(typeInstanceSimple.CompiledType);
+                }
+            }
         }
 
         StringBuilder contents = new();

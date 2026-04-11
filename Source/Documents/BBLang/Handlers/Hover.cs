@@ -159,6 +159,7 @@ sealed partial class DocumentBBLang
                             AttributeConstants.ExposeIdentifier => "Marks the function as exposable, so it can be called from outside the interpreter",
                             AttributeConstants.ExternalIdentifier => "Marks the function as external, as it's implementation is defined outside the interpreter",
                             AttributeConstants.InternalType => "Marks the type as the default one for the specified kind of values",
+                            AttributeConstants.InternalIdentifier => "Marks this constant for use by the compiler for some internal stuff",
                             _ => null,
                         };
 
@@ -341,7 +342,7 @@ sealed partial class DocumentBBLang
                 }
                 else if (item is Expression statementWithValue && statementWithValue.CompiledType is not null)
                 {
-                    typeHover = statementWithValue.CompiledType.ToString();
+                    typeHover = GetTypeHover(statementWithValue.CompiledType);
                 }
 
                 if (item is IReferenceableTo referenceableTo)

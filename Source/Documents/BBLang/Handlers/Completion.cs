@@ -213,6 +213,16 @@ sealed partial class DocumentBBLang
                         }
                         break;
                     case AttributeConstants.InternalIdentifier:
+                        if (attribute.Parameters.Length >= 1
+                            && attribute.Parameters[0].Position.Range.Contains(p)
+                            && attribute.Parameters[0] is StringLiteralExpression)
+                        {
+                            result.AddRange(new CompletionItem()
+                            {
+                                Label = "heap_start",
+                                Kind = CompletionItemKind.Constant,
+                            });
+                        }
                         break;
                     case AttributeConstants.InternalType:
                         if (attribute.Parameters.Length >= 1

@@ -241,6 +241,7 @@ partial class DocumentBBLang
 
             static void CompileDiagnostic(Diagnostic diagnostic, Dictionary<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> diagnosticsPerFile, DiagnosticsLevel parentLevel = 0)
             {
+                Logger.Info(diagnostic.RelatedInformation.Length.ToString());
                 if (diagnostic is DiagnosticAt diagnosticWithPosition)
                 {
                     if (diagnosticWithPosition.File is null)
@@ -258,7 +259,13 @@ partial class DocumentBBLang
                         Range = diagnosticWithPosition.Position.ToOmniSharp(),
                         Message = GetFullMessage(diagnosticWithPosition, 0),
                         Source = diagnosticWithPosition.File.ToString(),
-                        RelatedInformation = diagnosticWithPosition.RelatedInformation
+                        RelatedInformation = Diagnostic.EnumerateAll(diagnostic)
+                            .Where(v =>
+                                v is not DiagnosticAt w
+                                || (w.Location.File == diagnosticWithPosition.Location.File
+                                    && w.Location.Position.Union(diagnosticWithPosition.Location.Position).Equals(diagnosticWithPosition.Location.Position)
+                                ))
+                            .SelectMany(v => v.RelatedInformation)
                             .OfType<DiagnosticRelatedInformationAt>()
                             .Select(v => new OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticRelatedInformation()
                             {

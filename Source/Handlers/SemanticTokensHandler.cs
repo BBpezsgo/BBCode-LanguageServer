@@ -1,7 +1,16 @@
-﻿namespace LanguageServer.Handlers;
+namespace LanguageServer.Handlers;
 
 sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 {
+    readonly SemanticTokensLegend Legend = new()
+    {
+        TokenModifiers = new Container<SemanticTokenModifier>(
+            SemanticTokenModifier.Defaults
+            .Append(new SemanticTokenModifier("meow"))
+        ),
+        TokenTypes = new Container<SemanticTokenType>(SemanticTokenType.Defaults),
+    };
+
     protected override Task Tokenize(SemanticTokensBuilder builder, ITextDocumentIdentifierParams identifier, CancellationToken cancellationToken)
     {
         Logger.Debug($"[Handler] SemanticTokens ({identifier.TextDocument})");
@@ -16,16 +25,12 @@ sealed class SemanticTokensHandler : SemanticTokensHandlerBase
     }
 
     protected override Task<SemanticTokensDocument> GetSemanticTokensDocument(ITextDocumentIdentifierParams @params, CancellationToken cancellationToken)
-        => Task.FromResult(new SemanticTokensDocument(RegistrationOptions.Legend));
+        => Task.FromResult(new SemanticTokensDocument(Legend));
 
     protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities) => new()
     {
         DocumentSelector = TextDocumentSelector.ForLanguage(LanguageCore.LanguageConstants.LanguageId),
-        Legend = new SemanticTokensLegend()
-        {
-            TokenModifiers = capability.TokenModifiers,
-            TokenTypes = capability.TokenTypes,
-        },
+        Legend = Legend,
         Full = new SemanticTokensCapabilityRequestFull()
         {
             Delta = true,

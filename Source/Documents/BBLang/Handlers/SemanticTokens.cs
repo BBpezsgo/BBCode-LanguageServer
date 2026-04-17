@@ -40,7 +40,7 @@ sealed partial class DocumentBBLang
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.TypeParameter, Array.Empty<SemanticTokenModifier>());
                     break;
                 case TokenAnalyzedType.Keyword:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Keyword, Array.Empty<SemanticTokenModifier>());
+                    //builder.Push(token.Position.Range.ToOmniSharp(), new SemanticTokenType("keyword"), new SemanticTokenModifier("meow"));
                     break;
                 case TokenAnalyzedType.FieldName:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Property, Array.Empty<SemanticTokenModifier>());
@@ -52,7 +52,7 @@ sealed partial class DocumentBBLang
                 case TokenAnalyzedType.Statement:
                     break;
                 case TokenAnalyzedType.BuiltinType:
-                    builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Keyword, Array.Empty<SemanticTokenModifier>());
+                    builder.Push(token.Position.Range.ToOmniSharp(), new SemanticTokenType("keyword"), new SemanticTokenModifier("meow"));
                     break;
                 case TokenAnalyzedType.MathOperator:
                     builder.Push(token.Position.Range.ToOmniSharp(), SemanticTokenType.Operator, Array.Empty<SemanticTokenModifier>());

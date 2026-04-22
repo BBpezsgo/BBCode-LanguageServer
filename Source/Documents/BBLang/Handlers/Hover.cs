@@ -36,7 +36,7 @@ sealed partial class DocumentBBLang
         builder.Append(GeneralType.TryInsertTypeParameters(function.Type, typeArguments) ?? function.Type);
         builder.Append(' ');
         builder.Append(function.Definition.Identifier.ToString());
-        if (function.Definition.Template != null)
+        if (function.Definition.Template is not null)
         {
             builder.Append('<');
             builder.AppendJoin(", ", typeArguments is not null ? function.Definition.Template.Parameters.Select(v => typeArguments[v.Content].ToString()) : function.Definition.Template.Parameters.Select(v => v.Content));

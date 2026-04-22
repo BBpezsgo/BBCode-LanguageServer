@@ -71,40 +71,29 @@ sealed partial class DocumentBBLang
             {
                 if (v.Identifier != functionCall.Identifier.Content) return false;
                 if (!v.Definition.CanUse(Uri)) return false;
-                if (methodArgumentTypes.Length > v.Parameters.Length) return false;
+                //if (methodArgumentTypes.Length > v.Parameters.Length) return false;
                 return true;
             });
 
-        if (functionCall.IsMethodCall)
+        if (functionCall.Object is not null)
         {
             Logger.Info($"Filtering extension functions ...");
 
             candidatesBuilder = candidatesBuilder.Where(v => v.Definition.IsExtension);
 
-            if (functionCall.Object is null)
-            {
-                Logger.Error($"Invalid method call (object is null)");
-            }
-
-            if (functionCall.Object?.Value.CompiledType is not null)
+            if (functionCall.Object.Value.CompiledType is not null)
             {
                 GeneralType passed = functionCall.Object.Value.CompiledType;
                 Logger.Info($"Filtering functions with `this` parameter and type `{passed}`");
                 candidatesBuilder = candidatesBuilder
                     .Where(v =>
-                    {
-                        GeneralType defined = v.Parameters[0].Type;
-
-                        if (defined.SameAs(passed)) return true;
-                        if (defined.SameAs(new PointerType(passed))) return true;
-                        if (defined.SameAs(new ReferenceType(passed))) return true;
-
-                        return false;
-                    });
+                        StatementCompiler.CanCastImplicitly(passed, v.Parameters[0].Type, out _)
+                        || StatementCompiler.CanCastImplicitly(new PointerType(passed), v.Parameters[0].Type, out _)
+                        || StatementCompiler.CanCastImplicitly(new ReferenceType(passed), v.Parameters[0].Type, out _));
             }
             else
             {
-                Logger.Warn($"Method call object type is null ({functionCall.Object?.Value})");
+                Logger.Warn($"Method call object type is null ({functionCall.Object.Value})");
             }
         }
 

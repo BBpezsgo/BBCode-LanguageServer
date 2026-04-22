@@ -319,12 +319,13 @@ sealed partial class DocumentBBLang
                         {
                             if (prevType.Is(out PointerType? pointerType2))
                             {
-                             prevType = pointerType2.To;
-                            checkTypes.Add(prevType);
-                            }else if (prevType.Is(out ReferenceType? referenceType2))
+                                prevType = pointerType2.To;
+                                checkTypes.Add(prevType);
+                            }
+                            else if (prevType.Is(out ReferenceType? referenceType2))
                             {
-                             prevType = referenceType2.To;
-                            checkTypes.Add(prevType);
+                                prevType = referenceType2.To;
+                                checkTypes.Add(prevType);
                             }
                             else
                             {
@@ -358,7 +359,7 @@ sealed partial class DocumentBBLang
                             if (!function.Definition.CanUse(Uri)) continue;
                             if (function.Parameters.Length <= 0) continue;
                             if (!function.Parameters[0].Definition.IsThis) continue;
-                            if (!function.Parameters[0].Type.SameAs(prevType)) continue;
+                            if (!StatementCompiler.CanCastImplicitly(prevType, function.Parameters[0].Type, out _)) continue;
 
                             if (!functionOverloads.TryGetValue(function.Identifier, out var overloads))
                             { overloads = functionOverloads[function.Identifier] = new(); }

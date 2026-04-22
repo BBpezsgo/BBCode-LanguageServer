@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
@@ -241,7 +242,6 @@ partial class DocumentBBLang
 
             static void CompileDiagnostic(Diagnostic diagnostic, Dictionary<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> diagnosticsPerFile, DiagnosticsLevel parentLevel = 0)
             {
-                Logger.Info(diagnostic.RelatedInformation.Length.ToString());
                 if (diagnostic is DiagnosticAt diagnosticWithPosition)
                 {
                     if (diagnosticWithPosition.File is null)
@@ -255,7 +255,15 @@ partial class DocumentBBLang
 
                     container.Add(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic()
                     {
-                        Severity = (parentLevel > diagnosticWithPosition.Level ? parentLevel : diagnosticWithPosition.Level).ToOmniSharp(),
+                        Severity = (parentLevel > diagnosticWithPosition.Level ? parentLevel : diagnosticWithPosition.Level) switch {
+                            DiagnosticsLevel.Error => DiagnosticSeverity.Error,
+                            DiagnosticsLevel.Warning => DiagnosticSeverity.Warning,
+                            DiagnosticsLevel.Information => DiagnosticSeverity.Information,
+                            DiagnosticsLevel.Hint => DiagnosticSeverity.Hint,
+                            DiagnosticsLevel.OptimizationNotice => DiagnosticSeverity.Information,
+                            DiagnosticsLevel.FailedOptimization => DiagnosticSeverity.Information,
+                            _ => throw new UnreachableException(),
+                        },
                         Range = diagnosticWithPosition.Position.ToOmniSharp(),
                         Message = GetFullMessage(diagnosticWithPosition, 0),
                         Source = diagnosticWithPosition.File.ToString(),

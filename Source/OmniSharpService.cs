@@ -56,6 +56,7 @@ sealed class OmniSharpService
            .WithHandler<DidChangeConfigurationHandler>()
            .WithHandler<DocumentHighlightHandler>()
            .WithHandler<DocumentSymbolHandler>()
+           .WithHandler<DocumentFormattingHandler>()
            .WithHandler<HoverHandler>()
            .WithHandler<ImplementationHandler>()
            .WithHandler<InlayHintsHandler>()
@@ -70,7 +71,7 @@ sealed class OmniSharpService
 
         options.OnInitialize((server, request, cancellationToken) =>
         {
-            if (request.Capabilities?.TextDocument != null)
+            if (request.Capabilities?.TextDocument is not null)
             {
                 request.Capabilities.TextDocument.SemanticTokens = new SemanticTokensCapability()
                 {

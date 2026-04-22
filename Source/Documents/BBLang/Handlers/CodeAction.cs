@@ -86,7 +86,17 @@ sealed partial class DocumentBBLang
             if (!statement.Location.Position.Range.Contains(range.Start)) return true;
             if (statement is CompiledFunctionCall compiledFunctionCall)
             {
-                CompiledFunction? f = CompilerResult.Functions.FirstOrDefault(v => v.Function == compiledFunctionCall.Function);
+                CompiledFunction? f = CompilerResult.Functions.FirstOrDefault(v => LanguageCore.Utils.ReferenceEquals(v.Function, compiledFunctionCall.Function.Template) && StatementCompiler.TypeArgumentsEquals(v.TypeArguments, compiledFunctionCall.Function.TypeArguments));
+
+                Logger.Trace(compiledFunctionCall.Function.Template);
+                Logger.Trace(compiledFunctionCall.Function.TypeArguments);
+                Logger.Trace(f);
+
+                foreach (var item in CompilerResult.Functions)
+                {
+                    Logger.Trace(item.TypeArguments);
+                }
+
                 if (f is not null && f.Function.Parameters.Length == compiledFunctionCall.Arguments.Length)
                 {
                     if (!visitedStatements.Add(statement)) return true;
@@ -100,10 +110,15 @@ sealed partial class DocumentBBLang
 
                     if (StatementCompiler.InlineFunction(f.Body, inlineContext, out CompiledStatement? inlined1, out DiagnosticAt? inlineError))
                     {
+                        Stringifier.Builder builder = new()
+                        {
+                            IndentLevel = compiledFunctionCall.Location.Position.Range.Start.Character / 4,
+                        };
+                        Stringifier.Stringify(inlined1, builder);
                         result.Add(new CodeAction()
                         {
                             Kind = CodeActionKind.RefactorInline,
-                            Title = "Inline function",
+                            Title = $"Inline {f.Function.ToReadable()}",
                             Edit = new WorkspaceEdit()
                             {
                                 Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>()
@@ -115,7 +130,7 @@ sealed partial class DocumentBBLang
                                             new()
                                             {
                                                 Range = compiledFunctionCall.Location.Position.Range.ToOmniSharp(),
-                                                NewText = inlined1.Stringify(0),
+                                                NewText = builder.ToString(),
                                             }
                                         }
                                     }

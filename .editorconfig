@@ -55,3 +55,6 @@ dotnet_diagnostic.VSTHRD200.severity = none
 
 # IDE0220: Add explicit cast
 dotnet_diagnostic.IDE0220.severity = error
+
+# IDE0005: Using directive is unnecessary.
+dotnet_diagnostic.IDE0005.severity = warning

@@ -36,8 +36,7 @@ sealed partial class DocumentBBLang
                         TargetUri = link.TargetUri,
                     });
                 }
-                else if (type.Is(out GenericType? genericType) &&
-                            genericType.Definition != null)
+                else if (type.Is(out GenericType? genericType) && genericType.Definition is not null)
                 {
                     links.Add(new LocationLink()
                     {
@@ -47,8 +46,7 @@ sealed partial class DocumentBBLang
                         TargetUri = DocumentUri,
                     });
                 }
-                else if (type is AliasType aliasType &&
-                            aliasType.Definition != null)
+                else if (type is AliasType aliasType && aliasType.Definition is not null)
                 {
                     links.Add(new LocationLink()
                     {
@@ -58,8 +56,7 @@ sealed partial class DocumentBBLang
                         TargetUri = aliasType.Definition.Definition.File,
                     });
                 }
-                else if (type is EnumType enumType &&
-                            enumType.Definition != null)
+                else if (type is EnumType enumType && enumType.Definition is not null)
                 {
                     links.Add(new LocationLink()
                     {

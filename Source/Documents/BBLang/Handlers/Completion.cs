@@ -11,7 +11,7 @@ sealed partial class DocumentBBLang
 {
     public override async Task<IEnumerable<CompletionItem>?> Completion(CompletionParams e, CancellationToken cancellationToken)
     {
-        await AwaitForCompilation(Version, cancellationToken).ConfigureAwait(false);
+        await AwaitForCompilation(Version, cancellationToken, false).ConfigureAwait(false);
 
         List<CompletionItem> result = new();
 
@@ -152,8 +152,6 @@ sealed partial class DocumentBBLang
             }
         }
 
-        Logger.Trace($"Completion {(e.Context is null ? "null" : $"{e.Context.TriggerKind} {e.Context.TriggerCharacter}")}");
-
         SinglePosition p = e.Position.ToCool();
 
         foreach (AttributeUsage? attribute in
@@ -291,106 +289,119 @@ sealed partial class DocumentBBLang
             return result;
         }
 
-        foreach (Statement statement in AST.EnumerateStatements().Where(v => v.Position.Range.Contains(p)))
+        foreach (Statement statement in AST.EnumerateStatements())
         {
-            Logger.Trace($"# {statement.GetType().Name} {statement}");
-
-            if (statement is AnyCallExpression anyCallExpression
-                && anyCallExpression.Expression is FieldExpression fieldExpression1)
-            {
-                Logger.Trace(fieldExpression1.Identifier.Position.Range);
-                Logger.Trace(p);
-                Logger.Trace($" -> {anyCallExpression.Expression.GetType().Name} {anyCallExpression.Expression}");
-            }
+            GeneralType? objectType = null;
 
             if (statement is FieldExpression fieldExpression
                 && fieldExpression.Identifier.Position.Range.Contains(p))
             {
                 if (fieldExpression.Object.CompiledType is not null)
                 {
-                    List<GeneralType> checkTypes = new();
-
-                    {
-                        GeneralType prevType = fieldExpression.Object.CompiledType;
-                        checkTypes.Add(new PointerType(prevType));
-                        checkTypes.Add(new ReferenceType(prevType));
-                        checkTypes.Add(prevType);
-                        while (true)
-                        {
-                            if (prevType.Is(out PointerType? pointerType2))
-                            {
-                                prevType = pointerType2.To;
-                                checkTypes.Add(prevType);
-                            }
-                            else if (prevType.Is(out ReferenceType? referenceType2))
-                            {
-                                prevType = referenceType2.To;
-                                checkTypes.Add(prevType);
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                    }
-
-                    Dictionary<string, List<(CompiledFunctionDefinition Function, ImmutableDictionary<string, GeneralType>? TypeArguments)>> functionOverloads = new();
-
-                    foreach (GeneralType prevType in checkTypes)
-                    {
-                        if (prevType.Is(out StructType? structType))
-                        {
-                            foreach (CompiledField field in structType.Struct.Fields)
-                            {
-                                result.Add(new CompletionItem()
-                                {
-                                    Kind = CompletionItemKind.Field,
-                                    Label = field.Identifier,
-                                    LabelDetails = new CompletionItemLabelDetails()
-                                    {
-                                        Description = GeneralType.TryInsertTypeParameters(field.Type, structType.TypeArguments).ToString(),
-                                    },
-                                });
-                            }
-                        }
-
-                        foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
-                        {
-                            if (!function.Definition.CanUse(Uri)) continue;
-                            if (function.Parameters.Length <= 0) continue;
-                            if (!function.Parameters[0].Definition.IsThis) continue;
-                            if (!StatementCompiler.CanCastImplicitly(prevType, function.Parameters[0].Type, out _)) continue;
-
-                            if (!functionOverloads.TryGetValue(function.Identifier, out var overloads))
-                            { overloads = functionOverloads[function.Identifier] = new(); }
-                            overloads.Add((function, (prevType.Is(out StructType? w) && function.Context == w.Struct) ? w.TypeArguments : null));
-                        }
-                    }
-
-                    foreach ((string function, var overloads) in functionOverloads)
-                    {
-                        result.Add(new CompletionItem()
-                        {
-                            Kind = CompletionItemKind.Function,
-                            Label = function,
-                            LabelDetails = new CompletionItemLabelDetails()
-                            {
-                                Description = overloads.Count switch
-                                {
-                                    0 => null,
-                                    1 => GeneralType.TryInsertTypeParameters(overloads[0].Function.Type, overloads[0].TypeArguments).ToString(),
-                                    _ => $"{overloads.Count} overloads",
-                                },
-                            },
-                        });
-                    }
-
-                    return result;
+                    objectType = fieldExpression.Object.CompiledType;
                 }
                 else
                 {
                     Logger.Warn($"Missing type on {fieldExpression.Object.GetType().Name} {fieldExpression.Object}");
                 }
+            }
+
+            if (statement is IdentifierExpression identifierExpression
+                && new Range<SinglePosition>(identifierExpression.Identifier.Position.Range.Start, identifierExpression.Identifier.Position.Range.End + 1).Contains(p)
+                && e.Context is not null
+                && e.Context.TriggerKind == CompletionTriggerKind.TriggerCharacter
+                && e.Context.TriggerCharacter == ".")
+            {
+                if (identifierExpression.CompiledType is not null)
+                {
+                    objectType = identifierExpression.CompiledType;
+                }
+                else
+                {
+                    Logger.Warn($"Missing type on {identifierExpression.GetType().Name} {identifierExpression}");
+                }
+            }
+
+            if (objectType is not null)
+            {
+                List<GeneralType> checkTypes = new();
+
+                {
+                    GeneralType prevType = objectType;
+                    checkTypes.Add(new PointerType(prevType));
+                    checkTypes.Add(new ReferenceType(prevType));
+                    checkTypes.Add(prevType);
+                    while (true)
+                    {
+                        if (prevType.Is(out PointerType? pointerType2))
+                        {
+                            prevType = pointerType2.To;
+                            checkTypes.Add(prevType);
+                        }
+                        else if (prevType.Is(out ReferenceType? referenceType2))
+                        {
+                            prevType = referenceType2.To;
+                            checkTypes.Add(prevType);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                Dictionary<string, List<(CompiledFunctionDefinition Function, ImmutableDictionary<string, GeneralType>? TypeArguments)>> functionOverloads = new();
+
+                foreach (GeneralType prevType in checkTypes)
+                {
+                    if (prevType.Is(out StructType? structType))
+                    {
+                        foreach (CompiledField field in structType.Struct.Fields)
+                        {
+                            result.Add(new CompletionItem()
+                            {
+                                Kind = CompletionItemKind.Field,
+                                Label = field.Identifier,
+                                LabelDetails = new CompletionItemLabelDetails()
+                                {
+                                    Description = GeneralType.TryInsertTypeParameters(field.Type, structType.TypeArguments).ToString(),
+                                },
+                            });
+                        }
+                    }
+
+                    foreach (CompiledFunctionDefinition function in CompilerResult.FunctionDefinitions)
+                    {
+                        if (!function.Definition.CanUse(Uri)) continue;
+                        if (function.Parameters.Length <= 0) continue;
+                        if (!function.Parameters[0].Definition.IsThis) continue;
+                        if (!StatementCompiler.CanCastImplicitly(prevType, function.Parameters[0].Type, out _)) continue;
+
+                        if (!functionOverloads.TryGetValue(function.Identifier, out var overloads))
+                        { overloads = functionOverloads[function.Identifier] = new(); }
+                        overloads.Add((function, (prevType.Is(out StructType? w) && function.Context == w.Struct) ? w.TypeArguments : null));
+                    }
+                }
+
+                foreach ((string function, var overloads) in functionOverloads)
+                {
+                    result.Add(new CompletionItem()
+                    {
+                        Kind = CompletionItemKind.Function,
+                        Label = function,
+                        LabelDetails = new CompletionItemLabelDetails()
+                        {
+                            Description = overloads.Count switch
+                            {
+                                0 => null,
+                                1 => GeneralType.TryInsertTypeParameters(overloads[0].Function.Type, overloads[0].TypeArguments).ToString(),
+                                _ => $"{overloads.Count} overloads",
+                            },
+                        },
+                    });
+                }
+
+                return result;
             }
 
             if (statement is NewInstanceExpression newInstanceExpression
@@ -400,7 +411,8 @@ sealed partial class DocumentBBLang
                 return result;
             }
 
-            if (statement is MissingExpression)
+            if (statement is MissingExpression
+                && statement.Position.Range.Contains(p))
             {
                 AddExpressionItems();
                 return result;

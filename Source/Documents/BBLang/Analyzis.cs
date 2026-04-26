@@ -10,6 +10,15 @@ using Diagnostic = LanguageCore.Diagnostic;
 
 namespace LanguageServer.DocumentManagers;
 
+enum CompilationReason
+{
+    None,
+    Unknown,
+    Saved,
+    Opened,
+    Requested,
+}
+
 partial class DocumentBBLang
 {
     static readonly Dictionary<Uri, CacheItem> Cache = new();
@@ -23,16 +32,17 @@ partial class DocumentBBLang
     Task? CompilationTask;
     DocumentVersion CompiledVersion;
     DocumentVersion CurrentlyCompilingVersion;
+    CompilationReason CompilationReason;
     DocumentVersion DesiredCompiledVersion;
 
-    void RequestCompilation(DocumentVersion? version) => RequestCompilation(version ?? DocumentVersion.Zero(0));
-    void RequestCompilation(DocumentVersion version)
+    void RequestCompilation(DocumentVersion? version, CompilationReason reason) => RequestCompilation(version ?? DocumentVersion.Zero(0), reason);
+    void RequestCompilation(DocumentVersion version, CompilationReason reason)
     {
         if (CompilationTask is not null && !CompilationTask.IsCompleted) return;
         if (CompiledVersion == version) return;
         if (DesiredCompiledVersion == version) return;
 
-        Logger.Debug($"Requesting compilation for {version}");
+        Logger.Debug($"Requesting compilation for {version} because of {reason}");
 
         DesiredCompiledVersion = version;
 
@@ -42,19 +52,26 @@ partial class DocumentBBLang
 
             if (CompiledVersion == DesiredCompiledVersion) return;
 
+            CompilationReason = reason;
             await CompileAsync().ConfigureAwait(false);
+            CompilationReason = CompilationReason.None;
 
             if (DesiredCompiledVersion != CompiledVersion)
             {
-                RequestCompilation(DesiredCompiledVersion);
+                RequestCompilation(DesiredCompiledVersion, reason);
             }
         });
     }
 
-    Task AwaitForCompilation(DocumentVersion? version, CancellationToken cancellationToken) => AwaitForCompilation(version ?? DocumentVersion.Zero(0), cancellationToken);
-    Task AwaitForCompilation(DocumentVersion version, CancellationToken cancellationToken)
+    Task AwaitForCompilation(DocumentVersion? version, CancellationToken cancellationToken, bool force = true) => AwaitForCompilation(version ?? DocumentVersion.Zero(0), cancellationToken, force);
+    Task AwaitForCompilation(DocumentVersion version, CancellationToken cancellationToken, bool force = true)
     {
-        RequestCompilation(version);
+        if (!force && (CompilationReason is CompilationReason.Requested or CompilationReason.None))
+        {
+            Logger.Trace($"Skipping validation");
+            return Task.CompletedTask;
+        }
+        RequestCompilation(version, CompilationReason.Requested);
         if (CompilationTask is null) return Task.CompletedTask;
         return CompilationTask.WaitAsync(cancellationToken);
     }

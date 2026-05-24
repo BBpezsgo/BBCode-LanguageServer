@@ -375,7 +375,7 @@ sealed partial class DocumentBBLang
                         if (!function.Definition.CanUse(Uri)) continue;
                         if (function.Parameters.Length <= 0) continue;
                         if (!function.Parameters[0].Definition.IsThis) continue;
-                        if (!StatementCompiler.CanCastImplicitly(prevType, function.Parameters[0].Type, out _)) continue;
+                        if (!StatementCompiler.CanCastImplicitly(prevType, function.Parameters[0].Type, out _, out _)) continue;
 
                         if (!functionOverloads.TryGetValue(function.Identifier, out var overloads))
                         { overloads = functionOverloads[function.Identifier] = new(); }

@@ -1,7 +1,6 @@
 using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
-using LanguageCore.Parser.Statements;
 using OmniSharpLocation = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 
 namespace LanguageServer.DocumentManagers;
@@ -15,10 +14,9 @@ sealed partial class DocumentBBLang
         SinglePosition p = e.Position.ToCool();
         List<OmniSharpLocation> result = new();
 
-        void AddReferences<T>(IReferenceable<T?> definition)
-            where T : IPositioned
+        void AddReferences(IReferenceable definition)
         {
-            foreach (Reference<T?> reference in definition.References.DistinctBy(v => v.SourceLocation))
+            foreach (Reference reference in definition.GetReferences().DistinctBy(v => v.SourceLocation))
             {
                 result.Add(reference.SourceLocation.ToOmniSharp());
             }

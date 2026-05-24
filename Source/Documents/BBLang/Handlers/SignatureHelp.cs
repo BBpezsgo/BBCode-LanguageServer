@@ -87,9 +87,9 @@ sealed partial class DocumentBBLang
                 Logger.Info($"Filtering functions with `this` parameter and type `{passed}`");
                 candidatesBuilder = candidatesBuilder
                     .Where(v =>
-                        StatementCompiler.CanCastImplicitly(passed, v.Parameters[0].Type, out _)
-                        || StatementCompiler.CanCastImplicitly(new PointerType(passed), v.Parameters[0].Type, out _)
-                        || StatementCompiler.CanCastImplicitly(new ReferenceType(passed), v.Parameters[0].Type, out _));
+                        StatementCompiler.CanCastImplicitly(passed, v.Parameters[0].Type, out _, out _)
+                        || StatementCompiler.CanCastImplicitly(new PointerType(passed), v.Parameters[0].Type, out _, out _)
+                        || StatementCompiler.CanCastImplicitly(new ReferenceType(passed), v.Parameters[0].Type, out _, out _));
             }
             else
             {

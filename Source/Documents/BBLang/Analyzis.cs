@@ -120,7 +120,7 @@ partial class DocumentBBLang
                     {
                         if (configurationPath.IsFile)
                         {
-                            foreach (string item in System.IO.Directory.EnumerateFiles(projectRoot.LocalPath, "*.bbc"))
+                            foreach (string item in System.IO.Directory.EnumerateFiles(projectRoot.LocalPath, "*.bbc", System.IO.SearchOption.AllDirectories))
                             {
                                 project.Files.Add(new Uri(item, UriKind.Absolute));
                             }
@@ -200,7 +200,7 @@ partial class DocumentBBLang
                         files = [Uri.ToString()];
                     }
 
-                    Logger.Debug($"  Compiling {string.Join(", ", files)}");
+                    Logger.Debug($"  Compiling:{string.Join(null, files.Select(v => $"\n   {v}"))}");
                     compilerResult = StatementCompiler.CompileFiles(files, compilerSettings, diagnostics);
                     Logger.Debug($"  Compiled");
                 }

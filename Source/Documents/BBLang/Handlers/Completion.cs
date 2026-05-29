@@ -292,18 +292,12 @@ sealed partial class DocumentBBLang
         foreach (Statement statement in AST.EnumerateStatements())
         {
             GeneralType? objectType = null;
+            Expression? objectExpression = null;
 
             if (statement is FieldExpression fieldExpression
                 && fieldExpression.Identifier.Position.Range.Contains(p))
             {
-                if (fieldExpression.Object.CompiledType is not null)
-                {
-                    objectType = fieldExpression.Object.CompiledType;
-                }
-                else
-                {
-                    Logger.Warn($"Missing type on {fieldExpression.Object.GetType().Name} {fieldExpression.Object}");
-                }
+                objectExpression = fieldExpression.Object;
             }
 
             if (statement is IdentifierExpression identifierExpression
@@ -312,13 +306,57 @@ sealed partial class DocumentBBLang
                 && e.Context.TriggerKind == CompletionTriggerKind.TriggerCharacter
                 && e.Context.TriggerCharacter == ".")
             {
-                if (identifierExpression.CompiledType is not null)
+                objectExpression = identifierExpression;
+            }
+
+            if (objectExpression is not null)
+            {
+                if (objectExpression is IdentifierExpression objectIdentifierExpression)
                 {
-                    objectType = identifierExpression.CompiledType;
+                    foreach (CompiledEnum enumDefinition in CompilerResult.Enums)
+                    {
+                        if (enumDefinition.Identifier != objectIdentifierExpression.Content) continue;
+                        if (!enumDefinition.Definition.CanUse(Uri)) continue;
+
+                        foreach (CompiledEnumMember enumMember in enumDefinition.Members)
+                        {
+                            result.Add(new CompletionItem()
+                            {
+                                Kind = CompletionItemKind.EnumMember,
+                                Label = enumMember.Identifier,
+                                LabelDetails = new CompletionItemLabelDetails()
+                                {
+                                    Detail = $" = {enumMember.Value}",
+                                },
+                            });
+                        }
+                        return result;
+                    }
+
+                    foreach (EnumDefinition enumDefinition in AST.EnumDefinitions)
+                    {
+                        if (enumDefinition.Identifier.Content != objectIdentifierExpression.Content) continue;
+                        if (!enumDefinition.CanUse(Uri)) continue;
+
+                        foreach (EnumMemberDefinition enumMember in enumDefinition.Members)
+                        {
+                            result.Add(new CompletionItem()
+                            {
+                                Kind = CompletionItemKind.EnumMember,
+                                Label = enumMember.Identifier.Content,
+                            });
+                        }
+                        return result;
+                    }
+                }
+
+                if (objectExpression.CompiledType is not null)
+                {
+                    objectType = objectExpression.CompiledType;
                 }
                 else
                 {
-                    Logger.Warn($"Missing type on {identifierExpression.GetType().Name} {identifierExpression}");
+                    Logger.Warn($"Missing type on {objectExpression.GetType().Name} {objectExpression}");
                 }
             }
 

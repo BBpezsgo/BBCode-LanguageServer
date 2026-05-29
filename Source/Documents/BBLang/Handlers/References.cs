@@ -16,6 +16,22 @@ sealed partial class DocumentBBLang
 
         void AddReferences(IReferenceable definition)
         {
+            switch (definition)
+            {
+                case CompiledVariableDefinition v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledFunctionDefinition v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledGeneralFunctionDefinition v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledOperatorDefinition v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledConstructorDefinition v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledAlias v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledEnum v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledEnumMember v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledField v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                case CompiledVariableConstant v: result.Add(new LanguageCore.Location(v.Definition.Identifier.Position, v.Definition.File).ToOmniSharp()); break;
+                default:
+                    Logger.Warn($"Reference definition not implemented: {definition.GetType().Name}");
+                    break;
+            }
             foreach (Reference reference in definition.GetReferences().DistinctBy(v => v.SourceLocation))
             {
                 result.Add(reference.SourceLocation.ToOmniSharp());
@@ -74,25 +90,21 @@ sealed partial class DocumentBBLang
         }
         else if (AST.GetStatementAt(p, out var statement))
         {
-            Logger.Info(statement);
+            Logger.Info($"{statement.GetType().Name} {statement}");
             if (statement is IReferenceableTo referenceableTo)
             {
-                Logger.Info(statement);
-                Logger.Info(referenceableTo.Reference);
-                switch (referenceableTo.Reference)
+                if (referenceableTo.Reference is IReferenceable referenceable)
                 {
-                    case CompiledConstructorDefinition referenceable:
-                        AddReferences(referenceable!);
-                        break;
-                    case StatementCompiler.FunctionQueryResult<CompiledFunctionDefinition> referenceable:
-                        AddReferences(referenceable.Function);
-                        break;
-                    case null:
-                        break;
-                    default:
-                        Logger.Warn($"Not implemented: `{referenceableTo.Reference?.GetType()}`");
-                        break;
+                    AddReferences(referenceable);
                 }
+                else if (referenceableTo.Reference is StatementCompiler.FunctionQueryResult<CompiledFunctionDefinition> v)
+                {
+                    AddReferences(v.Function);
+                }
+            }
+            else if (statement is IReferenceable referenceable)
+            {
+                AddReferences(referenceable);
             }
         }
 

@@ -104,7 +104,7 @@ sealed partial class DocumentBBLang
         {
             for (int i = 0; i < candidates.Length; i++)
             {
-                if (candidates[i] == call.Reference)
+                if (candidates[i] == call.Reference.Function)
                 {
                     activeSignature = i;
                     break;

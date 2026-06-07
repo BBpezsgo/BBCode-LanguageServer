@@ -56,7 +56,7 @@ sealed class OmniSharpService
            .WithHandler<DidChangeConfigurationHandler>()
            .WithHandler<DocumentHighlightHandler>()
            .WithHandler<DocumentSymbolHandler>()
-           //.WithHandler<DocumentFormattingHandler>()
+           .WithHandler<DocumentFormattingHandler>()
            .WithHandler<HoverHandler>()
            .WithHandler<ImplementationHandler>()
            .WithHandler<InlayHintsHandler>()

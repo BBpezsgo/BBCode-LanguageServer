@@ -14,7 +14,7 @@ sealed partial class DocumentBBLang
 
         List<CommandOrCodeAction> result = new();
 
-        var range = request.Range.ToCool();
+        Range<SinglePosition> range = request.Range.ToCool();
 
         if (AST.GetStatementAt(range.Start, out var statement))
         {
@@ -84,65 +84,58 @@ sealed partial class DocumentBBLang
         {
             if (statement.Location.File != Uri) return true;
             if (!statement.Location.Position.Range.Contains(range.Start)) return true;
-            if (statement is CompiledFunctionCall compiledFunctionCall)
+            if (statement is not CompiledFunctionCall compiledFunctionCall) return true;
+
+            CompiledFunction? f = CompilerResult.Functions.FirstOrDefault(v => LanguageCore.Utils.ReferenceEquals(v.Function, compiledFunctionCall.Function.Template) && StatementCompiler.TypeArgumentsEquals(v.TypeArguments, compiledFunctionCall.Function.TypeArguments));
+
+            if (f is null) return false;
+
+            Logger.Trace($"compiledFunctionCall: {compiledFunctionCall}");
+            Logger.Trace($"f: {f}");
+
+            if (f.Function.Parameters.Length != compiledFunctionCall.Arguments.Length) return true;
+            if (!visitedStatements.Add(statement)) return true;
+
+            StatementCompiler.InlineContext inlineContext = new()
             {
-                CompiledFunction? f = CompilerResult.Functions.FirstOrDefault(v => LanguageCore.Utils.ReferenceEquals(v.Function, compiledFunctionCall.Function.Template) && StatementCompiler.TypeArgumentsEquals(v.TypeArguments, compiledFunctionCall.Function.TypeArguments));
+                Arguments = f.Function.Parameters
+                    .Select((value, i) => (value.Identifier, compiledFunctionCall.Arguments[i]))
+                    .ToImmutableDictionary(v => v.Identifier, v => v.Item2),
+            };
 
-                Logger.Trace(compiledFunctionCall.Function.Template);
-                Logger.Trace(compiledFunctionCall.Function.TypeArguments);
-                Logger.Trace(f);
-
-                foreach (var item in CompilerResult.Functions)
+            if (StatementCompiler.InlineFunction(f.Body, inlineContext, out CompiledStatement? inlined1, out DiagnosticAt? inlineError))
+            {
+                Stringifier.Builder builder = new()
                 {
-                    Logger.Trace(item.TypeArguments);
-                }
-
-                if (f is not null && f.Function.Parameters.Length == compiledFunctionCall.Arguments.Length)
+                    IndentLevel = compiledFunctionCall.Location.Position.Range.Start.Character / 4,
+                };
+                Stringifier.Stringify(inlined1, builder);
+                result.Add(new CodeAction()
                 {
-                    if (!visitedStatements.Add(statement)) return true;
-
-                    StatementCompiler.InlineContext inlineContext = new()
+                    Kind = CodeActionKind.RefactorInline,
+                    Title = $"Inline {f.Function.ToReadable()}",
+                    Edit = new WorkspaceEdit()
                     {
-                        Arguments = f.Function.Parameters
-                            .Select((value, i) => (value.Identifier, compiledFunctionCall.Arguments[i]))
-                            .ToImmutableDictionary(v => v.Identifier, v => v.Item2),
-                    };
-
-                    if (StatementCompiler.InlineFunction(f.Body, inlineContext, out CompiledStatement? inlined1, out DiagnosticAt? inlineError))
-                    {
-                        Stringifier.Builder builder = new()
+                        Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>()
                         {
-                            IndentLevel = compiledFunctionCall.Location.Position.Range.Start.Character / 4,
-                        };
-                        Stringifier.Stringify(inlined1, builder);
-                        result.Add(new CodeAction()
-                        {
-                            Kind = CodeActionKind.RefactorInline,
-                            Title = $"Inline {f.Function.ToReadable()}",
-                            Edit = new WorkspaceEdit()
                             {
-                                Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>()
+                                Uri,
+                                new TextEdit[]
                                 {
+                                    new()
                                     {
-                                        Uri,
-                                        new TextEdit[]
-                                        {
-                                            new()
-                                            {
-                                                Range = compiledFunctionCall.Location.Position.Range.ToOmniSharp(),
-                                                NewText = builder.ToString(),
-                                            }
-                                        }
+                                        Range = compiledFunctionCall.Location.Position.Range.ToOmniSharp(),
+                                        NewText = builder.ToString(),
                                     }
                                 }
                             }
-                        });
+                        }
                     }
-                    else
-                    {
-                        Logger.Trace($"Failed to inline {f.ToReadable()}: {inlineError}");
-                    }
-                }
+                });
+            }
+            else
+            {
+                Logger.Trace($"Failed to inline {f.ToReadable()}: {inlineError}");
             }
             return true;
         });

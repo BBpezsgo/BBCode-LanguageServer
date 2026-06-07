@@ -347,7 +347,7 @@ sealed partial class DocumentBBLang
 
                 if (item is IReferenceableTo referenceableTo)
                 {
-                    Logger.Trace($"{referenceableTo.Reference?.GetType().Name ?? "null"} {referenceableTo.Reference}");
+                    //Logger.Trace($"{referenceableTo.Reference?.GetType().Name ?? "null"} {referenceableTo.Reference}");
                     definitionHover = GetDefinitionHover(referenceableTo.Reference);
                     if (referenceableTo.Reference is ILocated locatedReference)
                     {
@@ -356,7 +356,7 @@ sealed partial class DocumentBBLang
                 }
                 else
                 {
-                    Logger.Trace($"{item.GetType().Name} {item}");
+                    //Logger.Trace($"{item.GetType().Name} {item}");
                 }
             }
         }

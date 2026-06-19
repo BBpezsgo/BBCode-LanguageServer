@@ -158,18 +158,27 @@ partial class DocumentBBLang
 
             diagnostics.Clear();
 
+            List<ISourceProvider> sourceProviders = [Documents];
+            bool isPartialSource = false;
+
+            if (Uri.IsFile)
+            {
+                sourceProviders.Add(new FileSourceProvider()
+                {
+                    ExtraDirectories = config.ExtraDirectories,
+                });
+            }
+            else
+            {
+                isPartialSource = true;
+            }
+
             CompilerSettings compilerSettings = CompilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
             {
                 Optimizations = OptimizationSettings.None,
                 CompileEverything = true,
                 PreprocessorVariables = PreprocessorVariables.Normal,
-                SourceProviders = [
-                    Documents,
-                    new FileSourceProvider()
-                    {
-                        ExtraDirectories = config.ExtraDirectories,
-                    },
-                ],
+                SourceProviders = [.. sourceProviders],
                 AdditionalImports = config.AdditionalImports,
                 ExternalFunctions = config.ExternalFunctions.As<LanguageCore.Runtime.IExternalFunction>(),
                 ExternalConstants = config.ExternalConstants,
@@ -179,66 +188,50 @@ partial class DocumentBBLang
                 },
                 Cache = Cache,
                 OptimizationDiagnostics = true,
+                SourcePartiallyAvaliable = true,
             };
             HashSet<Uri> compiledFiles;
-            if (DocumentUri.Scheme == "file")
+            CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
+            try
             {
-                CompilerResult compilerResult = CompilerResult.MakeEmpty(Uri);
-                try
+                string[] files;
+                if (project is null)
                 {
-                    string[] files;
-                    if (project is null)
-                    {
-                        files = [.. Documents.OpenedDocuments.Select(v => v.Uri.ToString())];
-                    }
-                    else if (project.Configuration.IsProject)
-                    {
-                        files = [.. project.Files.Select(v => v.ToString())];
-                    }
-                    else
-                    {
-                        files = [Uri.ToString()];
-                    }
-
-                    Logger.Debug($"  Compiling:{string.Join(null, files.Select(v => $"\n   {v}"))}");
-                    compilerResult = StatementCompiler.CompileFiles(files, compilerSettings, diagnostics);
-                    Logger.Debug($"  Compiled");
+                    files = [.. Documents.OpenedDocuments.Select(v => v.Uri.ToString())];
                 }
-                catch (LanguageExceptionAt languageException)
+                else if (project.Configuration.IsProject)
                 {
-                    diagnostics.Add(languageException.ToDiagnostic());
+                    files = [.. project.Files.Select(v => v.ToString())];
                 }
-                catch (LanguageException languageException)
+                else
                 {
-                    diagnostics.Add(languageException.ToDiagnostic());
+                    files = [Uri.ToString()];
                 }
 
-                ParsedFile raw = compilerResult.RawTokens.FirstOrDefault(v => v.File == Uri);
-                if (raw.Index == null)
-                {
-                    Logger.Warn($"Compiled file not found");
-                }
-                Tokens = !raw.AST.Tokens.IsDefault ? raw.AST.Tokens : !raw.Tokens.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
-                AST = raw.AST.IsNotEmpty ? raw.AST : AST;
-                CompilerResult = compilerResult;
-
-                compiledFiles = new(compilerResult.RawTokens.Select(v => v.File));
-                Logger.Info($"Validated {CurrentlyCompilingVersion} ({(diagnostics.HasErrors ? "failed" : "ok")})");
+                Logger.Debug($"  Compiling:{string.Join(null, files.Select(v => $"\n   {v}"))}");
+                compilerResult = StatementCompiler.CompileFiles(files, compilerSettings, diagnostics, Logger.Instance);
+                Logger.Debug($"  Compiled");
             }
-            else if (Content is not null)
+            catch (LanguageExceptionAt languageException)
             {
-                TokenizerResult tokens = Tokenizer.Tokenize(Content, diagnostics, Uri, compilerSettings.PreprocessorVariables, compilerSettings.TokenizerSettings);
-                ParserResult ast = Parser.Parse(tokens.Tokens, Uri, diagnostics);
-                Tokens = !ast.Tokens.IsDefault ? ast.Tokens : !tokens.Tokens.IsDefault ? tokens.Tokens : ImmutableArray<Token>.Empty;
-                AST = ast.IsNotEmpty ? ast : AST;
-
-                compiledFiles = new() { Uri };
-                Logger.Info($"Validated {CurrentlyCompilingVersion} ({(diagnostics.HasErrors ? "failed" : "ok")}) (fallback)");
+                diagnostics.Add(languageException.ToDiagnostic());
             }
-            else
+            catch (LanguageException languageException)
             {
-                compiledFiles = new();
+                diagnostics.Add(languageException.ToDiagnostic());
             }
+
+            ParsedFile raw = compilerResult.RawTokens.FirstOrDefault(v => v.File == Uri);
+            if (raw.Index == null)
+            {
+                Logger.Warn($"Compiled file not found");
+            }
+            Tokens = !raw.AST.Tokens.IsDefault ? raw.AST.Tokens : !raw.Tokens.Tokens.IsDefault ? Tokens : ImmutableArray<Token>.Empty;
+            AST = raw.AST.IsNotEmpty ? raw.AST : AST;
+            CompilerResult = compilerResult;
+
+            compiledFiles = new(compilerResult.RawTokens.Select(v => v.File));
+            Logger.Info($"Validated {CurrentlyCompilingVersion} ({(diagnostics.HasErrors ? "failed" : "ok")})");
 
             foreach (Diagnostic item in diagnostics.DiagnosticsWithoutContext)
             {
@@ -257,8 +250,10 @@ partial class DocumentBBLang
                 return result;
             }
 
-            static void CompileDiagnostic(Diagnostic diagnostic, Dictionary<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> diagnosticsPerFile, DiagnosticsLevel parentLevel = 0)
+            void CompileDiagnostic(Diagnostic diagnostic, Dictionary<Uri, List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> diagnosticsPerFile, DiagnosticsLevel parentLevel = 0)
             {
+                if (diagnostic.IgnoreOnPartialSource && isPartialSource) return;
+
                 if (diagnostic is DiagnosticAt diagnosticWithPosition)
                 {
                     if (diagnosticWithPosition.File is null)
@@ -272,7 +267,8 @@ partial class DocumentBBLang
 
                     container.Add(new OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic()
                     {
-                        Severity = (parentLevel > diagnosticWithPosition.Level ? parentLevel : diagnosticWithPosition.Level) switch {
+                        Severity = (parentLevel > diagnosticWithPosition.Level ? parentLevel : diagnosticWithPosition.Level) switch
+                        {
                             DiagnosticsLevel.Error => DiagnosticSeverity.Error,
                             DiagnosticsLevel.Warning => DiagnosticSeverity.Warning,
                             DiagnosticsLevel.Information => DiagnosticSeverity.Information,

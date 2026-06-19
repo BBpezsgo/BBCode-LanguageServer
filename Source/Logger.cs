@@ -5,6 +5,8 @@ namespace LanguageServer;
 
 public class Logger : ILogger
 {
+    public static readonly Logger Instance = new();
+
     static string FormatMessage(object? message) => message switch
     {
         Exception ex => $"{ex.GetType().Name} {ex.Message}\n{ex.StackTrace}\n\n{FormatMessage(ex.InnerException)}".TrimEnd(),

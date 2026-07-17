@@ -50,6 +50,7 @@ sealed partial class DocumentBBLang
                 case TokenAnalyzedType.CompileTagParameter:
                     break;
                 case TokenAnalyzedType.Statement:
+                    builder.Push(token.Position.Range.ToOmniSharp(), new SemanticTokenType("keyword"), new SemanticTokenModifier("meow"));
                     break;
                 case TokenAnalyzedType.BuiltinType:
                     builder.Push(token.Position.Range.ToOmniSharp(), new SemanticTokenType("keyword"), new SemanticTokenModifier("meow"));
